@@ -1,0 +1,138 @@
+# ColorOS 16 优化配置文件
+# 配置文件位置: /storage/emulated/0/Android/coloros16_optimize_config.yaml
+# 修改配置后重启生效
+
+optimize_settings:
+  # ======================== 1. 日志系统优化 ========================
+  disable_logd:
+    enabled: true
+    description: "彻底禁用logd，永久封死复活"
+
+  # ======================== 2. OTA更新阻断 ========================
+  block_ota:
+    enabled: true
+    description: "彻底阻断OTA自动更新"
+    components:
+      - com.oplus.ota
+      - com.oplus.sau
+      - com.coloros.ota
+      - com.coloros.sau
+
+  # ======================== 3. 开发者选项锁定 ========================
+  lock_developer_options:
+    enabled: true
+    description: "锁定开发者选项不被系统重置"
+
+  # ======================== 4. 广告与数据收集屏蔽 ========================
+  block_ads_and_tracking:
+    enabled: true
+    description: "屏蔽冗余耗电服务、广告、数据收集"
+    system_props:
+      - persist.sys.oplus.ad_enable
+      - persist.sys.oplus.personalized_ad
+      - persist.ad.track
+      - persist.sys.usage_stat_enable
+      - persist.oppo.collect
+    packages:
+      - com.oplus.statistics.rom
+      - com.coloros.assistant
+      - com.coloros.assistantscreen
+      - com.coloros.sceneservice
+      - com.oplus.breeno
+
+  # ======================== 5. 内存/IO轻量优化 ========================
+  memory_io_optimization:
+    enabled: true
+    description: "内存/IO轻量优化（无副作用）"
+    kernel_params:
+      - path: "/proc/sys/kernel/sched_schedstats"
+        value: "0"
+      - path: "/sys/module/binder/parameters/debug_mask"
+        value: "0"
+      - path: "/proc/sys/vm/compact_unevictable_allowed"
+        value: "0"
+
+  # ======================== 7. 健康与运动服务 ========================
+  disable_health_services:
+    enabled: false
+    description: "禁用健康与运动服务（非必要后台服务）"
+    packages:
+      - com.oplus.healthservice
+      - com.oplus.sports
+
+  # ======================== 8. 流量监控与网络服务 ========================
+  disable_network_monitoring:
+    enabled: false
+    description: "禁用流量监控与网络服务（减少后台网络活动）"
+    packages:
+      - com.oplus.trafficmonitor
+      - com.oplus.dmp
+      - com.oplus.search
+
+  # ======================== 9. 锁屏杂志与壁纸服务 ========================
+  disable_lockscreen_magazine:
+    enabled: false
+    description: "禁用锁屏杂志与壁纸服务（节省存储和网络）"
+    packages:
+      - com.coloros.pictorial
+      - com.oplus.wallpaper
+    system_props:
+      - persist.sys.lockscreen_magazine
+
+  # ======================== 10. 游戏空间与性能监控 ========================
+  disable_gamespace:
+    enabled: false
+    description: "禁用游戏空间与性能监控（减少系统负载）"
+    packages:
+      - com.coloros.gamespace
+      - com.oplus.gamespace
+      - com.oplus.performance
+
+  # ======================== 11. 钱包与支付服务 ========================
+  disable_wallet_services:
+    enabled: false
+    description: "禁用钱包与支付相关服务（如不需要NFC支付）"
+    packages:
+      - com.coloros.wallet
+      - com.oplus.wallet
+      - com.nearme.atlas
+
+  # ======================== 12. 备份与云服务 ========================
+  disable_backup_services:
+    enabled: false
+    description: "禁用备份与云服务（如不需要自动备份）"
+    packages:
+      - com.coloros.backuprestore
+      - com.heytap.cloud
+
+  # ======================== 13. 额外内核优化 ========================
+  extra_kernel_optimization:
+    enabled: true
+    description: "额外内核优化参数"
+    kernel_params:
+      - path: "/proc/sys/kernel/printk"
+        value: "3 3 3 3"
+      - path: "/sys/kernel/mm/transparent_hugepage/enabled"
+        value: "never"
+
+  # ======================== 14. 进程查杀优化 ========================
+  kill_redundant_processes:
+    enabled: true
+    description: "核心冗余进程查杀"
+    processes:
+      - smartscene
+      - preload
+      - sysmonitor
+      - hotstart
+
+  # ======================== 15. 系统属性开关 ========================
+  system_prop_toggles:
+    enabled: true
+    description: "冗余服务开关锁定"
+    props:
+      - name: "persist.sys.preload"
+        value: "0"
+      - name: "persist.sys.monitor"
+        value: "0"
+      - name: "persist.sys.hotstart"
+        value: "0"
