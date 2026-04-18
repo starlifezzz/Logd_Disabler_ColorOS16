@@ -17,6 +17,233 @@
                 background-color: black;
             }
         }
+        
+        /* 固定头部 - 修复状态栏重叠问题 */
+        .fixed-header {
+            position: fixed;
+            top: var(--window-inset-top, 0px); /* 使用安全区域顶部内边距 */
+            left: 0;
+            right: 0;
+            background-color: #f5f5f5; /* 设置与页面背景一致的颜色 */
+            padding: 16px;
+            z-index: 1000;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        @media (prefers-color-scheme: dark) {
+            .fixed-header {
+                background-color: #1a1a1a; /* 暗色模式下的背景颜色 */
+                box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+            }
+        }
+
+        .header-title {
+            text-align: left;
+            margin: 0;
+            font-size: 20px;
+            font-weight: 600;
+            color: #1976d2;
+        }
+        
+        @media (prefers-color-scheme: dark) {
+            .header-title {
+                color: #90caf9;
+            }
+        }
+        
+        .header-author {
+            font-size: 12px;
+            color: #666;
+            margin-top: 4px;
+        }
+        
+        @media (prefers-color-scheme: dark) {
+            .header-author {
+                color: #aaa;
+            }
+        }
+        
+        /* 保存按钮在右上角 */
+        .save-button-top {
+            background: linear-gradient(135deg, #4CAF50, #3F51B5);
+            color: white;
+            border: none;
+            border-radius: 25px;
+            padding: 12px 24px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .save-button-top:hover:not(:disabled) {
+            background: linear-gradient(135deg, #3F51B5, #4CAF50);
+            box-shadow: 0 6px 12px rgba(0, 0, 0, 0.3);
+            transform: translateY(-2px);
+        }
+
+        .save-button-top:disabled {
+            background: linear-gradient(135deg, #CCCCCC, #AAAAAA);
+            cursor: not-allowed;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+            transform: none;
+        }
+
+        @media (prefers-color-scheme: dark) {
+            .save-button-top {
+                background: linear-gradient(135deg, #64FFDA, #6E7FFC);
+                color: #1A1A1A;
+                box-shadow: 0 4px 8px rgba(0, 0, 0, 0.4);
+            }
+
+            .save-button-top:hover:not(:disabled) {
+                background: linear-gradient(135deg, #6E7FFC, #64FFDA);
+                box-shadow: 0 6px 12px rgba(0, 0, 0, 0.5);
+            }
+
+            .save-button-top:disabled {
+                background: linear-gradient(135deg, #555555, #333333);
+                color: #888;
+                box-shadow: 0 2px 4px rgba(0, 0, 0, 0.4);
+            }
+        }
+        
+        /* 页面内容区域 - 调整顶部间距 */
+        .page-content {
+            margin-top: calc(90px + var(--window-inset-top, 0px)); /* 头部高度 + 状态栏高度 */
+            padding: 0 16px;
+        }
+        
+        /* 底部导航栏 - iOS 26 液态玻璃效果 */
+        .bottom-nav {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            display: flex;
+            justify-content: space-around;
+            align-items: center;
+            height: 70px;
+            background: rgba(255, 255, 255, 0.8);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            border-top: 1px solid rgba(255, 255, 255, 0.3);
+            box-shadow: 0 -2px 20px rgba(0,0,0,0.1);
+            z-index: 1000;
+        }
+        
+        @media (prefers-color-scheme: dark) {
+            .bottom-nav {
+                background: rgba(30, 30, 30, 0.8);
+                border-top-color: rgba(60, 60, 60, 0.3);
+                box-shadow: 0 -2px 20px rgba(0,0,0,0.3);
+            }
+        }
+        
+        .nav-item {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 12px 20px;
+            text-decoration: none;
+            color: #757575;
+            font-size: 12px;
+            transition: color 0.2s;
+            border-radius: 15px;
+            margin: 0 8px;
+        }
+        
+        .nav-item.active {
+            color: #1976d2;
+            font-weight: bold;
+            background: rgba(25, 118, 210, 0.1);
+        }
+        
+        @media (prefers-color-scheme: dark) {
+            .nav-item.active {
+                color: #90caf9;
+                background: rgba(144, 202, 249, 0.1);
+            }
+        }
+        
+        .nav-icon {
+            font-size: 22px;
+            margin-bottom: 4px;
+        }
+        
+        /* 错误消息 */
+        .error-message {
+            background-color: #ffebee;
+            color: #c62828;
+            padding: 12px;
+            border-radius: 10px;
+            margin-bottom: 16px;
+            border-left: 4px solid #c62828;
+            font-size: 14px;
+        }
+        
+        @media (prefers-color-scheme: dark) {
+            .error-message {
+                background-color: #2c1a1a;
+                color: #ef9a9a;
+                border-left-color: #ef9a9a;
+            }
+        }
+        
+        /* 验证结果项 */
+        .verification-item {
+            margin-bottom: 16px;
+            padding: 16px;
+            background-color: white;
+            border-radius: 12px;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.1);
+        }
+        
+        @media (prefers-color-scheme: dark) {
+            .verification-item {
+                background-color: #2d2d2d;
+                box-shadow: 0 2px 6px rgba(0,0,0,0.3);
+            }
+        }
+        
+        .verification-title {
+            font-size: 16px;
+            font-weight: 600;
+            margin-bottom: 12px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        
+        .status-success { color: #4caf50; }
+        .status-error { color: #f44336; }
+        .status-warning { color: #ff9800; }
+        
+        .verification-detail {
+            margin-left: 24px;
+            font-size: 14px;
+            line-height: 1.4;
+        }
+        
+        .verification-subitem {
+            margin-top: 8px;
+            padding-left: 16px;
+            border-left: 2px solid #e0e0e0;
+        }
+        
+        @media (prefers-color-scheme: dark) {
+            .verification-subitem {
+                border-left-color: #444;
+            }
+        }
     </style>
 </head>
 <body>
@@ -30,7 +257,6 @@
     </script>
     
     <script>
-        // 复制 Zygisk-Next 的核心 API 实现
         let callbackId = 0;
         function generateCallbackName(prefix) {
             return `${prefix}_callback_${Date.now()}_${callbackId++}`;
@@ -89,6 +315,110 @@
             } catch (error) {
                 console.error("Failed to set property:", key, value, error);
                 return false;
+            }
+        }
+        
+        // 检查进程是否运行 - 简化为直接使用ps方法，匹配手动测试
+        async function checkProcess(processName) {
+            try {
+                // 直接使用 ps 方法，与手动测试 'ps -A | grep -v grep | grep logd' 保持一致
+                const result = await executeShell(`ps -A | grep -v grep | grep "${processName}"`);
+                return result.stdout.trim() !== "";
+            } catch (error) {
+                console.error("Process check failed:", processName, error);
+                return false;
+            }
+        }
+        
+        // 检查包是否被禁用
+        async function checkPackageDisabled(packageName) {
+            try {
+                // 首先检查包是否存在
+                const listResult = await executeShell(`pm list packages --user 0 | grep "${packageName}"`);
+                if (listResult.stdout.trim() === "") {
+                    return "not_exists"; // 包不存在
+                }
+                
+                // 检查是否被禁用
+                const disabledResult = await executeShell(`pm list packages -d --user 0 | grep "${packageName}"`);
+                return disabledResult.stdout.trim() !== "";
+            } catch (error) {
+                return "error";
+            }
+        }
+        
+        // 检查内核参数
+        async function checkKernelParam(paramPath, expectedValue) {
+            try {
+                const result = await executeShell(`[ -f "${paramPath}" ] && cat "${paramPath}"`);
+                if (result.stdout.trim() === expectedValue) {
+                    return true;
+                }
+                return false;
+            } catch (error) {
+                return false;
+            }
+        }
+        
+        // 检查文件状态
+        async function checkFileStatus(filePath) {
+            try {
+                const existsResult = await executeShell(`[ -f "${filePath}" ] && echo "exists"`);
+                if (existsResult.stdout.trim() !== "exists") {
+                    return "not_exists";
+                }
+                
+                const executableResult = await executeShell(`[ -x "${filePath}" ] && echo "executable"`);
+                if (executableResult.stdout.trim() === "executable") {
+                    return "executable";
+                }
+                
+                return "exists_not_executable";
+            } catch (error) {
+                return "error";
+            }
+        }
+        
+        // 检查 SELinux 状态
+        async function checkSELinuxStatus() {
+            try {
+                const result = await executeShell("getenforce");
+                return result.stdout.trim();
+            } catch (error) {
+                return "unknown";
+            }
+        }
+        
+        // 检查 ZRAM 状态
+        async function checkZRAMStatus() {
+            try {
+                const disksizeResult = await executeShell('[ -f "/sys/block/zram0/disksize" ] && cat "/sys/block/zram0/disksize"');
+                const size = disksizeResult.stdout.trim();
+                if (size && /^\d+$/.test(size) && parseInt(size) > 0) {
+                    return Math.floor(parseInt(size) / 1024 / 1024) + " MB";
+                }
+                return "disabled";
+            } catch (error) {
+                return "error";
+            }
+        }
+        
+        // 检查 KernelSU 环境
+        async function checkRootEnvironment() {
+            try {
+                const ksuResult = await executeShell('[ -d "/data/adb/ksu" ] && echo "ksu"');
+                if (ksuResult.stdout.trim() === "ksu") {
+                    return "KernelSU";
+                }
+                
+                const magiskResult = await executeShell('[ -d "/data/adb/magisk" ] && echo "magisk"');
+                if (magiskResult.stdout.trim() === "magisk") {
+                    return "Magisk";
+                }
+                
+                return "unknown";
+            } catch (error) {
+                return "error";
             }
         }
         
@@ -199,6 +529,261 @@
             }
         ];
         
+        // 验证功能状态
+        async function verifyFunctionality() {
+            const results = {};
+            
+            // 1. 日志系统优化
+            results.disable_logd = {
+                title: "日志系统优化",
+                status: "checking",
+                details: []
+            };
+            
+            // 检查 logd 进程
+            const logdRunning = await checkProcess("logd");
+            if (!logdRunning) {
+                results.disable_logd.details.push({ name: "logd 进程", status: "success", message: "已停止" });
+            } else {
+                results.disable_logd.details.push({ name: "logd 进程", status: "error", message: "仍在运行" });
+            }
+            
+            // 检查 logd 文件
+            const logdFileStatus = await checkFileStatus("/system/bin/logd");
+            if (logdFileStatus === "exists_not_executable") {
+                results.disable_logd.details.push({ name: "logd 文件", status: "success", message: "已被挂载覆盖或禁用" });
+            } else if (logdFileStatus === "not_exists") {
+                // results.disable_logd.details.push({ name: "logd 文件", status: "warning", message: "文件不存在" });
+                results.disable_logd.details.push({ name: "logd 文件", status: "success", message: "文件不存在" });
+            } else {
+                results.disable_logd.details.push({ name: "logd 文件", status: "error", message: "仍可执行" });
+            }
+            
+            // 2. OTA更新阻断
+            results.block_ota = {
+                title: "OTA更新阻断",
+                status: "checking",
+                details: []
+            };
+            
+            const updateEngineRunning = await checkProcess("update_engine");
+            if (!updateEngineRunning) {
+                results.block_ota.details.push({ name: "update_engine 进程", status: "success", message: "已停止" });
+            } else {
+                results.block_ota.details.push({ name: "update_engine 进程", status: "error", message: "仍在运行" });
+            }
+            
+            // 检查 OTA 相关包
+            const otaPackages = ["com.oplus.ota", "com.oplus.sau"];
+            for (const pkg of otaPackages) {
+                const pkgStatus = await checkPackageDisabled(pkg);
+                if (pkgStatus === true) {
+                    results.block_ota.details.push({ name: pkg, status: "success", message: "已禁用" });
+                } else if (pkgStatus === "not_exists") {
+                    results.block_ota.details.push({ name: pkg, status: "warning", message: "包不存在" });
+                } else {
+                    results.block_ota.details.push({ name: pkg, status: "error", message: "未禁用" });
+                }
+            }
+            
+            // 检查系统属性
+            const otaProps = [
+                { prop: "persist.ota.auto_download", expected: "0" },
+                { prop: "persist.sys.recovery_update", expected: "0" }
+            ];
+            for (const propInfo of otaProps) {
+                const actual = await getSystemProperty(propInfo.prop, "");
+                if (actual === propInfo.expected) {
+                    results.block_ota.details.push({ name: propInfo.prop, status: "success", message: `正确 (${actual})` });
+                } else {
+                    results.block_ota.details.push({ name: propInfo.prop, status: "error", message: `错误 (期望: ${propInfo.expected}, 实际: ${actual})` });
+                }
+            }
+            
+            // 3. 开发者选项锁定
+            results.lock_developer_options = {
+                title: "开发者选项锁定",
+                status: "checking",
+                details: []
+            };
+            
+            const devLockProp = await getSystemProperty("persist.dev.option.lock", "");
+            if (devLockProp === "1") {
+                results.lock_developer_options.details.push({ name: "persist.dev.option.lock", status: "success", message: "正确 (1)" });
+            } else {
+                results.lock_developer_options.details.push({ name: "persist.dev.option.lock", status: "error", message: `错误 (期望: 1, 实际: ${devLockProp})` });
+            }
+            
+            // 4. 广告与数据收集屏蔽
+            results.block_ads_and_tracking = {
+                title: "广告与数据收集屏蔽",
+                status: "checking",
+                details: []
+            };
+            
+            const adPackages = ["com.oplus.statistics.rom", "com.coloros.assistant", "com.coloros.assistantscreen"];
+            for (const pkg of adPackages) {
+                const pkgStatus = await checkPackageDisabled(pkg);
+                if (pkgStatus === true) {
+                    results.block_ads_and_tracking.details.push({ name: pkg, status: "success", message: "已禁用" });
+                } else if (pkgStatus === "not_exists") {
+                    results.block_ads_and_tracking.details.push({ name: pkg, status: "warning", message: "包不存在" });
+                } else {
+                    results.block_ads_and_tracking.details.push({ name: pkg, status: "error", message: "未禁用" });
+                }
+            }
+            
+            const adProps = [
+                { prop: "persist.sys.oplus.ad_enable", expected: "0" },
+                { prop: "persist.sys.oplus.personalized_ad", expected: "0" },
+                { prop: "persist.ad.track", expected: "0" },
+                { prop: "persist.sys.usage_stat_enable", expected: "0" },
+                { prop: "persist.oppo.collect", expected: "0" }
+            ];
+            for (const propInfo of adProps) {
+                const actual = await getSystemProperty(propInfo.prop, "");
+                if (actual === propInfo.expected) {
+                    results.block_ads_and_tracking.details.push({ name: propInfo.prop, status: "success", message: `正确 (${actual})` });
+                } else {
+                    results.block_ads_and_tracking.details.push({ name: propInfo.prop, status: "error", message: `错误 (期望: ${propInfo.expected}, 实际: ${actual})` });
+                }
+            }
+            
+            // 5. 内存/IO优化
+            results.memory_io_optimization = {
+                title: "内存/IO优化",
+                status: "checking",
+                details: []
+            };
+            
+            const kernelParams = [
+                { path: "/proc/sys/kernel/sched_schedstats", expected: "0" },
+                { path: "/sys/module/binder/parameters/debug_mask", expected: "0" },
+                { path: "/proc/sys/vm/compact_unevictable_allowed", expected: "0" }
+            ];
+            for (const param of kernelParams) {
+                const isCorrect = await checkKernelParam(param.path, param.expected);
+                if (isCorrect) {
+                    results.memory_io_optimization.details.push({ name: param.path, status: "success", message: `正确 (${param.expected})` });
+                } else {
+                    results.memory_io_optimization.details.push({ name: param.path, status: "error", message: `错误 (期望: ${param.expected})` });
+                }
+            }
+            
+            // 6. 冗余进程状态
+            results.kill_redundant_processes = {
+                title: "冗余进程状态",
+                status: "checking",
+                details: []
+            };
+            
+            const redundantProcesses = ["smartscene", "preload", "sysmonitor", "hotstart"];
+            for (const proc of redundantProcesses) {
+                const isRunning = await checkProcess(proc);
+                if (!isRunning) {
+                    results.kill_redundant_processes.details.push({ name: proc, status: "success", message: "已停止" });
+                } else {
+                    results.kill_redundant_processes.details.push({ name: proc, status: "error", message: "仍在运行" });
+                }
+            }
+            
+            // 7. 健康服务状态
+            results.disable_health_services = {
+                title: "健康服务状态",
+                status: "checking",
+                details: []
+            };
+            
+            const healthPackages = ["com.oplus.healthservice", "com.oplus.sports"];
+            for (const pkg of healthPackages) {
+                const pkgStatus = await checkPackageDisabled(pkg);
+                if (pkgStatus === true) {
+                    results.disable_health_services.details.push({ name: pkg, status: "success", message: "已禁用" });
+                } else if (pkgStatus === "not_exists") {
+                    results.disable_health_services.details.push({ name: pkg, status: "warning", message: "包不存在" });
+                } else {
+                    results.disable_health_services.details.push({ name: pkg, status: "error", message: "未禁用" });
+                }
+            }
+            
+            // 8. SELinux 状态
+            results.selinux_status = {
+                title: "SELinux 状态",
+                status: "checking",
+                details: []
+            };
+            
+            const selinuxStatus = await checkSELinuxStatus();
+            if (selinuxStatus === "Permissive") {
+                results.selinux_status.details.push({ name: "SELinux", status: "success", message: "宽容模式" });
+            } else if (selinuxStatus === "Enforcing") {
+                results.selinux_status.details.push({ name: "SELinux", status: "warning", message: "强制模式 - 可能影响优化生效" });
+            } else {
+                results.selinux_status.details.push({ name: "SELinux", status: "error", message: `未知状态: ${selinuxStatus}` });
+            }
+            
+            // 9. ZRAM 状态
+            results.zram_status = {
+                title: "ZRAM/Swap 状态",
+                status: "checking",
+                details: []
+            };
+            
+            const zramStatus = await checkZRAMStatus();
+            if (zramStatus !== "disabled" && zramStatus !== "error") {
+                results.zram_status.details.push({ name: "ZRAM", status: "success", message: `已启用 (${zramStatus})` });
+            } else if (zramStatus === "disabled") {
+                results.zram_status.details.push({ name: "ZRAM", status: "warning", message: "未启用" });
+            } else {
+                results.zram_status.details.push({ name: "ZRAM", status: "error", message: "检测失败" });
+            }
+            
+            // 10. Root 环境
+            results.root_environment = {
+                title: "Root 环境",
+                status: "checking",
+                details: []
+            };
+            
+            const rootEnv = await checkRootEnvironment();
+            if (rootEnv === "KernelSU") {
+                results.root_environment.details.push({ name: "Root 管理器", status: "success", message: "KernelSU" });
+            } else if (rootEnv === "Magisk") {
+                results.root_environment.details.push({ name: "Root 管理器", status: "success", message: "Magisk" });
+            } else {
+                results.root_environment.details.push({ name: "Root 管理器", status: "error", message: "未检测到" });
+            }
+            
+            // 计算整体状态
+            for (const key in results) {
+                let hasError = false;
+                let hasWarning = false;
+                let allSuccess = true;
+                
+                for (const detail of results[key].details) {
+                    if (detail.status === "error") {
+                        hasError = true;
+                        allSuccess = false;
+                    } else if (detail.status === "warning") {
+                        hasWarning = true;
+                        allSuccess = false;
+                    }
+                }
+                
+                if (hasError) {
+                    results[key].status = "error";
+                } else if (hasWarning) {
+                    results[key].status = "warning";
+                } else if (allSuccess) {
+                    results[key].status = "success";
+                } else {
+                    results[key].status = "unknown";
+                }
+            }
+            
+            return results;
+        }
+        
         // 初始化应用
         async function initializeApp() {
             const appContainer = document.getElementById('app');
@@ -223,6 +808,9 @@
                     const loading = ref(true);
                     const saving = ref(false);
                     const errorMessage = ref('');
+                    const currentPage = ref('config'); // 'config' or 'verify'
+                    const verificationResults = ref({});
+                    const verifying = ref(false);
                     
                     // 计算属性：分离启用和禁用的选项
                     const enabledOptions = computed(() => 
@@ -282,6 +870,20 @@
                         }
                     };
                     
+                    // 验证功能
+                    const verifyFunctionalityUI = async () => {
+                        verifying.value = true;
+                        errorMessage.value = '';
+                        try {
+                            const results = await verifyFunctionality();
+                            verificationResults.value = results;
+                        } catch (error) {
+                            errorMessage.value = '验证功能时发生错误: ' + error.message;
+                        } finally {
+                            verifying.value = false;
+                        }
+                    };
+                    
                     onMounted(() => {
                         loadSettings();
                     });
@@ -293,66 +895,156 @@
                         errorMessage,
                         saveSettings,
                         enabledOptions,
-                        disabledOptions
+                        disabledOptions,
+                        currentPage,
+                        verificationResults,
+                        verifying,
+                        verifyFunctionalityUI
                     };
                 },
                 
                 template: `
-                    <div class="container">
-                        <h1>Logd Disabler for ColorOS16</h1>
-                        <div class="author-info">by zhangchongjie</div>
-                        
-                        <div v-if="loading" class="loading">
-                            <div class="spinner"></div>
-                            <p>加载中...</p>
+                    <div>
+                        <!-- 固定头部 -->
+                        <div class="fixed-header">
+                            <div>
+                                <h1 class="header-title">Logd Disabler for ColorOS16</h1>
+                                <div class="header-author">by zhangchongjie</div>
+                            </div>
+                            <button 
+                                v-if="currentPage === 'config'"
+                                @click="saveSettings" 
+                                :disabled="saving"
+                                class="save-button-top"
+                            >
+                                <span v-if="saving">保存中...</span>
+                                <span v-else>
+                                    <span class="restart-icon">🔄</span>
+                                    保存重启
+                                </span>
+                            </button>
                         </div>
                         
-                        <div v-else>
-                            <div v-if="errorMessage" class="error-message">
-                                {{ errorMessage }}
+                        <!-- 页面内容 -->
+                        <div class="page-content">
+                            <div v-if="currentPage === 'config'">
+                                <div v-if="loading" class="loading">
+                                    <div class="spinner"></div>
+                                    <p>加载中...</p>
+                                </div>
+                                
+                                <div v-else>
+                                    <div v-if="errorMessage" class="error-message">
+                                        {{ errorMessage }}
+                                    </div>
+                                    
+                                    <!-- 默认启用的选项 -->
+                                    <h2 class="section-title section-enabled">🟢 默认启用</h2>
+                                    <div class="setting-item setting-enabled" v-for="option in enabledOptions" :key="option.key">
+                                        <label>
+                                            <input 
+                                                type="checkbox" 
+                                                v-model="settings[option.key]"
+                                                :disabled="saving"
+                                            >
+                                            {{ option.name }}
+                                        </label>
+                                        <p class="description">{{ option.description }}</p>
+                                    </div>
+                                    
+                                    <!-- 默认禁用的选项 -->
+                                    <h2 class="section-title section-disabled">⚪ 默认禁用</h2>
+                                    <div class="setting-item setting-disabled" v-for="option in disabledOptions" :key="option.key">
+                                        <label>
+                                            <input 
+                                                type="checkbox" 
+                                                v-model="settings[option.key]"
+                                                :disabled="saving"
+                                            >
+                                            {{ option.name }}
+                                        </label>
+                                        <p class="description">{{ option.description }}</p>
+                                    </div>
+                                </div>
                             </div>
                             
-                            <!-- 默认启用的选项 -->
-                            <h2 class="section-title section-enabled">🟢 默认启用</h2>
-                            <div class="setting-item setting-enabled" v-for="option in enabledOptions" :key="option.key">
-                                <label>
-                                    <input 
-                                        type="checkbox" 
-                                        v-model="settings[option.key]"
-                                        :disabled="saving"
-                                    >
-                                    {{ option.name }}
-                                </label>
-                                <p class="description">{{ option.description }}</p>
+                            <div v-else-if="currentPage === 'verify'">
+                                <div v-if="verifying" class="loading">
+                                    <div class="spinner"></div>
+                                    <p>正在检测功能状态...</p>
+                                </div>
+                                
+                                <div v-else>
+                                    <div v-if="errorMessage" class="error-message">
+                                        {{ errorMessage }}
+                                    </div>
+                                    
+                                    <div v-if="Object.keys(verificationResults).length === 0" class="verification-item">
+                                        <p>点击下方按钮开始检测功能状态</p>
+                                    </div>
+                                    
+                                    <div v-for="(result, key) in verificationResults" :key="key" class="verification-item">
+                                        <div class="verification-title">
+                                            <span :class="{
+                                                'status-success': result.status === 'success',
+                                                'status-error': result.status === 'error',
+                                                'status-warning': result.status === 'warning'
+                                            }">
+                                                {{ result.status === 'success' ? '🟢' : result.status === 'error' ? '🔴' : '🟡' }}
+                                            </span>
+                                            {{ result.title }}
+                                        </div>
+                                        <div class="verification-detail" v-for="detail in result.details" :key="detail.name">
+                                            <div class="verification-subitem">
+                                                <strong>{{ detail.name }}:</strong> 
+                                                <span :class="{
+                                                    'status-success': detail.status === 'success',
+                                                    'status-error': detail.status === 'error',
+                                                    'status-warning': detail.status === 'warning'
+                                                }">
+                                                    {{ detail.message }}
+                                                </span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    
+                                    <div class="button-container">
+                                        <button 
+                                            @click="verifyFunctionalityUI" 
+                                            :disabled="verifying"
+                                            class="save-button"
+                                        >
+                                            <span v-if="verifying">检测中...</span>
+                                            <span v-else>
+                                                <span class="restart-icon">🔍</span>
+                                                重新检测功能状态
+                                            </span>
+                                        </button>
+                                    </div>
+                                </div>
                             </div>
-                            
-                            <!-- 默认禁用的选项 -->
-                            <h2 class="section-title section-disabled">⚪ 默认禁用</h2>
-                            <div class="setting-item setting-disabled" v-for="option in disabledOptions" :key="option.key">
-                                <label>
-                                    <input 
-                                        type="checkbox" 
-                                        v-model="settings[option.key]"
-                                        :disabled="saving"
-                                    >
-                                    {{ option.name }}
-                                </label>
-                                <p class="description">{{ option.description }}</p>
-                            </div>
-                            
-                            <div class="button-container">
-                                <button 
-                                    @click="saveSettings" 
-                                    :disabled="saving"
-                                    class="save-button"
-                                >
-                                    <span v-if="saving">保存中...</span>
-                                    <span v-else>
-                                        <span class="restart-icon">🔄</span>
-                                        保存设置并重启
-                                    </span>
-                                </button>
-                            </div>
+                        </div>
+                        
+                        <!-- 底部导航栏 -->
+                        <div class="bottom-nav">
+                            <a 
+                                href="#" 
+                                class="nav-item" 
+                                :class="{ active: currentPage === 'config' }"
+                                @click.prevent="currentPage = 'config'"
+                            >
+                                <div class="nav-icon">⚙️</div>
+                                <div>配置</div>
+                            </a>
+                            <a 
+                                href="#" 
+                                class="nav-item" 
+                                :class="{ active: currentPage === 'verify' }"
+                                @click.prevent="currentPage = 'verify'; verifyFunctionalityUI()"
+                            >
+                                <div class="nav-icon">✅</div>
+                                <div>验证</div>
+                            </a>
                         </div>
                     </div>
                 `
