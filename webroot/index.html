@@ -1,0 +1,373 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Logd Disabler for ColorOS16</title>
+    <link rel="stylesheet" href="assets/style.css">
+    <!-- Window Safe Area Insets -->
+    <link rel="stylesheet" type="text/css" href="/internal/insets.css" />
+    <style>
+        .root_layout {
+            padding-top: var(--window-inset-top);
+            padding-bottom: var(--window-inset-bottom);
+        }
+        @media (prefers-color-scheme: dark) {
+            body {
+                background-color: black;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div id="app"></div>
+    
+    <script>
+        // 兼容 apatch
+        if (window.apatch !== undefined && window.apatch.ksu === undefined) {
+            window.ksu = window.apatch;
+        }
+    </script>
+    
+    <script>
+        // 复制 Zygisk-Next 的核心 API 实现
+        let callbackId = 0;
+        function generateCallbackName(prefix) {
+            return `${prefix}_callback_${Date.now()}_${callbackId++}`;
+        }
+        
+        function execCommand(command, options = {}) {
+            return new Promise((resolve, reject) => {
+                const callbackName = generateCallbackName("exec");
+                window[callbackName] = (errno, stdout, stderr) => {
+                    resolve({ errno, stdout, stderr });
+                    delete window[callbackName];
+                };
+                
+                try {
+                    ksu.exec(command, JSON.stringify(options), callbackName);
+                } catch (error) {
+                    reject(error);
+                    delete window[callbackName];
+                }
+            });
+        }
+        
+        // 设置环境变量 PATH
+        const PATH_ENV = ["/system/bin", "/data/adb/ksu/bin", "/data/adb/modules/zygisksu/bin"].join(":");
+        const defaultOptions = { env: { PATH: PATH_ENV } };
+        
+        // 执行 shell 命令的封装
+        async function executeShell(command) {
+            try {
+                const result = await execCommand(`sh -c '${command}'`, defaultOptions);
+                return result;
+            } catch (error) {
+                return { errno: -1, stdout: "", stderr: error.toString() };
+            }
+        }
+        
+        // 获取系统属性
+        async function getSystemProperty(key, defaultValue = "false") {
+            try {
+                const result = await executeShell(`getprop ${key}`);
+                if (result.errno === 0) {
+                    return result.stdout.trim() || defaultValue;
+                }
+                return defaultValue;
+            } catch (error) {
+                console.error("Failed to get property:", key, error);
+                return defaultValue;
+            }
+        }
+        
+        // 设置系统属性
+        async function setSystemProperty(key, value) {
+            try {
+                const result = await executeShell(`setprop ${key} ${value}`);
+                return result.errno === 0;
+            } catch (error) {
+                console.error("Failed to set property:", key, value, error);
+                return false;
+            }
+        }
+        
+        // 检查 KernelSU API 是否可用
+        function isKsuAvailable() {
+            return typeof ksu !== 'undefined' && typeof ksu.exec === 'function';
+        }
+        
+        // 定义所有可配置的优化选项
+        const OPTIMIZATION_OPTIONS = [
+            {
+                key: 'disable_logd',
+                name: '禁用logd日志系统',
+                description: '彻底禁用logd，永久封死复活',
+                defaultValue: true,
+                category: 'enabled'
+            },
+            {
+                key: 'block_ota',
+                name: '阻断OTA自动更新',
+                description: '彻底阻断OTA自动更新',
+                defaultValue: true,
+                category: 'enabled'
+            },
+            {
+                key: 'lock_developer_options',
+                name: '锁定开发者选项',
+                description: '锁定开发者选项不被系统重置',
+                defaultValue: true,
+                category: 'enabled'
+            },
+            {
+                key: 'block_ads_and_tracking',
+                name: '屏蔽广告与数据收集',
+                description: '屏蔽冗余耗电服务、广告、数据收集',
+                defaultValue: true,
+                category: 'enabled'
+            },
+            {
+                key: 'memory_io_optimization',
+                name: '内存/IO轻量优化',
+                description: '内存/IO轻量优化（无副作用）',
+                defaultValue: true,
+                category: 'enabled'
+            },
+            {
+                key: 'extra_kernel_optimization',
+                name: '额外内核优化',
+                description: '额外内核优化参数',
+                defaultValue: true,
+                category: 'enabled'
+            },
+            {
+                key: 'kill_redundant_processes',
+                name: '进程查杀优化',
+                description: '核心冗余进程查杀',
+                defaultValue: true,
+                category: 'enabled'
+            },
+            {
+                key: 'system_prop_toggles',
+                name: '系统属性开关',
+                description: '冗余服务开关锁定',
+                defaultValue: true,
+                category: 'enabled'
+            },
+            {
+                key: 'disable_health_services',
+                name: '禁用健康服务',
+                description: '禁用健康与运动服务（非必要后台服务）',
+                defaultValue: false,
+                category: 'disabled'
+            },
+            {
+                key: 'disable_network_monitoring',
+                name: '禁用流量监控',
+                description: '禁用流量监控与网络服务（减少后台网络活动）',
+                defaultValue: false,
+                category: 'disabled'
+            },
+            {
+                key: 'disable_lockscreen_magazine',
+                name: '禁用锁屏杂志',
+                description: '禁用锁屏杂志与壁纸服务（节省存储和网络）',
+                defaultValue: false,
+                category: 'disabled'
+            },
+            {
+                key: 'disable_gamespace',
+                name: '禁用游戏空间',
+                description: '禁用游戏空间与性能监控（减少系统负载）',
+                defaultValue: false,
+                category: 'disabled'
+            },
+            {
+                key: 'disable_wallet_services',
+                name: '禁用钱包服务',
+                description: '禁用钱包与支付相关服务（如不需要NFC支付）',
+                defaultValue: false,
+                category: 'disabled'
+            },
+            {
+                key: 'disable_backup_services',
+                name: '禁用备份服务',
+                description: '禁用备份与云服务（如不需要自动备份）',
+                defaultValue: false,
+                category: 'disabled'
+            }
+        ];
+        
+        // 初始化应用
+        async function initializeApp() {
+            const appContainer = document.getElementById('app');
+            
+            if (!isKsuAvailable()) {
+                appContainer.innerHTML = `
+                    <div style="padding: 20px; text-align: center;">
+                        <h2>❌ KernelSU API 不可用</h2>
+                        <p>请确保您已正确安装 KernelSU 并授予此模块权限。</p>
+                        <p>如果问题持续存在，请检查您的 KernelSU 版本。</p>
+                    </div>
+                `;
+                return;
+            }
+            
+            // 创建 Vue 应用
+            const { createApp, ref, onMounted, computed } = Vue;
+            
+            const app = createApp({
+                setup() {
+                    const settings = ref({});
+                    const loading = ref(true);
+                    const saving = ref(false);
+                    const errorMessage = ref('');
+                    
+                    // 计算属性：分离启用和禁用的选项
+                    const enabledOptions = computed(() => 
+                        OPTIMIZATION_OPTIONS.filter(option => option.category === 'enabled')
+                    );
+                    
+                    const disabledOptions = computed(() => 
+                        OPTIMIZATION_OPTIONS.filter(option => option.category === 'disabled')
+                    );
+                    
+                    // 加载当前设置
+                    const loadSettings = async () => {
+                        try {
+                            const newSettings = {};
+                            for (const option of OPTIMIZATION_OPTIONS) {
+                                const propKey = `persist.sys.coloros16_optimize_gui.${option.key}`;
+                                const value = await getSystemProperty(propKey, option.defaultValue ? 'true' : 'false');
+                                newSettings[option.key] = value === 'true';
+                            }
+                            settings.value = newSettings;
+                        } catch (error) {
+                            errorMessage.value = '加载设置失败: ' + error.message;
+                        } finally {
+                            loading.value = false;
+                        }
+                    };
+                    
+                    // 保存设置
+                    const saveSettings = async () => {
+                        if (saving.value) return;
+                        
+                        saving.value = true;
+                        errorMessage.value = '';
+                        
+                        try {
+                            let allSuccess = true;
+                            for (const option of OPTIMIZATION_OPTIONS) {
+                                const propKey = `persist.sys.coloros16_optimize_gui.${option.key}`;
+                                const value = settings.value[option.key] ? 'true' : 'false';
+                                const success = await setSystemProperty(propKey, value);
+                                if (!success) {
+                                    allSuccess = false;
+                                }
+                            }
+                            
+                            if (allSuccess) {
+                                alert('✅ 设置已保存成功！\n\n设备将在几秒后自动重启以应用更改。\n\n如果未自动重启，请手动重启设备。');
+                                // 触发重启
+                                await executeShell('reboot');
+                            } else {
+                                errorMessage.value = '❌ 保存设置失败，请重试。';
+                            }
+                        } catch (error) {
+                            errorMessage.value = '❌ 保存设置时发生错误: ' + error.message;
+                        } finally {
+                            saving.value = false;
+                        }
+                    };
+                    
+                    onMounted(() => {
+                        loadSettings();
+                    });
+                    
+                    return {
+                        settings,
+                        loading,
+                        saving,
+                        errorMessage,
+                        saveSettings,
+                        enabledOptions,
+                        disabledOptions
+                    };
+                },
+                
+                template: `
+                    <div class="container">
+                        <h1>Logd Disabler for ColorOS16</h1>
+                        <div class="author-info">by zhangchongjie</div>
+                        
+                        <div v-if="loading" class="loading">
+                            <div class="spinner"></div>
+                            <p>加载中...</p>
+                        </div>
+                        
+                        <div v-else>
+                            <div v-if="errorMessage" class="error-message">
+                                {{ errorMessage }}
+                            </div>
+                            
+                            <!-- 默认启用的选项 -->
+                            <h2 class="section-title section-enabled">🟢 默认启用</h2>
+                            <div class="setting-item setting-enabled" v-for="option in enabledOptions" :key="option.key">
+                                <label>
+                                    <input 
+                                        type="checkbox" 
+                                        v-model="settings[option.key]"
+                                        :disabled="saving"
+                                    >
+                                    {{ option.name }}
+                                </label>
+                                <p class="description">{{ option.description }}</p>
+                            </div>
+                            
+                            <!-- 默认禁用的选项 -->
+                            <h2 class="section-title section-disabled">⚪ 默认禁用</h2>
+                            <div class="setting-item setting-disabled" v-for="option in disabledOptions" :key="option.key">
+                                <label>
+                                    <input 
+                                        type="checkbox" 
+                                        v-model="settings[option.key]"
+                                        :disabled="saving"
+                                    >
+                                    {{ option.name }}
+                                </label>
+                                <p class="description">{{ option.description }}</p>
+                            </div>
+                            
+                            <div class="button-container">
+                                <button 
+                                    @click="saveSettings" 
+                                    :disabled="saving"
+                                    class="save-button"
+                                >
+                                    <span v-if="saving">保存中...</span>
+                                    <span v-else>
+                                        <span class="restart-icon">🔄</span>
+                                        保存设置并重启
+                                    </span>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                `
+            });
+            
+            app.mount('#app');
+        }
+    </script>
+    
+    <!-- 引入本地 Vue.js 文件 -->
+    <script src="assets/vue.global.prod.js"></script>
+    
+    <script>
+        // 现在 Vue 已经通过 script 标签加载，直接初始化应用
+        initializeApp();
+    </script>
+</body>
+</html>
