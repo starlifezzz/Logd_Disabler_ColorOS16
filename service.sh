@@ -27,6 +27,38 @@ get_ksu_setting() {
     fi
 }
 
+# 更新YAML配置文件中的单个配置项
+update_yaml_config_item() {
+    local section="$1"
+    local new_value="$2"
+    local config_file="$3"
+    
+    # 创建临时文件
+    local temp_file="${config_file}.tmp"
+    
+    # 复制原文件到临时文件
+    cp "$config_file" "$temp_file"
+    
+    # 使用更可靠的sed命令更新配置项
+    # 先删除原有的enabled行，再插入新的
+    sed -i "/^[[:space:]]*$section:/,/^[[:space:]]*[^[:space:]]/{
+        /^[[:space:]]*enabled:/d
+    }" "$temp_file"
+    
+    # 在section后插入新的enabled行
+    sed -i "/^[[:space:]]*$section:/a \    enabled: $new_value" "$temp_file"
+    
+    # 验证临时文件是否有效，然后替换原文件
+    if [ -f "$temp_file" ] && [ -s "$temp_file" ]; then
+        mv "$temp_file" "$config_file"
+        chmod 644 "$config_file"
+        log_info "Updated $section to $new_value"
+    else
+        log_info "Failed to update $section, keeping original config"
+        rm -f "$temp_file"
+    fi
+}
+
 # 从KernelSU UI设置更新YAML配置
 update_config_from_ksu_ui() {
     log_info "Updating config from KernelSU UI settings"
@@ -47,21 +79,21 @@ update_config_from_ksu_ui() {
     local wallet_services=$(get_ksu_setting "disable_wallet_services" "false")
     local backup_services=$(get_ksu_setting "disable_backup_services" "false")
     
-    # 更新YAML配置文件
-    sed -i "s/^\([[:space:]]*enabled:[[:space:]]*\)true/\1$disable_logd/" "$CONFIG_FILE"
-    sed -i "s/^\([[:space:]]*enabled:[[:space:]]*\)true/\1$block_ota/" "$CONFIG_FILE"
-    sed -i "s/^\([[:space:]]*enabled:[[:space:]]*\)true/\1$lock_dev_options/" "$CONFIG_FILE"
-    sed -i "s/^\([[:space:]]*enabled:[[:space:]]*\)true/\1$block_ads/" "$CONFIG_FILE"
-    sed -i "s/^\([[:space:]]*enabled:[[:space:]]*\)true/\1$mem_io_opt/" "$CONFIG_FILE"
-    sed -i "s/^\([[:space:]]*enabled:[[:space:]]*\)true/\1$extra_kernel/" "$CONFIG_FILE"
-    sed -i "s/^\([[:space:]]*enabled:[[:space:]]*\)true/\1$kill_procs/" "$CONFIG_FILE"
-    sed -i "s/^\([[:space:]]*enabled:[[:space:]]*\)true/\1$sys_props/" "$CONFIG_FILE"
-    sed -i "s/^\([[:space:]]*enabled:[[:space:]]*\)false/\1$health_services/" "$CONFIG_FILE"
-    sed -i "s/^\([[:space:]]*enabled:[[:space:]]*\)false/\1$net_monitor/" "$CONFIG_FILE"
-    sed -i "s/^\([[:space:]]*enabled:[[:space:]]*\)false/\1$lockscreen_mag/" "$CONFIG_FILE"
-    sed -i "s/^\([[:space:]]*enabled:[[:space:]]*\)false/\1$gamespace/" "$CONFIG_FILE"
-    sed -i "s/^\([[:space:]]*enabled:[[:space:]]*\)false/\1$wallet_services/" "$CONFIG_FILE"
-    sed -i "s/^\([[:space:]]*enabled:[[:space:]]*\)false/\1$backup_services/" "$CONFIG_FILE"
+    # 更新YAML配置文件 - 使用更可靠的方法
+    update_yaml_config_item "disable_logd" "$disable_logd" "$CONFIG_FILE"
+    update_yaml_config_item "block_ota" "$block_ota" "$CONFIG_FILE"
+    update_yaml_config_item "lock_developer_options" "$lock_dev_options" "$CONFIG_FILE"
+    update_yaml_config_item "block_ads_and_tracking" "$block_ads" "$CONFIG_FILE"
+    update_yaml_config_item "memory_io_optimization" "$mem_io_opt" "$CONFIG_FILE"
+    update_yaml_config_item "extra_kernel_optimization" "$extra_kernel" "$CONFIG_FILE"
+    update_yaml_config_item "kill_redundant_processes" "$kill_procs" "$CONFIG_FILE"
+    update_yaml_config_item "system_prop_toggles" "$sys_props" "$CONFIG_FILE"
+    update_yaml_config_item "disable_health_services" "$health_services" "$CONFIG_FILE"
+    update_yaml_config_item "disable_network_monitoring" "$net_monitor" "$CONFIG_FILE"
+    update_yaml_config_item "disable_lockscreen_magazine" "$lockscreen_mag" "$CONFIG_FILE"
+    update_yaml_config_item "disable_gamespace" "$gamespace" "$CONFIG_FILE"
+    update_yaml_config_item "disable_wallet_services" "$wallet_services" "$CONFIG_FILE"
+    update_yaml_config_item "disable_backup_services" "$backup_services" "$CONFIG_FILE"
 }
 
 # 创建或使用配置文件，并从UI设置更新
@@ -74,6 +106,7 @@ create_config_with_ui_sync() {
             chmod 644 "$CONFIG_FILE" 2>/dev/null
         else
             log_info "Failed to create configuration"
+            return 1
         fi
     else
         log_info "Using existing configuration: $CONFIG_FILE"
