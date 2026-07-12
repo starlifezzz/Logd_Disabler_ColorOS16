@@ -1,16 +1,19 @@
 #!/system/bin/sh
-# ColorOS16 优化模块 - 自定义脚本
-# 在模块安装时自动设置脚本执行权限
+SKIPUNZIP=1
 
-MODDIR=${0%/*}
+ui_print "- 正在解压模块文件..."
+unzip -o "$ZIPFILE" -x 'META-INF/*' -d "$MODPATH" >&2
 
-# 为所有脚本文件添加执行权限
-chmod +x "$MODDIR"/*.sh
+ui_print "- 设置脚本执行权限..."
+set_perm_recursive "$MODPATH" 0 0 0755 0644
+set_perm "$MODPATH/post-fs-data.sh" 0 0 0755
+set_perm "$MODPATH/service.sh" 0 0 0755
+set_perm "$MODPATH/boot-completed.sh" 0 0 0755
+set_perm "$MODPATH/get_status_json.sh" 0 0 0755
 
-# 确保配置文件存在
-if [ ! -f "$MODDIR/system/etc/coloros16_optimize_config.yaml" ]; then
-    # 如果需要复制默认配置，可以在这里添加逻辑
-    echo "Default config file not found, skipping..."
+ui_print "- 检测系统环境..."
+if ! grep -qE "ColorOS|oplus|OnePlus" /system/build.prop /system_ext/build.prop /vendor/build.prop 2>/dev/null; then
+    abort "❌ 错误：此模块仅适用于 ColorOS / OnePlus (OPPO) 设备！"
 fi
 
-echo "ColorOS16 optimization module permissions set successfully"
+ui_print "✅ 安装完成！请在 KernelSU 管理器中打开 WebUI 进行配置。"
