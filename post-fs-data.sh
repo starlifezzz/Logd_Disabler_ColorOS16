@@ -1,108 +1,167 @@
 #!/system/bin/sh
-# ColorOS 16 优化模块 - YAML配置驱动
-# 开机早期post-fs-data安全窗口执行，零系统修改，卸载即完全复原
+# ================================================================
+# ColorOS16 优化模块 - post-fs-data 阶段脚本
+# 执行时机：data 分区挂载后、系统服务启动前
+# ================================================================
 
 MODDIR=${0%/*}
+PROP_PREFIX="persist.sys.coloros16_optimize_gui."
+WORK_DIR="/data/adb/logd_disabler"
+LOG_FILE="$WORK_DIR/post-fs-data.log"
 
-# 函数：获取KernelSU UI设置的系统属性值
-get_ksu_setting() {
-    local key="$1"
-    local default="$2"
-    local prop_key="persist.sys.coloros16_optimize_gui.$key"
-    local value=$(getprop "$prop_key")
-    if [ -n "$value" ]; then
-        echo "$value"
-    else
-        echo "$default"
-    fi
+mkdir -p "$WORK_DIR"
+
+log() {
+    echo "[$(date '+%Y-%m-%d %H:%M:%S')] $1" >> "$LOG_FILE"
 }
-post-fs-data.sh
-# ======================== 1. 彻底禁用logd，永久封死复活 ========================
-if [ "$(get_ksu_setting "disable_logd" "false")" = "true" ]; then
-    [ -f '/system/bin/logd' ] && mount -o bind /dev/null /system/bin/logd
-    killall -9 logd 2>/dev/null
-    setprop persist.logd.enable 0
+
+log "========== post-fs-data.sh 开始执行 =========="
+
+# 创建 dummy 文件（用于 mount bind 覆盖二进制）
+DUMMY="$WORK_DIR/dummy"
+if [ ! -f "$DUMMY" ]; then
+    touch "$DUMMY"
+    chmod 755 "$DUMMY"
+    log "创建 dummy 文件"
 fi
 
-# ======================== 2. 彻底阻断OTA自动更新 ========================
-if [ "$(get_ksu_setting "block_ota" "false")" = "true" ]; then
-    [ -f '/system/bin/update_engine' ] && mount -o bind /dev/null /system/bin/update_engine
-    pkill -9 update_engine 2>/dev/null
+# ===================== Logd 禁用 =====================
+# 必须在 post-fs-data 阶段做 mount 覆盖，因为 service 阶段 logd 已经在跑了
+if [ "$(getprop ${PROP_PREFIX}disable_logd)" = "true" ]; then
+    log "[Logd] 开始 mount 覆盖..."
+
+    # 覆盖 logd 相关二进制文件
+    for bin in logd logcat logpersist.start logpersist.stop logtagd; do
+        TARGET="/system/bin/$bin"
+        if [ -f "$TARGET" ]; then
+            mount -o bind "$DUMMY" "$TARGET" 2>/dev/null
+            if [ $? -eq 0 ]; then
+                log "  ✅ 覆盖成功: $TARGET"
+            else
+                log "  ❌ 覆盖失败: $TARGET (尝试其他方法)"
+                # 备用方案：直接清空文件内容（如果 /system 可写）
+                cp "$DUMMY" "$TARGET" 2>/dev/null
+            fi
+        fi
+    done
+
+    # 同样覆盖 /system/xbin 下的（某些 ColorOS 版本放在这里）
+    for bin in logd logcat; do
+        TARGET="/system/xbin/$bin"
+        if [ -f "$TARGET" ]; then
+            mount -o bind "$DUMMY" "$TARGET" 2>/dev/null
+            log "  覆盖 xbin: $TARGET"
+        fi
+    done
+
+    # 禁用 logpersist（ColorOS16 的持久化日志）
+    setprop logd.logpersistd "" 2>/dev/null
+    setprop logd.logpersistd.enable false 2>/dev/null
+    setprop persist.logd.disabled 1
+
+    log "[Logd] mount 覆盖完成"
+else
+    log "[Logd] 未启用，跳过"
+fi
+
+# ===================== OTA 阻断 =====================
+if [ "$(getprop ${PROP_PREFIX}block_ota)" = "true" ]; then
+    log "[OTA] 开始 mount 覆盖..."
+
+    for bin in update_engine update_engine_client; do
+        TARGET="/system/bin/$bin"
+        if [ -f "$TARGET" ]; then
+            mount -o bind "$DUMMY" "$TARGET" 2>/dev/null
+            if [ $? -eq 0 ]; then
+                log "  ✅ 覆盖成功: $TARGET"
+            else
+                log "  ❌ 覆盖失败: $TARGET"
+            fi
+        fi
+    done
+
+    # 覆盖 OTA 相关 APK 的 odex（防止 dex2oat 后仍能运行）
+    for apk_dir in /system/app/OTA /system/priv-app/OTA /system/app/OplusOTA /system/priv-app/OplusOTA; do
+        if [ -d "$apk_dir" ]; then
+            mount -o bind "$DUMMY" "$apk_dir" 2>/dev/null
+            log "  覆盖 OTA 目录: $apk_dir"
+        fi
+    done
+
+    # 清除 OTA 缓存
+    rm -rf /data/data/com.oplus.ota/cache/* 2>/dev/null
+    rm -rf /data/data/com.coloros.ota/cache/* 2>/dev/null
+    rm -rf /data/ota_package/* 2>/dev/null
+
+    setprop persist.sys.ota.disabled 1
     setprop persist.ota.auto_download 0
-    setprop persist.sys.recovery_update 0
-    setprop persist.sys.coupdate 0
-    rm -rf /data/ota_package /cache/ota 2>/dev/null
+
+    log "[OTA] 覆盖完成"
+else
+    log "[OTA] 未启用，跳过"
 fi
 
-# ======================== 3. 锁定开发者选项不被系统重置 ========================
-if [ "$(get_ksu_setting "lock_developer_options" "false")" = "true" ]; then
-    settings put --user 0 global development_settings_enabled 1
-    settings put --user 0 global adb_enabled 1
-    setprop persist.dev.option.lock 1
-fi
+# ===================== 内核参数优化 =====================
+# post-fs-data 阶段写入内核参数（此时不会被系统服务覆盖）
 
-# ======================== 4. 屏蔽冗余耗电服务、广告、数据收集 ========================
-# 核心冗余进程查杀
-if [ "$(get_ksu_setting "kill_redundant_processes" "false")" = "true" ]; then
-    pkill -9 smartscene preload sysmonitor hotstart 2>/dev/null
-fi
+# 内存/IO 优化（始终执行）
+log "[Kernel] 写入内核参数..."
 
-# 【新增】彻底关闭系统广告总开关
-if [ "$(get_ksu_setting "block_ads_and_tracking" "false")" = "true" ]; then
-    setprop persist.sys.oplus.ad_enable 0
-    setprop persist.sys.oplus.personalized_ad 0
-    setprop persist.ad.track 0
-    # 【新增】彻底关死用户体验计划/数据统计
-    setprop persist.sys.usage_stat_enable 0
-    setprop persist.oppo.collect 0
-    # 冗余服务开关锁定
-    setprop persist.sys.preload 0
-    setprop persist.sys.monitor 0
-    setprop persist.sys.hotstart 0
-fi
+# sched_schedstats: 关闭调度统计，减少内核开销
+echo 0 > /proc/sys/kernel/sched_schedstats 2>/dev/null
+log "  sched_schedstats=$(cat /proc/sys/kernel/sched_schedstats 2>/dev/null)"
 
-# ======================== 5. 内存/IO轻量优化（无副作用） ========================
-if [ "$(get_ksu_setting "memory_io_optimization" "false")" = "true" ]; then
-    # 尝试设置内存/IO优化参数
-    if [ -w '/proc/sys/kernel/sched_schedstats' ]; then
-        echo 0 > /proc/sys/kernel/sched_schedstats 2>/dev/null || true
-    fi
-    if [ -w '/sys/module/binder/parameters/debug_mask' ]; then
-        echo 0 > /sys/module/binder/parameters/debug_mask 2>/dev/null || true
-    fi
-    if [ -w '/proc/sys/vm/compact_unevictable_allowed' ]; then
-        echo 0 > /proc/sys/vm/compact_unevictable_allowed 2>/dev/null || true
-    fi
-fi
+# binder debug_mask: 关闭 binder 调试
+echo 0 > /sys/module/binder/parameters/debug_mask 2>/dev/null
+log "  binder debug_mask=$(cat /sys/module/binder/parameters/debug_mask 2>/dev/null)"
 
-# ======================== 6. 额外内核优化参数 ========================
-if [ "$(get_ksu_setting "extra_kernel_optimization" "false")" = "true" ]; then
-    # 减少内核调试开销 - 使用更宽松的匹配
-    if [ -w '/proc/sys/kernel/printk' ]; then
-        # 先读取当前值，只修改需要的部分
-        current_printk=$(cat /proc/sys/kernel/printk 2>/dev/null)
-        if [ -n "$current_printk" ]; then
-            # 期望: console_loglevel=3, default_message_loglevel=3, minimum_console_loglevel=3, default_console_loglevel=3
-            # 实际格式可能是: "4\t3\t1\t7" 或类似
-            echo "3 3 1 3" > /proc/sys/kernel/printk 2>/dev/null || true
+# compact_unevictable_allowed: 禁止压缩不可回收页
+echo 0 > /proc/sys/vm/compact_unevictable_allowed 2>/dev/null
+log "  compact_unevictable=$(cat /proc/sys/vm/compact_unevictable_allowed 2>/dev/null)"
+
+# printk: 强制写入，多次写入确保第一个值也生效
+echo "3 3 3 3" > /proc/sys/kernel/printk 2>/dev/null
+# 单独写 console_loglevel（第一个值）
+echo 3 > /proc/sys/kernel/printk_console_loglevel 2>/dev/null
+# 通过 sysctl 方式再写一次
+setprop persist.sys.kernel.printk "3 3 3 3" 2>/dev/null
+# 最终验证
+CURRENT_PRINTK=$(cat /proc/sys/kernel/printk 2>/dev/null)
+log "  printk=$CURRENT_PRINTK"
+
+# 透明大页: 禁用（某些内核需要写多次或用不同路径）
+echo never > /sys/kernel/mm/transparent_hugepage/enabled 2>/dev/null
+echo never > /sys/kernel/mm/transparent_hugepage/defrag 2>/dev/null
+# 备用路径（某些 ColorOS 内核用这个）
+echo never > /sys/kernel/mm/transparent_hugepage/khugepaged/defrag 2>/dev/null
+# 通过内核 cmdline 属性备份
+setprop persist.sys.thp.enabled never 2>/dev/null
+CURRENT_THP=$(cat /sys/kernel/mm/transparent_hugepage/enabled 2>/dev/null)
+log "  thp=$CURRENT_THP"
+
+# swappiness
+echo 30 > /proc/sys/vm/swappiness 2>/dev/null
+log "  swappiness=$(cat /proc/sys/vm/swappiness 2>/dev/null)"
+
+# dirty ratio
+echo 10 > /proc/sys/vm/dirty_ratio 2>/dev/null
+echo 5 > /proc/sys/vm/dirty_background_ratio 2>/dev/null
+log "  dirty_ratio=$(cat /proc/sys/vm/dirty_ratio 2>/dev/null)"
+
+# vfs_cache_pressure
+echo 50 > /proc/sys/vm/vfs_cache_pressure 2>/dev/null
+log "  vfs_cache_pressure=$(cat /proc/sys/vm/vfs_cache_pressure 2>/dev/null)"
+
+# IO 调度器
+for queue in /sys/block/sd*/queue/scheduler /sys/block/ufs*/queue/scheduler /sys/block/dm-*/queue/scheduler; do
+    if [ -f "$queue" ]; then
+        if grep -q "mq-deadline" "$queue" 2>/dev/null; then
+            echo "mq-deadline" > "$queue" 2>/dev/null
+        elif grep -q "none" "$queue" 2>/dev/null; then
+            echo "none" > "$queue" 2>/dev/null
         fi
     fi
-    # 禁用透明大页（减少内存碎片）
-    if [ -w '/sys/kernel/mm/transparent_hugepage/enabled' ]; then
-        echo "never" > /sys/kernel/mm/transparent_hugepage/enabled 2>/dev/null || true
-    fi
-fi
+done
+log "  IO scheduler done"
 
-# ======================== 7. 关闭 Oplus DCS 后台监控（节省电量，避免后台频繁唤醒） ========================
-# 这个功能没有对应的UI开关，始终执行
-setprop persist.oplus.dcs.enable 0
-
-# ======================== 8. 新增功能支持 ========================
-# AI智能助手服务 - 系统属性部分（如果有相关属性）
-# 语音助手服务 - 系统属性部分（如果有相关属性）  
-# 主题服务 - 系统属性部分（如果有相关属性）
-# 网络优化服务 - 系统属性部分（如果有相关属性）
-# 安全服务 - 系统属性部分（如果有相关属性）
-# 多媒体服务 - 系统属性部分（如果有相关属性）
-# 系统工具服务 - 系统属性部分（如果有相关属性）
-# 注：以上新功能主要通过pm disable实现，在service.sh中处理
+log "========== post-fs-data.sh 执行完毕 =========="

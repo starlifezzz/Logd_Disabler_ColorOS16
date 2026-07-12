@@ -16,12 +16,10 @@ echo ""
 get_ksu_setting() {
     local key="$1"
     local default="$2"
-    # KernelSU UI设置存储为系统属性 persist.sys.<module_id>.<key>
     local value=$(getprop "persist.sys.coloros16_optimize_gui.$key")
     if [ -z "$value" ]; then
         echo "$default"
     else
-        # 正确解析布尔值
         if [ "$value" = "true" ] || [ "$value" = "1" ]; then
             echo "true"
         elif [ "$value" = "false" ] || [ "$value" = "0" ]; then
@@ -35,50 +33,37 @@ get_ksu_setting() {
 # 函数：检查进程是否运行
 check_process() {
     process_name="$1"
-    # 使用多种方法检测进程
     if pgrep -f "$process_name" > /dev/null 2>&1; then
         echo "  🔴 正在运行"
         return 0
     fi
-    
-    # 额外检查：使用pidof
     if pidof "$process_name" > /dev/null 2>&1; then
-        echo "  🔴 正在运行"  
+        echo "  🔴 正在运行"
         return 0
     fi
-    
-    # 额外检查：使用ps（针对logd特殊情况）
     if [ "$process_name" = "logd" ]; then
         if ps -A | grep -v grep | grep -q 'logd'; then
             echo "  🔴 正在运行"
             return 0
         fi
     fi
-    
     echo "  🟢 已停止"
     return 1
 }
 
-# 函数：检查包状态并对比用户配置（统一使用"已优化"/"未优化"）
+# 函数：检查包状态并对比用户配置
 check_package_with_config() {
     local package="$1"
     local config_key="$2"
-    
-    # 检查用户配置
     local user_enabled=$(get_ksu_setting "$config_key" "false")
-    
-    # 检查包是否存在
     if pm list packages --user 0 2>/dev/null | grep -qF "package:$package"; then
-        # 包存在，检查是否被禁用
         if pm list packages -d --user 0 2>/dev/null | grep -qF "package:$package"; then
-            # 包被禁用
             if [ "$user_enabled" = "true" ]; then
                 echo "  🟢 已优化"
             else
                 echo "  🔴 已优化（应为未优化）"
             fi
         else
-            # 包未被禁用
             if [ "$user_enabled" = "true" ]; then
                 echo "  🔴 未优化（与用户设置冲突）"
             else
@@ -86,7 +71,6 @@ check_package_with_config() {
             fi
         fi
     else
-        # 包不存在
         if [ "$user_enabled" = "true" ]; then
             echo "  ⚠️  未优化（包不存在）"
         else
@@ -100,20 +84,15 @@ check_system_prop_with_config() {
     local prop="$1"
     local expected_value="$2"
     local config_key="$3"
-    
-    # 检查用户配置
     local user_enabled=$(get_ksu_setting "$config_key" "false")
-    
     actual_value=$(getprop "$prop")
     if [ "$actual_value" = "$expected_value" ]; then
-        # 属性值正确
         if [ "$user_enabled" = "true" ]; then
             echo "  🟢 已优化"
         else
             echo "  🔴 已优化（应为未优化）"
         fi
     else
-        # 属性值错误
         if [ "$user_enabled" = "true" ]; then
             echo "  🔴 未优化（期望: $expected_value, 实际: $actual_value）"
         else
@@ -122,26 +101,21 @@ check_system_prop_with_config() {
     fi
 }
 
-# 函数：检查内核参数状态并对比用户配置
+# 函数：检查内核参数状态并对比用户配置（严格匹配）
 check_kernel_param_with_config() {
     local param_path="$1"
     local expected_value="$2"
     local config_key="$3"
-    
-    # 检查用户配置
     local user_enabled=$(get_ksu_setting "$config_key" "false")
-    
     if [ -f "$param_path" ]; then
         actual_value=$(cat "$param_path" 2>/dev/null)
         if [ "$actual_value" = "$expected_value" ]; then
-            # 参数值正确
             if [ "$user_enabled" = "true" ]; then
                 echo "  🟢 已优化"
             else
                 echo "  🔴 已优化（应为未优化）"
             fi
         else
-            # 参数值错误
             if [ "$user_enabled" = "true" ]; then
                 echo "  🔴 未优化（期望: $expected_value, 实际: $actual_value）"
             else
@@ -149,7 +123,6 @@ check_kernel_param_with_config() {
             fi
         fi
     else
-        # 参数文件不存在
         if [ "$user_enabled" = "true" ]; then
             echo "  ⚠️  未优化（参数文件不存在）"
         else
@@ -170,16 +143,13 @@ echo "   logd 进程状态:"
 check_process "logd"
 echo "   logd 文件状态:"
 if [ -f "/system/bin/logd" ]; then
-    # 检查是否被挂载覆盖
     if [ -L "/system/bin/logd" ] || [ ! -x "/system/bin/logd" ]; then
         echo "  🟢 已被挂载覆盖或禁用"
     else
-        # 检查文件大小（被挂载为/dev/null时大小为0）
         file_size=$(stat -c %s "/system/bin/logd" 2>/dev/null)
         if [ "$file_size" = "0" ]; then
             echo "  🟢 文件已被清空或挂载覆盖"
         else
-            # 检查文件权限
             file_perms=$(stat -c %a "/system/bin/logd" 2>/dev/null)
             if [ "$file_perms" = "000" ]; then
                 echo "  🟢 文件权限已被禁用"
@@ -266,8 +236,56 @@ else
     echo "   用户设置: 🔴 未启用"
 fi
 echo "   内核参数状态:"
-check_kernel_param_with_config "/proc/sys/kernel/printk" "3 3 3 3" "extra_kernel_optimization"
-check_kernel_param_with_config "/sys/kernel/mm/transparent_hugepage/enabled" "never" "extra_kernel_optimization"
+
+# --- printk 专用检测（处理 tab/空格 差异 + 内核锁定第一个值） ---
+printk_path="/proc/sys/kernel/printk"
+if [ -f "$printk_path" ]; then
+    actual_printk=$(cat "$printk_path" 2>/dev/null)
+    # 把所有 tab 替换为空格，然后合并多个空格为一个
+    normalized_printk=$(echo "$actual_printk" | tr '\t' ' ' | tr -s ' ')
+    # 提取第2、3、4个值（第1个值 console_loglevel 可能被内核强制锁定）
+    printk_v2=$(echo "$normalized_printk" | awk '{print $2}')
+    printk_v3=$(echo "$normalized_printk" | awk '{print $3}')
+    printk_v4=$(echo "$normalized_printk" | awk '{print $4}')
+    if [ "$extra_kernel_enabled" = "true" ]; then
+        if [ "$printk_v2" = "3" ] && [ "$printk_v3" = "3" ] && [ "$printk_v4" = "3" ]; then
+            echo "  🟢 已优化 (printk=$normalized_printk)"
+        else
+            echo "  🔴 未优化（期望: x 3 3 3, 实际: $normalized_printk）"
+        fi
+    else
+        echo "  🟢 未优化 (printk=$normalized_printk)"
+    fi
+else
+    if [ "$extra_kernel_enabled" = "true" ]; then
+        echo "  ⚠️  未优化（参数文件不存在）"
+    else
+        echo "  🟢 未优化（参数文件不存在）"
+    fi
+fi
+
+# --- THP 专用检测（正确处理 [never] 格式） ---
+thp_path="/sys/kernel/mm/transparent_hugepage/enabled"
+if [ -f "$thp_path" ]; then
+    actual_thp=$(cat "$thp_path" 2>/dev/null)
+    if [ "$extra_kernel_enabled" = "true" ]; then
+        # 内核输出格式为 "always [madvise] never" 或 "always madvise [never]"
+        # 方括号内的才是当前选中值
+        if echo "$actual_thp" | grep -q '\[never\]'; then
+            echo "  🟢 已优化 (THP=$actual_thp)"
+        else
+            echo "  🔴 未优化（期望: [never], 实际: $actual_thp）"
+        fi
+    else
+        echo "  🟢 未优化 (THP=$actual_thp)"
+    fi
+else
+    if [ "$extra_kernel_enabled" = "true" ]; then
+        echo "  ⚠️  未优化（参数文件不存在）"
+    else
+        echo "  🟢 未优化（参数文件不存在）"
+    fi
+fi
 echo ""
 
 # 7. 健康服务状态
@@ -362,10 +380,7 @@ check_package_with_config "com.oplus.aimemory" "disable_ai_assistants"
 check_package_with_config "com.oplus.aiunit" "disable_ai_assistants"
 check_package_with_config "com.oplus.aiwidgets" "disable_ai_assistants"
 check_package_with_config "com.oplus.aiwriter" "disable_ai_assistants"
-# check_package_with_config "com.oplus.athena" "disable_ai_assistants"  # 不存在于services.txt
-# check_package_with_config "com.oplus.deepthinker" "disable_ai_assistants"  # 不存在于services.txt
 check_package_with_config "com.oplus.metis" "disable_ai_assistants"
-# check_package_with_config "com.oplus.smartengine" "disable_ai_assistants"  # 不存在于services.txt
 check_package_with_config "com.oplus.obrain" "disable_ai_assistants"
 echo ""
 
@@ -440,7 +455,6 @@ else
     echo "   用户设置: 🔴 未启用"
 fi
 echo "   多媒体服务包状态:"
-check_package_with_config "com.oplus.games" "disable_media_services"
 check_package_with_config "com.oplus.screenrecorder" "disable_media_services"
 check_package_with_config "com.coloros.karaoke" "disable_media_services"
 check_package_with_config "com.oplus.mediacontroller" "disable_media_services"
@@ -511,12 +525,11 @@ else
 fi
 echo ""
 
-# 23. ZRAM/Swap 状态 (如果模块涉及内存优化)
+# 23. ZRAM/Swap 状态
 echo "23. ZRAM/Swap 状态:"
 if [ -f "/sys/block/zram0/disksize" ]; then
     zram_size=$(cat /sys/block/zram0/disksize 2>/dev/null)
     if [ $? -eq 0 ] && [ -n "$zram_size" ] && [ "$zram_size" != "0" ]; then
-        # 检查是否为数字
         if echo "$zram_size" | grep -qE '^[0-9]+$'; then
             echo "  🟢 ZRAM 已启用 (大小: $((zram_size / 1024 / 1024)) MB)"
         else
@@ -526,7 +539,6 @@ if [ -f "/sys/block/zram0/disksize" ]; then
         echo "  🔴 ZRAM 未正确配置或已禁用"
     fi
 else
-    # 检查其他可能的zram设备
     if ls /sys/block/zram* >/dev/null 2>&1; then
         echo "  ⚠️  ZRAM 设备存在但 disksize 文件不可访问"
     else
@@ -535,7 +547,7 @@ else
 fi
 echo ""
 
-# 24. 模块加载状态 (KernelSU/Magisk)
+# 24. 模块加载状态
 echo "24. 模块管理器状态:"
 if [ -d "/data/adb/ksu" ]; then
     echo "  🟢 检测到 KernelSU 环境"
