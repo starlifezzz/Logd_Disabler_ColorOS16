@@ -1,7 +1,6 @@
 #!/system/bin/sh
 # ColorOS 16 优化模块状态验证脚本
-# 使用系统属性 persist.sys.coloros16_optimize_gui.* 作为唯一配置源
-# 用于检查各项配置和功能的实际状态
+# 【核心修复】使用 pm list packages --user 0 检测包是否被卸载（与 service.sh 的 pm uninstall 对齐）
 
 MODDIR=${0%/*}
 
@@ -52,29 +51,29 @@ check_process() {
 }
 
 # 函数：检查包状态并对比用户配置
+# 【核心修复】使用 pm list packages --user 0 检测（与 pm uninstall --user 0 对齐）
+# 逻辑：
+#   包不在 pm list packages --user 0 中 → 已被卸载 → 已优化 ✅
+#   包在 pm list packages --user 0 中 → 仍然存在 → 未优化 🔴
 check_package_with_config() {
     local package="$1"
     local config_key="$2"
     local user_enabled=$(get_ksu_setting "$config_key" "false")
+
+    # 检查包是否对用户可见（存在于用户包列表中）
     if pm list packages --user 0 2>/dev/null | grep -qF "package:$package"; then
-        if pm list packages -d --user 0 2>/dev/null | grep -qF "package:$package"; then
-            if [ "$user_enabled" = "true" ]; then
-                echo "  🟢 已优化"
-            else
-                echo "  🔴 已优化（应为未优化）"
-            fi
+        # 包还在 → 未被卸载
+        if [ "$user_enabled" = "true" ]; then
+            echo "  🔴 未优化（包仍存在，与用户设置冲突）"
         else
-            if [ "$user_enabled" = "true" ]; then
-                echo "  🔴 未优化（与用户设置冲突）"
-            else
-                echo "  🟢 未优化"
-            fi
+            echo "  🟢 未禁用（符合预期）"
         fi
     else
+        # 包不在 → 已被 pm uninstall --user 0 卸载
         if [ "$user_enabled" = "true" ]; then
-            echo "  ⚠️  未优化（包不存在）"
+            echo "  🟢 已卸载（已优化）"
         else
-            echo "  🟢 未优化（包不存在）"
+            echo "  ⚠️ 已卸载（但用户未要求禁用，可能需要恢复）"
         fi
     fi
 }
@@ -85,7 +84,9 @@ check_system_prop_with_config() {
     local expected_value="$2"
     local config_key="$3"
     local user_enabled=$(get_ksu_setting "$config_key" "false")
+
     actual_value=$(getprop "$prop")
+
     if [ "$actual_value" = "$expected_value" ]; then
         if [ "$user_enabled" = "true" ]; then
             echo "  🟢 已优化"
@@ -107,6 +108,7 @@ check_kernel_param_with_config() {
     local expected_value="$2"
     local config_key="$3"
     local user_enabled=$(get_ksu_setting "$config_key" "false")
+
     if [ -f "$param_path" ]; then
         actual_value=$(cat "$param_path" 2>/dev/null)
         if [ "$actual_value" = "$expected_value" ]; then
@@ -124,7 +126,7 @@ check_kernel_param_with_config() {
         fi
     else
         if [ "$user_enabled" = "true" ]; then
-            echo "  ⚠️  未优化（参数文件不存在）"
+            echo "  ⚠️ 未优化（参数文件不存在）"
         else
             echo "  🟢 未优化（参数文件不存在）"
         fi
@@ -135,7 +137,7 @@ check_kernel_param_with_config() {
 echo "1. 日志系统优化:"
 disable_logd_enabled=$(get_ksu_setting "disable_logd" "false")
 if [ "$disable_logd_enabled" = "true" ]; then
-    echo "   用户设置: 🟢 已启用"
+    echo "   用户设置: 🟢 已启用（禁用日志）"
 else
     echo "   用户设置: 🔴 未启用"
 fi
@@ -159,7 +161,7 @@ if [ -f "/system/bin/logd" ]; then
         fi
     fi
 else
-    echo "  ⚠️  logd 文件不存在"
+    echo "  ⚠️ logd 文件不存在"
 fi
 echo ""
 
@@ -167,7 +169,7 @@ echo ""
 echo "2. OTA更新阻断:"
 block_ota_enabled=$(get_ksu_setting "block_ota" "false")
 if [ "$block_ota_enabled" = "true" ]; then
-    echo "   用户设置: 🟢 已启用"
+    echo "   用户设置: 🟢 已启用（阻断更新）"
 else
     echo "   用户设置: 🔴 未启用"
 fi
@@ -185,7 +187,7 @@ echo ""
 echo "3. 开发者选项锁定:"
 lock_dev_options_enabled=$(get_ksu_setting "lock_developer_options" "false")
 if [ "$lock_dev_options_enabled" = "true" ]; then
-    echo "   用户设置: 🟢 已启用"
+    echo "   用户设置: 🟢 已启用（锁定选项）"
 else
     echo "   用户设置: 🔴 未启用"
 fi
@@ -197,7 +199,7 @@ echo ""
 echo "4. 广告与数据收集屏蔽:"
 block_ads_enabled=$(get_ksu_setting "block_ads_and_tracking" "false")
 if [ "$block_ads_enabled" = "true" ]; then
-    echo "   用户设置: 🟢 已启用"
+    echo "   用户设置: 🟢 已启用（屏蔽广告）"
 else
     echo "   用户设置: 🔴 未启用"
 fi
@@ -237,13 +239,11 @@ else
 fi
 echo "   内核参数状态:"
 
-# --- printk 专用检测（处理 tab/空格 差异 + 内核锁定第一个值） ---
+# printk 专用检测
 printk_path="/proc/sys/kernel/printk"
 if [ -f "$printk_path" ]; then
     actual_printk=$(cat "$printk_path" 2>/dev/null)
-    # 把所有 tab 替换为空格，然后合并多个空格为一个
     normalized_printk=$(echo "$actual_printk" | tr '\t' ' ' | tr -s ' ')
-    # 提取第2、3、4个值（第1个值 console_loglevel 可能被内核强制锁定）
     printk_v2=$(echo "$normalized_printk" | awk '{print $2}')
     printk_v3=$(echo "$normalized_printk" | awk '{print $3}')
     printk_v4=$(echo "$normalized_printk" | awk '{print $4}')
@@ -258,19 +258,17 @@ if [ -f "$printk_path" ]; then
     fi
 else
     if [ "$extra_kernel_enabled" = "true" ]; then
-        echo "  ⚠️  未优化（参数文件不存在）"
+        echo "  ⚠️ 未优化（参数文件不存在）"
     else
         echo "  🟢 未优化（参数文件不存在）"
     fi
 fi
 
-# --- THP 专用检测（正确处理 [never] 格式） ---
+# THP 专用检测
 thp_path="/sys/kernel/mm/transparent_hugepage/enabled"
 if [ -f "$thp_path" ]; then
     actual_thp=$(cat "$thp_path" 2>/dev/null)
     if [ "$extra_kernel_enabled" = "true" ]; then
-        # 内核输出格式为 "always [madvise] never" 或 "always madvise [never]"
-        # 方括号内的才是当前选中值
         if echo "$actual_thp" | grep -q '\[never\]'; then
             echo "  🟢 已优化 (THP=$actual_thp)"
         else
@@ -281,31 +279,18 @@ if [ -f "$thp_path" ]; then
     fi
 else
     if [ "$extra_kernel_enabled" = "true" ]; then
-        echo "  ⚠️  未优化（参数文件不存在）"
+        echo "  ⚠️ 未优化（参数文件不存在）"
     else
         echo "  🟢 未优化（参数文件不存在）"
     fi
 fi
 echo ""
 
-# 7. 健康服务状态
-echo "7. 健康服务:"
-health_services_enabled=$(get_ksu_setting "disable_health_services" "false")
-if [ "$health_services_enabled" = "true" ]; then
-    echo "   用户设置: 🟢 已启用"
-else
-    echo "   用户设置: 🔴 未启用"
-fi
-echo "   健康服务包状态:"
-check_package_with_config "com.oplus.healthservice" "disable_health_services"
-check_package_with_config "com.heytap.health" "disable_health_services"
-echo ""
-
 # 8. 流量监控与网络服务状态
 echo "8. 流量监控与网络服务:"
 net_monitor_enabled=$(get_ksu_setting "disable_network_monitoring" "false")
 if [ "$net_monitor_enabled" = "true" ]; then
-    echo "   用户设置: 🟢 已启用"
+    echo "   用户设置: 🟢 已启用（禁用监控）"
 else
     echo "   用户设置: 🔴 未启用"
 fi
@@ -318,7 +303,7 @@ echo ""
 echo "9. 锁屏杂志与壁纸服务:"
 lockscreen_mag_enabled=$(get_ksu_setting "disable_lockscreen_magazine" "false")
 if [ "$lockscreen_mag_enabled" = "true" ]; then
-    echo "   用户设置: 🟢 已启用"
+    echo "   用户设置: 🟢 已启用（禁用杂志）"
 else
     echo "   用户设置: 🔴 未启用"
 fi
@@ -332,7 +317,7 @@ echo ""
 echo "10. 游戏空间与性能监控:"
 gamespace_enabled=$(get_ksu_setting "disable_gamespace" "false")
 if [ "$gamespace_enabled" = "true" ]; then
-    echo "   用户设置: 🟢 已启用"
+    echo "   用户设置: 🟢 已启用（禁用游戏空间）"
 else
     echo "   用户设置: 🔴 未启用"
 fi
@@ -340,25 +325,11 @@ echo "   游戏空间包状态:"
 check_package_with_config "com.oplus.games" "disable_gamespace"
 echo ""
 
-# 11. 钱包与支付服务状态
-echo "11. 钱包与支付服务:"
-wallet_services_enabled=$(get_ksu_setting "disable_wallet_services" "false")
-if [ "$wallet_services_enabled" = "true" ]; then
-    echo "   用户设置: 🟢 已启用"
-else
-    echo "   用户设置: 🔴 未启用"
-fi
-echo "   钱包服务包状态:"
-check_package_with_config "com.oplus.pay" "disable_wallet_services"
-check_package_with_config "com.coloros.securepay" "disable_wallet_services"
-check_package_with_config "com.finshell.wallet" "disable_wallet_services"
-echo ""
-
 # 12. 备份与云服务状态
 echo "12. 备份与云服务:"
 backup_services_enabled=$(get_ksu_setting "disable_backup_services" "false")
 if [ "$backup_services_enabled" = "true" ]; then
-    echo "   用户设置: 🟢 已启用"
+    echo "   用户设置: 🟢 已启用（禁用备份）"
 else
     echo "   用户设置: 🔴 未启用"
 fi
@@ -371,7 +342,7 @@ echo ""
 echo "13. AI智能助手服务:"
 ai_assistants_enabled=$(get_ksu_setting "disable_ai_assistants" "false")
 if [ "$ai_assistants_enabled" = "true" ]; then
-    echo "   用户设置: 🟢 已启用"
+    echo "   用户设置: 🟢 已启用（禁用AI）"
 else
     echo "   用户设置: 🔴 未启用"
 fi
@@ -388,7 +359,7 @@ echo ""
 echo "14. 语音助手服务:"
 voice_assistant_enabled=$(get_ksu_setting "disable_voice_assistants" "false")
 if [ "$voice_assistant_enabled" = "true" ]; then
-    echo "   用户设置: 🟢 已启用"
+    echo "   用户设置: 🟢 已启用（禁用语音）"
 else
     echo "   用户设置: 🔴 未启用"
 fi
@@ -403,7 +374,7 @@ echo ""
 echo "15. 主题和个性化服务:"
 theme_service_enabled=$(get_ksu_setting "disable_theme_services" "false")
 if [ "$theme_service_enabled" = "true" ]; then
-    echo "   用户设置: 🟢 已启用"
+    echo "   用户设置: 🟢 已启用（禁用主题）"
 else
     echo "   用户设置: 🔴 未启用"
 fi
@@ -421,7 +392,7 @@ echo ""
 echo "16. 网络优化服务:"
 network_optimization_enabled=$(get_ksu_setting "disable_network_optimization" "false")
 if [ "$network_optimization_enabled" = "true" ]; then
-    echo "   用户设置: 🟢 已启用"
+    echo "   用户设置: 🟢 已启用（禁用网络优化）"
 else
     echo "   用户设置: 🔴 未启用"
 fi
@@ -437,7 +408,7 @@ echo ""
 echo "17. 安全和权限服务:"
 security_service_enabled=$(get_ksu_setting "disable_security_services" "false")
 if [ "$security_service_enabled" = "true" ]; then
-    echo "   用户设置: 🟢 已启用"
+    echo "   用户设置: 🟢 已启用（禁用安全服务）"
 else
     echo "   用户设置: 🔴 未启用"
 fi
@@ -450,7 +421,7 @@ echo ""
 echo "18. 多媒体和娱乐服务:"
 media_services_enabled=$(get_ksu_setting "disable_media_services" "false")
 if [ "$media_services_enabled" = "true" ]; then
-    echo "   用户设置: 🟢 已启用"
+    echo "   用户设置: 🟢 已启用（禁用多媒体）"
 else
     echo "   用户设置: 🔴 未启用"
 fi
@@ -464,7 +435,7 @@ echo ""
 echo "19. 系统工具和监控服务:"
 system_tools_enabled=$(get_ksu_setting "disable_system_tools" "false")
 if [ "$system_tools_enabled" = "true" ]; then
-    echo "   用户设置: 🟢 已启用"
+    echo "   用户设置: 🟢 已启用（禁用系统工具）"
 else
     echo "   用户设置: 🔴 未启用"
 fi
@@ -521,7 +492,7 @@ if [ "$selinux_status" = "Permissive" ]; then
 elif [ "$selinux_status" = "Enforcing" ]; then
     echo "  🔴 当前为 Enforcing (强制模式) - 可能影响部分优化生效"
 else
-    echo "  ⚠️  未知状态: $selinux_status"
+    echo "  ⚠️ 未知状态: $selinux_status"
 fi
 echo ""
 
@@ -533,16 +504,16 @@ if [ -f "/sys/block/zram0/disksize" ]; then
         if echo "$zram_size" | grep -qE '^[0-9]+$'; then
             echo "  🟢 ZRAM 已启用 (大小: $((zram_size / 1024 / 1024)) MB)"
         else
-            echo "  ⚠️  ZRAM 大小格式异常: $zram_size"
+            echo "  ⚠️ ZRAM 大小格式异常: $zram_size"
         fi
     else
         echo "  🔴 ZRAM 未正确配置或已禁用"
     fi
 else
     if ls /sys/block/zram* >/dev/null 2>&1; then
-        echo "  ⚠️  ZRAM 设备存在但 disksize 文件不可访问"
+        echo "  ⚠️ ZRAM 设备存在但 disksize 文件不可访问"
     else
-        echo "  ⚠️  未检测到 ZRAM 设备"
+        echo "  ⚠️ 未检测到 ZRAM 设备"
     fi
 fi
 echo ""
@@ -554,7 +525,7 @@ if [ -d "/data/adb/ksu" ]; then
 elif [ -d "/data/adb/magisk" ]; then
     echo "  🟢 检测到 Magisk 环境"
 else
-    echo "  ⚠️  未检测到常见的 Root 管理器目录"
+    echo "  ⚠️ 未检测到常见的 Root 管理器目录"
 fi
 echo ""
 
@@ -562,7 +533,7 @@ echo "========================================"
 echo "验证完成！"
 echo ""
 echo "使用说明:"
-echo "- 🟢 表示功能正常工作"
+echo "- 🟢 表示功能正常工作（已优化/已禁用）"
 echo "- 🔴 表示功能未生效或有问题"
 echo "- ⚠️ 表示配置或环境异常"
 echo ""

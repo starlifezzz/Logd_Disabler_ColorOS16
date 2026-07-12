@@ -17,28 +17,22 @@
   :root{--bg:#000;--bg2:#1c1c1e;--bg3:rgba(255,255,255,.06);--tx:#f5f5f7;--tx2:#98989d;--tx3:#636366;--bd:rgba(255,255,255,.08);--accent:#0a84ff;--green:#30d158;--red:#ff453a;--orange:#ff9f0a;--purple:#bf5af2;--teal:#64d2ff}
 }
 html,body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;background:var(--bg);color:var(--tx);-webkit-font-smoothing:antialiased;overflow-x:hidden;line-height:1.47}
-
 .topbar{position:sticky;top:0;z-index:100;height:56px;display:flex;align-items:center;justify-content:space-between;padding:0 16px;background:color-mix(in srgb,var(--bg) 80%,transparent);backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);border-bottom:1px solid var(--bd)}
 .topbar h1{font-size:17px;font-weight:600}
 .topbar-r{display:flex;gap:4px;align-items:center}
-
 .ibtn{width:36px;height:36px;border-radius:50%;border:none;background:transparent;color:var(--tx);cursor:pointer;display:flex;align-items:center;justify-content:center;-webkit-tap-highlight-color:transparent}
 .ibtn:active{background:var(--bg3)}
 .ibtn svg{width:22px;height:22px}
 .ibtn.spin svg{animation:spin .8s linear infinite}
 @keyframes spin{to{transform:rotate(360deg)}}
-
 .main{padding:12px 16px 100px;max-width:600px;margin:0 auto}
-
 .prog-w{margin-bottom:12px}
 .prog-b{height:3px;background:var(--bg3);border-radius:2px;overflow:hidden}
 .prog-f{height:100%;background:var(--accent);border-radius:2px;transition:width .3s}
 .prog-t{font-size:11px;color:var(--tx2);margin-top:4px;text-align:center}
-
 .banner{display:flex;align-items:flex-start;gap:10px;padding:12px 14px;border-radius:var(--card-r);margin-bottom:12px;font-size:13px}
 .banner.warn{background:color-mix(in srgb,var(--orange) 10%,transparent);color:var(--orange)}
 .banner svg{width:20px;height:20px;flex-shrink:0;margin-top:1px}
-
 .card{background:var(--bg2);border-radius:var(--card-r);border:1px solid var(--bd);margin-bottom:12px;overflow:hidden}
 .card-h{display:flex;align-items:center;gap:8px;padding:14px 16px 8px}
 .card-ic{width:32px;height:32px;border-radius:8px;display:flex;align-items:center;justify-content:center}
@@ -51,7 +45,6 @@ html,body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-se
 .card-ic.c-teal{background:color-mix(in srgb,var(--teal) 12%,transparent);color:var(--teal)}
 .card-t{font-size:15px;font-weight:600;flex:1}
 .card-b{padding:0 4px 4px}
-
 .li{display:flex;align-items:center;gap:12px;padding:12px;border-radius:var(--item-r);cursor:pointer;-webkit-tap-highlight-color:transparent;transition:background .15s}
 .li:active{background:var(--bg3)}
 .li-ic{width:36px;height:36px;border-radius:8px;flex-shrink:0;display:flex;align-items:center;justify-content:center;background:var(--bg3);color:var(--tx2)}
@@ -60,16 +53,12 @@ html,body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-se
 .li-t{font-size:14px;font-weight:500}
 .li-d{font-size:12px;color:var(--tx2);margin-top:1px}
 .li-m{display:flex;align-items:center;gap:6px;margin-top:3px}
-
 .badge{display:inline-flex;align-items:center;font-size:11px;font-weight:500;padding:2px 8px;border-radius:100px}
 .badge.on{background:color-mix(in srgb,var(--green) 12%,transparent);color:var(--green)}
 .badge.off{background:var(--bg3);color:var(--tx2)}
 .badge.err{background:color-mix(in srgb,var(--red) 12%,transparent);color:var(--red)}
 .badge.work{background:color-mix(in srgb,var(--accent) 12%,transparent);color:var(--accent)}
-.badge.auto{background:color-mix(in srgb,var(--teal) 12%,transparent);color:var(--teal)}
-
 .sep{height:1px;background:var(--bd);margin:0 12px}
-
 .sw{position:relative;display:inline-block;width:51px;height:31px;flex-shrink:0}
 .sw input{opacity:0;width:0;height:0;position:absolute}
 .sw-t{position:absolute;inset:0;border-radius:16px;background:var(--tx3);transition:background .25s;cursor:pointer}
@@ -77,18 +66,14 @@ html,body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-se
 .sw input:checked+.sw-t{background:var(--green)}
 .sw input:checked+.sw-t::after{transform:translateX(20px)}
 .sw input:disabled+.sw-t{opacity:.4;cursor:not-allowed}
-
 .info-r{display:flex;justify-content:space-between;align-items:center;padding:10px 16px;font-size:13px}
 .info-r .l{color:var(--tx2)}
 .info-r .v{font-weight:500}
-
 .fab{position:fixed;bottom:24px;right:24px;z-index:90;width:56px;height:56px;border-radius:16px;border:none;background:var(--accent);color:#fff;cursor:pointer;box-shadow:0 4px 16px color-mix(in srgb,var(--accent) 40%,transparent);display:flex;align-items:center;justify-content:center;-webkit-tap-highlight-color:transparent;transition:transform .15s}
 .fab:active{transform:scale(.9)}
 .fab svg{width:24px;height:24px}
-
 .fab-debug{position:fixed;bottom:24px;left:24px;z-index:90;width:48px;height:48px;border-radius:50%;border:none;background:var(--orange);color:#fff;cursor:pointer;box-shadow:0 4px 12px color-mix(in srgb,var(--orange) 40%,transparent);display:flex;align-items:center;justify-content:center;-webkit-tap-highlight-color:transparent;font-size:20px}
 .fab-debug:active{transform:scale(.9)}
-
 .overlay{position:fixed;inset:0;z-index:200;background:rgba(0,0,0,.45);display:flex;align-items:center;justify-content:center;padding:24px;animation:fadeIn .2s}
 @keyframes fadeIn{from{opacity:0}}
 .dlg{background:var(--bg2);border-radius:16px;width:100%;max-width:480px;padding:24px;box-shadow:0 8px 40px rgba(0,0,0,.2);animation:popIn .25s cubic-bezier(.4,0,.2,1);display:flex;flex-direction:column;max-height:85vh}
@@ -101,9 +86,7 @@ html,body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-se
 .btn-p{background:var(--accent);color:#fff}
 .btn-s{background:transparent;color:var(--accent)}
 .btn-w{background:var(--orange);color:#fff}
-
 .log-box{flex:1;overflow-y:auto;white-space:pre-wrap;font-family:monospace;font-size:11px;line-height:1.6;background:var(--bg3);border-radius:8px;padding:12px;max-height:55vh;color:var(--tx)}
-
 .debug-section{margin-bottom:16px}
 .debug-title{font-size:13px;font-weight:600;color:var(--tx);margin-bottom:8px;display:flex;align-items:center;gap:6px}
 .debug-item{background:var(--bg3);border-radius:8px;padding:10px;margin-bottom:6px;font-family:monospace;font-size:11px}
@@ -115,13 +98,11 @@ html,body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-se
 @media(prefers-color-scheme:dark){
   .debug-item .raw{background:rgba(255,255,255,.05)}
 }
-
 .footer{text-align:center;padding:20px 16px;font-size:12px;color:var(--tx3)}
 .hide{display:none!important}
 </style>
 </head>
 <body>
-
 <div class="topbar">
   <h1>ColorOS 16 优化</h1>
   <div class="topbar-r">
@@ -132,7 +113,6 @@ html,body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-se
 </div>
 
 <div class="main">
-
   <div class="prog-w hide" id="progW">
     <div class="prog-b"><div class="prog-f" id="progF" style="width:0%"></div></div>
     <div class="prog-t" id="progT">检测中...</div>
@@ -140,7 +120,7 @@ html,body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-se
 
   <div class="banner warn">
     <svg viewBox="0 0 24 24" fill="currentColor"><path d="M1 21h22L12 2 1 21zm12-3h-2v-2h2v2zm0-4h-2v-4h2v4z"/></svg>
-    <span>开启/关闭选项后，<b>重启设备</b>才会完全生效。标记"⚡自动"的项目开机时自动执行，无需手动操作。</span>
+    <span>开关<b>绿色=已禁用/已优化</b>，<b>灰色=未禁用/系统默认</b>。修改后需<b>重启设备</b>生效。</span>
   </div>
 
   <div id="cardsContainer"></div>
@@ -169,7 +149,6 @@ html,body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-se
 <button class="fab" onclick="showLog()">
   <svg viewBox="0 0 24 24" fill="currentColor"><path d="M20 4H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 14H4V8h16v10zm-8-2h4v-2h-4v2zm-6-4h10v-2H6v2zm0 4h4v-2H6v2z"/></svg>
 </button>
-
 <button class="fab-debug" onclick="showDebug()">🐛</button>
 
 <div class="overlay hide" id="logOv" onclick="if(event.target===this)hideLog()">
@@ -224,79 +203,132 @@ function sh(cmd) {
 // ===================== 常量 =====================
 var PROP_PREFIX = 'persist.sys.coloros16_optimize_gui.';
 
-// ===================== 功能定义（完全对齐 verify_status.sh） =====================
+// ===================== 功能定义（统一语义：绿色=已禁用/已优化） =====================
+// 【核心修复】所有 checkCmd 和 verifyCmd 使用 pm list packages（不是 -d）
+// 逻辑：包不在列表中 = 已被 pm uninstall = 已禁用 ✅
 var FEATURES = [
-  { group: '守护进程', groupIcon: 'shield', groupColor: 'c-red', items: [
-    { key: 'disable_logd', title: '彻底禁用 Logd', desc: 'mount 覆盖 /system/bin/logd + 强杀进程', type: 'toggle',
-      checkCmd: 'pgrep -x logd >/dev/null 2>&1 && echo running || echo stopped',
-      verifyCmd: 'echo "进程:"; pgrep -x logd >/dev/null 2>&1 && echo running || echo stopped; echo "文件:"; if [ -f /system/bin/logd ]; then sz=$(stat -c %s /system/bin/logd 2>/dev/null); echo "size=$sz"; else echo "notfound"; fi' },
-    { key: 'block_ota', title: '阻断 OTA 更新', desc: '覆盖 update_engine + 禁用 OTA 包', type: 'toggle',
-      checkCmd: 'pgrep -x update_engine >/dev/null 2>&1 && echo running || echo stopped',
-      verifyCmd: 'echo "进程:"; pgrep -x update_engine >/dev/null 2>&1 && echo running || echo stopped; echo "包:"; pm list packages -d --user 0 2>/dev/null | grep -E "oplus.ota|oplus.sau"; echo "属性:"; echo "ota_dl=$(getprop persist.ota.auto_download 2>/dev/null)"; echo "recovery=$(getprop persist.sys.recovery_update 2>/dev/null)"' },
-    { key: 'lock_developer_options', title: '锁定开发者选项', desc: '防止系统重置开发者选项状态', type: 'toggle',
-      checkCmd: 'test "$(settings get global development_settings_enabled 2>/dev/null)" = "0" && echo locked || echo unlocked',
-      verifyCmd: 'echo "dev=$(settings get global development_settings_enabled 2>/dev/null)"; echo "lock=$(getprop persist.dev.option.lock 2>/dev/null)"' },
-    { key: 'kill_redundant_processes', title: '进程查杀优化', desc: 'smartscene / sysmonitor / hotstart / preload', type: 'toggle',
-      checkCmd: 'r="ok"; pgrep -x smartscene >/dev/null 2>&1 && r="running"; pgrep -x sysmonitor >/dev/null 2>&1 && r="running"; pgrep -x hotstart >/dev/null 2>&1 && r="running"; echo "$r"',
-      verifyCmd: 'echo "smartscene:"; pgrep -x smartscene 2>/dev/null || echo stopped; echo "preload:"; pgrep -x preload 2>/dev/null || echo stopped; echo "sysmonitor:"; pgrep -x sysmonitor 2>/dev/null || echo stopped; echo "hotstart:"; pgrep -x hotstart 2>/dev/null || echo stopped' },
-    { key: 'system_prop_toggles', title: '系统属性开关', desc: '禁用 preload / monitor / hotstart 属性', type: 'toggle',
-      checkCmd: 'test "$(getprop persist.sys.preload)" = "0" && echo set || echo unset',
-      verifyCmd: 'echo "preload=$(getprop persist.sys.preload 2>/dev/null)"; echo "monitor=$(getprop persist.sys.monitor 2>/dev/null)"; echo "hotstart=$(getprop persist.sys.hotstart 2>/dev/null)"' }
-  ]},
-  { group: '隐私与广告', groupIcon: 'visibility_off', groupColor: 'c-purple', items: [
-    { key: 'block_ads_and_tracking', title: '广告与数据收集屏蔽', desc: '关闭个性化广告、用户体验计划、数据统计', type: 'toggle',
-      checkCmd: 'test "$(getprop persist.sys.oplus.ad_enable 2>/dev/null)" = "0" && echo disabled || echo enabled',
-      verifyCmd: 'echo "包:"; pm list packages -d --user 0 2>/dev/null | grep -E "statistics.rom|assistantscreen|sceneservice"; echo "属性:"; echo "ad=$(getprop persist.sys.oplus.ad_enable 2>/dev/null)"; echo "pad=$(getprop persist.sys.oplus.personalized_ad 2>/dev/null)"; echo "track=$(getprop persist.ad.track 2>/dev/null)"; echo "usage=$(getprop persist.sys.usage_stat_enable 2>/dev/null)"; echo "collect=$(getprop persist.oppo.collect 2>/dev/null)"' }
-  ]},
-  { group: '性能优化', groupIcon: 'tune', groupColor: 'c-green', items: [
-    { key: 'memory_io_optimization', title: '内存/IO 优化', desc: '关闭 schedstats / binder debug / compact', type: 'toggle',
-      checkCmd: 'v=$(cat /proc/sys/kernel/sched_schedstats 2>/dev/null); test "$v" = "0" && echo ok || echo "fail($v)"',
-      verifyCmd: 'echo "schedstats=$(cat /proc/sys/kernel/sched_schedstats 2>/dev/null)"; echo "binder=$(cat /sys/module/binder/parameters/debug_mask 2>/dev/null)"; echo "compact=$(cat /proc/sys/vm/compact_unevictable_allowed 2>/dev/null)"' },
-    { key: 'extra_kernel_optimization', title: '额外内核优化', desc: 'printk 日志级别 / 禁用透明大页', type: 'toggle',
-      checkCmd: 'p=$(cat /proc/sys/kernel/printk 2>/dev/null); echo "$p"',
-      verifyCmd: 'echo "printk=$(cat /proc/sys/kernel/printk 2>/dev/null)"; echo "thp=$(cat /sys/kernel/mm/transparent_hugepage/enabled 2>/dev/null)"' }
-  ]},
-  { group: '可选禁用服务', groupIcon: 'toggle_off', groupColor: 'c-orange', items: [
-    { key: 'disable_health_services', title: '健康服务', desc: 'com.oplus.healthservice / com.heytap.health', type: 'toggle',
-      checkCmd: 'pm list packages -d --user 0 2>/dev/null | grep -q "com.oplus.healthservice" && echo disabled || echo enabled',
-      verifyCmd: 'pm list packages -d --user 0 2>/dev/null | grep -E "healthservice|heytap.health"' },
-    { key: 'disable_network_monitoring', title: '流量监控与网络服务', desc: 'com.oplus.trafficmonitor / com.oplus.dmp', type: 'toggle',
-      checkCmd: 'pm list packages -d --user 0 2>/dev/null | grep -q "com.oplus.trafficmonitor" && echo disabled || echo enabled',
-      verifyCmd: 'pm list packages -d --user 0 2>/dev/null | grep -E "trafficmonitor|oplus.dmp"' },
-    { key: 'disable_lockscreen_magazine', title: '锁屏杂志与壁纸服务', desc: 'com.heytap.pictorial', type: 'toggle',
-      checkCmd: 'pm list packages -d --user 0 2>/dev/null | grep -q "com.heytap.pictorial" && echo disabled || echo enabled',
-      verifyCmd: 'echo "包:"; pm list packages -d --user 0 2>/dev/null | grep "heytap.pictorial"; echo "属性:"; echo "mag=$(getprop persist.sys.lockscreen_magazine 2>/dev/null)"' },
-    { key: 'disable_gamespace', title: '游戏空间与性能监控', desc: 'com.oplus.games', type: 'toggle',
-      checkCmd: 'pm list packages -d --user 0 2>/dev/null | grep -q "com.oplus.games" && echo disabled || echo enabled',
-      verifyCmd: 'pm list packages -d --user 0 2>/dev/null | grep "oplus.games"' },
-    { key: 'disable_wallet_services', title: '钱包与支付服务', desc: 'com.oplus.pay / com.coloros.securepay / com.finshell.wallet', type: 'toggle',
-      checkCmd: 'pm list packages -d --user 0 2>/dev/null | grep -q "com.oplus.pay" && echo disabled || echo enabled',
-      verifyCmd: 'pm list packages -d --user 0 2>/dev/null | grep -E "oplus.pay|securepay|finshell.wallet"' },
-    { key: 'disable_backup_services', title: '备份与云服务', desc: 'com.oplus.wifibackuprestore / com.heytap.cloud', type: 'toggle',
-      checkCmd: 'pm list packages -d --user 0 2>/dev/null | grep -q "com.heytap.cloud" && echo disabled || echo enabled',
-      verifyCmd: 'pm list packages -d --user 0 2>/dev/null | grep -E "wifibackuprestore|heytap.cloud"' },
-    { key: 'disable_ai_assistants', title: 'AI 智能助手', desc: 'aimemory / aiunit / aiwidgets / aiwriter / metis / obrain', type: 'toggle',
-      checkCmd: 'pm list packages -d --user 0 2>/dev/null | grep -q "com.oplus.aimemory" && echo disabled || echo enabled',
-      verifyCmd: 'pm list packages -d --user 0 2>/dev/null | grep -E "aimemory|aiunit|aiwidgets|aiwriter|metis|obrain"' },
-    { key: 'disable_voice_assistants', title: '语音助手', desc: 'ovoicemanager / ovoicemanager.wakeup / speechassist / ttsaccessibilityengine', type: 'toggle',
-      checkCmd: 'pm list packages -d --user 0 2>/dev/null | grep -q "com.oplus.ovoicemanager" && echo disabled || echo enabled',
-      verifyCmd: 'pm list packages -d --user 0 2>/dev/null | grep -E "ovoicemanager|speechassist|ttsaccessibilityengine"' },
-    { key: 'disable_theme_services', title: '主题和个性化服务', desc: 'themestore / keyguard.clock 等 7 个包', type: 'toggle',
-      checkCmd: 'pm list packages -d --user 0 2>/dev/null | grep -q "com.oplus.themestore" && echo disabled || echo enabled',
-      verifyCmd: 'pm list packages -d --user 0 2>/dev/null | grep -E "themestore|keyguard.clock|keyguard.personality|keyguard.style"' },
-    { key: 'disable_network_optimization', title: '网络优化服务', desc: 'networksense / cellularqoe / tai.wifiqoe / tai.borderpresearch / nearcomm', type: 'toggle',
-      checkCmd: 'pm list packages -d --user 0 2>/dev/null | grep -q "com.oplus.networksense" && echo disabled || echo enabled',
-      verifyCmd: 'pm list packages -d --user 0 2>/dev/null | grep -E "networksense|cellularqoe|tai.wifiqoe|tai.borderpresearch|nearcomm"' },
-    { key: 'disable_security_services', title: '安全和权限服务', desc: 'com.oplus.securitykeyboard / com.coloros.securityguard', type: 'toggle',
-      checkCmd: 'pm list packages -d --user 0 2>/dev/null | grep -q "com.oplus.securitykeyboard" && echo disabled || echo enabled',
-      verifyCmd: 'pm list packages -d --user 0 2>/dev/null | grep -E "securitykeyboard|securityguard"' },
-    { key: 'disable_media_services', title: '多媒体和娱乐服务', desc: 'com.oplus.screenrecorder / com.coloros.karaoke / com.oplus.mediacontroller', type: 'toggle',
-      checkCmd: 'pm list packages -d --user 0 2>/dev/null | grep -q "com.oplus.screenrecorder" && echo disabled || echo enabled',
-      verifyCmd: 'pm list packages -d --user 0 2>/dev/null | grep -E "screenrecorder|karaoke|mediacontroller"' },
-    { key: 'disable_system_tools', title: '系统工具和监控服务', desc: 'powermonitor / logkit / crashbox 等 9 个包', type: 'toggle',
-      checkCmd: 'pm list packages -d --user 0 2>/dev/null | grep -q "com.oplus.powermonitor" && echo disabled || echo enabled',
-      verifyCmd: 'pm list packages -d --user 0 2>/dev/null | grep -E "powermonitor|audiomonitor|logkit|engineermode|crashbox|appplatform|contentportal|postmanservice|subsys"' }
-  ]}
+{ group: '守护进程', groupIcon: 'shield', groupColor: 'c-red', items: [
+  { key: 'disable_logd', title: '禁用系统日志 (Logd)',
+    desc: 'mount 覆盖 /system/bin/logd + 强杀进程',
+    type: 'toggle',
+    checkCmd: 'pgrep -x logd >/dev/null 2>&1 && echo running || echo stopped',
+    verifyCmd: 'echo "进程:"; pgrep -x logd >/dev/null 2>&1 && echo running || echo stopped; echo "文件:"; if [ -f /system/bin/logd ]; then sz=$(stat -c %s /system/bin/logd 2>/dev/null); echo "size=$sz"; else echo "notfound"; fi'
+  },
+  { key: 'block_ota', title: '禁用 OTA 更新',
+    desc: '覆盖 update_engine + 卸载 OTA 相关包',
+    type: 'toggle',
+    checkCmd: 'pgrep -x update_engine >/dev/null 2>&1 && echo running || echo stopped',
+    verifyCmd: 'echo "进程:"; pgrep -x update_engine >/dev/null 2>&1 && echo running || echo stopped; echo "包:"; for p in com.oplus.ota com.oplus.sau; do pm list packages --user 0 2>/dev/null | grep -qF "package:$p" && echo "$p:存在" || echo "$p:已卸载"; done; echo "属性:"; echo "ota_dl=$(getprop persist.ota.auto_download 2>/dev/null)"; echo "recovery=$(getprop persist.sys.recovery_update 2>/dev/null)"'
+  },
+  { key: 'lock_developer_options', title: '禁用开发者选项访问',
+    desc: '防止系统重置开发者选项状态',
+    type: 'toggle',
+    checkCmd: 'test "$(settings get global development_settings_enabled 2>/dev/null)" = "0" && echo locked || echo unlocked',
+    verifyCmd: 'echo "dev=$(settings get global development_settings_enabled 2>/dev/null)"; echo "lock=$(getprop persist.dev.option.lock 2>/dev/null)"'
+  },
+  { key: 'kill_redundant_processes', title: '禁用冗余后台进程',
+    desc: 'smartscene / sysmonitor / hotstart / preload',
+    type: 'toggle',
+    checkCmd: 'r="ok"; pgrep -x smartscene >/dev/null 2>&1 && r="running"; pgrep -x sysmonitor >/dev/null 2>&1 && r="running"; pgrep -x hotstart >/dev/null 2>&1 && r="running"; echo "$r"',
+    verifyCmd: 'echo "smartscene:"; pgrep -x smartscene 2>/dev/null || echo stopped; echo "preload:"; pgrep -x preload 2>/dev/null || echo stopped; echo "sysmonitor:"; pgrep -x sysmonitor 2>/dev/null || echo stopped; echo "hotstart:"; pgrep -x hotstart 2>/dev/null || echo stopped'
+  },
+  { key: 'system_prop_toggles', title: '禁用系统预加载属性',
+    desc: '禁用 preload / monitor / hotstart 属性',
+    type: 'toggle',
+    checkCmd: 'test "$(getprop persist.sys.preload)" = "0" && echo set || echo unset',
+    verifyCmd: 'echo "preload=$(getprop persist.sys.preload 2>/dev/null)"; echo "monitor=$(getprop persist.sys.monitor 2>/dev/null)"; echo "hotstart=$(getprop persist.sys.hotstart 2>/dev/null)"'
+  }
+]},
+{ group: '隐私与广告', groupIcon: 'visibility_off', groupColor: 'c-purple', items: [
+  { key: 'block_ads_and_tracking', title: '禁用广告与数据收集',
+    desc: '关闭个性化广告、用户体验计划、数据统计',
+    type: 'toggle',
+    checkCmd: 'test "$(getprop persist.sys.oplus.ad_enable 2>/dev/null)" = "0" && echo disabled || echo enabled',
+    verifyCmd: 'echo "包:"; for p in com.oplus.statistics.rom com.coloros.assistantscreen com.coloros.sceneservice; do pm list packages --user 0 2>/dev/null | grep -qF "package:$p" && echo "$p:存在" || echo "$p:已卸载"; done; echo "属性:"; echo "ad=$(getprop persist.sys.oplus.ad_enable 2>/dev/null)"; echo "pad=$(getprop persist.sys.oplus.personalized_ad 2>/dev/null)"; echo "track=$(getprop persist.ad.track 2>/dev/null)"; echo "usage=$(getprop persist.sys.usage_stat_enable 2>/dev/null)"; echo "collect=$(getprop persist.oppo.collect 2>/dev/null)"'
+  }
+]},
+{ group: '性能优化', groupIcon: 'tune', groupColor: 'c-green', items: [
+  { key: 'memory_io_optimization', title: '启用内存/IO 优化',
+    desc: '关闭 schedstats / binder debug / compact',
+    type: 'toggle',
+    checkCmd: 'v=$(cat /proc/sys/kernel/sched_schedstats 2>/dev/null); test "$v" = "0" && echo ok || echo "fail($v)"',
+    verifyCmd: 'echo "schedstats=$(cat /proc/sys/kernel/sched_schedstats 2>/dev/null)"; echo "binder=$(cat /sys/module/binder/parameters/debug_mask 2>/dev/null)"; echo "compact=$(cat /proc/sys/vm/compact_unevictable_allowed 2>/dev/null)"'
+  },
+  { key: 'extra_kernel_optimization', title: '启用内核深度优化',
+    desc: 'printk 日志级别 / 禁用透明大页',
+    type: 'toggle',
+    checkCmd: 'p=$(cat /proc/sys/kernel/printk 2>/dev/null); echo "$p"',
+    verifyCmd: 'echo "printk=$(cat /proc/sys/kernel/printk 2>/dev/null)"; echo "thp=$(cat /sys/kernel/mm/transparent_hugepage/enabled 2>/dev/null)"'
+  }
+]},
+{ group: '可选禁用服务', groupIcon: 'toggle_off', groupColor: 'c-orange', items: [
+  { key: 'disable_network_monitoring', title: '禁用流量监控',
+    desc: 'com.oplus.trafficmonitor / com.oplus.dmp',
+    type: 'toggle',
+    checkCmd: 'pm list packages --user 0 2>/dev/null | grep -qF "com.oplus.trafficmonitor" && echo enabled || echo disabled',
+    verifyCmd: 'for p in com.oplus.trafficmonitor com.oplus.dmp; do pm list packages --user 0 2>/dev/null | grep -qF "package:$p" && echo "$p:存在" || echo "$p:已卸载"; done'
+  },
+  { key: 'disable_lockscreen_magazine', title: '禁用锁屏杂志',
+    desc: 'com.heytap.pictorial',
+    type: 'toggle',
+    checkCmd: 'pm list packages --user 0 2>/dev/null | grep -qF "com.heytap.pictorial" && echo enabled || echo disabled',
+    verifyCmd: 'echo "包:"; pm list packages --user 0 2>/dev/null | grep -qF "package:com.heytap.pictorial" && echo "pictorial:存在" || echo "pictorial:已卸载"; echo "属性:"; echo "mag=$(getprop persist.sys.lockscreen_magazine 2>/dev/null)"'
+  },
+  { key: 'disable_gamespace', title: '禁用游戏空间',
+    desc: 'com.oplus.games',
+    type: 'toggle',
+    checkCmd: 'pm list packages --user 0 2>/dev/null | grep -qF "com.oplus.games" && echo enabled || echo disabled',
+    verifyCmd: 'pm list packages --user 0 2>/dev/null | grep -qF "package:com.oplus.games" && echo "games:存在" || echo "games:已卸载"'
+  },
+  { key: 'disable_backup_services', title: '禁用备份与云服务',
+    desc: 'com.oplus.wifibackuprestore / com.heytap.cloud',
+    type: 'toggle',
+    checkCmd: 'pm list packages --user 0 2>/dev/null | grep -qF "com.heytap.cloud" && echo enabled || echo disabled',
+    verifyCmd: 'for p in com.oplus.wifibackuprestore com.heytap.cloud; do pm list packages --user 0 2>/dev/null | grep -qF "package:$p" && echo "$p:存在" || echo "$p:已卸载"; done'
+  },
+  { key: 'disable_ai_assistants', title: '禁用 AI 智能助手',
+    desc: 'aimemory / aiunit / aiwidgets / aiwriter / metis / obrain',
+    type: 'toggle',
+    checkCmd: 'pm list packages --user 0 2>/dev/null | grep -qF "com.oplus.aimemory" && echo enabled || echo disabled',
+    verifyCmd: 'for p in com.oplus.aimemory com.oplus.aiunit com.oplus.aiwidgets com.oplus.aiwriter com.oplus.metis com.oplus.obrain; do pm list packages --user 0 2>/dev/null | grep -qF "package:$p" && echo "$p:存在" || echo "$p:已卸载"; done'
+  },
+  { key: 'disable_voice_assistants', title: '禁用语音助手',
+    desc: 'ovoicemanager / speechassist / ttsaccessibilityengine',
+    type: 'toggle',
+    checkCmd: 'pm list packages --user 0 2>/dev/null | grep -qF "com.oplus.ovoicemanager" && echo enabled || echo disabled',
+    verifyCmd: 'for p in com.oplus.ovoicemanager com.oplus.ovoicemanager.wakeup com.heytap.speechassist com.oplus.ttsaccessibilityengine; do pm list packages --user 0 2>/dev/null | grep -qF "package:$p" && echo "$p:存在" || echo "$p:已卸载"; done'
+  },
+  { key: 'disable_theme_services', title: '禁用主题和个性化服务',
+    desc: 'themestore / keyguard.clock 等 7 个包',
+    type: 'toggle',
+    checkCmd: 'pm list packages --user 0 2>/dev/null | grep -qF "com.oplus.themestore" && echo enabled || echo disabled',
+    verifyCmd: 'for p in com.oplus.themestore com.heytap.themestore com.oplus.keyguard.clock.magazine com.oplus.keyguard.clock.gallery com.oplus.keyguard.clock.graffiti com.oplus.keyguard.personality.clocks com.oplus.keyguard.style.widgets; do pm list packages --user 0 2>/dev/null | grep -qF "package:$p" && echo "$p:存在" || echo "$p:已卸载"; done'
+  },
+  { key: 'disable_network_optimization', title: '禁用网络优化服务',
+    desc: 'networksense / cellularqoe / tai.wifiqoe 等',
+    type: 'toggle',
+    checkCmd: 'pm list packages --user 0 2>/dev/null | grep -qF "com.oplus.networksense" && echo enabled || echo disabled',
+    verifyCmd: 'for p in com.oplus.networksense com.oplus.cellularqoe com.oplus.tai.wifiqoe com.oplus.tai.borderpresearch com.oplus.nearcomm; do pm list packages --user 0 2>/dev/null | grep -qF "package:$p" && echo "$p:存在" || echo "$p:已卸载"; done'
+  },
+  { key: 'disable_security_services', title: '禁用安全和权限服务',
+    desc: 'com.oplus.securitykeyboard / com.coloros.securityguard',
+    type: 'toggle',
+    checkCmd: 'pm list packages --user 0 2>/dev/null | grep -qF "com.oplus.securitykeyboard" && echo enabled || echo disabled',
+    verifyCmd: 'for p in com.oplus.securitykeyboard com.coloros.securityguard; do pm list packages --user 0 2>/dev/null | grep -qF "package:$p" && echo "$p:存在" || echo "$p:已卸载"; done'
+  },
+  { key: 'disable_media_services', title: '禁用多媒体和娱乐服务',
+    desc: 'com.oplus.screenrecorder / com.coloros.karaoke / com.oplus.mediacontroller',
+    type: 'toggle',
+    checkCmd: 'pm list packages --user 0 2>/dev/null | grep -qF "com.oplus.screenrecorder" && echo enabled || echo disabled',
+    verifyCmd: 'for p in com.oplus.screenrecorder com.coloros.karaoke com.oplus.mediacontroller; do pm list packages --user 0 2>/dev/null | grep -qF "package:$p" && echo "$p:存在" || echo "$p:已卸载"; done'
+  },
+  { key: 'disable_system_tools', title: '禁用系统工具和监控服务',
+    desc: 'powermonitor / logkit / crashbox 等 9 个包',
+    type: 'toggle',
+    checkCmd: 'pm list packages --user 0 2>/dev/null | grep -qF "com.oplus.powermonitor" && echo enabled || echo disabled',
+    verifyCmd: 'for p in com.oplus.powermonitor com.oplus.audiomonitor com.oplus.logkit com.oplus.engineermode com.oplus.crashbox com.oplus.appplatform com.oplus.contentportal com.oplus.postmanservice com.oplus.subsys; do pm list packages --user 0 2>/dev/null | grep -qF "package:$p" && echo "$p:存在" || echo "$p:已卸载"; done'
+  }
+]}
 ];
 
 // ===================== 状态 =====================
@@ -329,7 +361,11 @@ function addLog(msg, level) {
   var box = document.getElementById('logBox');
   if(box) box.textContent = logLines.join('\n');
 }
-function showLog() { document.getElementById('logOv').classList.remove('hide'); var b=document.getElementById('logBox'); if(b)b.scrollTop=b.scrollHeight; }
+
+function showLog() {
+  document.getElementById('logOv').classList.remove('hide');
+  var b=document.getElementById('logBox'); if(b)b.scrollTop=b.scrollHeight;
+}
 function hideLog() { document.getElementById('logOv').classList.add('hide'); }
 function clearLog() { logLines=[]; warnLogs=[]; document.getElementById('logBox').textContent='暂无日志'; }
 
@@ -340,7 +376,6 @@ async function showDebug() {
   document.getElementById('debugOv').classList.remove('hide');
 
   var html = '';
-
   html += '<div class="debug-section">';
   html += '<div class="debug-title">⚠️ Warn/Error 日志 (' + warnLogs.length + ')</div>';
   if (warnLogs.length === 0) {
@@ -389,13 +424,10 @@ async function showDebug() {
     }
   }
   html += '</div>';
-
   body.innerHTML = html;
 }
 
-function hideDebug() {
-  document.getElementById('debugOv').classList.add('hide');
-}
+function hideDebug() { document.getElementById('debugOv').classList.add('hide'); }
 
 function escapeHtml(str) {
   return str.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/\n/g,'<br>');
@@ -405,11 +437,7 @@ async function copyDebugInfo() {
   var text = '=== ColorOS16 Debug Info ===\n';
   text += 'Time: ' + new Date().toISOString() + '\n\n';
   text += '--- Warn/Error Logs ---\n';
-  if (warnLogs.length === 0) {
-    text += '(none)\n';
-  } else {
-    text += warnLogs.join('\n') + '\n';
-  }
+  if (warnLogs.length === 0) { text += '(none)\n'; } else { text += warnLogs.join('\n') + '\n'; }
   text += '\n--- Feature States ---\n';
 
   for (var i = 0; i < FEATURES.length; i++) {
@@ -451,13 +479,11 @@ async function copyDebugInfo() {
 function renderCards() {
   var container = document.getElementById('cardsContainer');
   var html = '';
-
   FEATURES.forEach(function(group) {
     var iconSvg = getGroupIcon(group.groupIcon);
     html += '<div class="card"><div class="card-h">';
     html += '<div class="card-ic '+group.groupColor+'">'+iconSvg+'</div>';
     html += '<div class="card-t">'+group.group+'</div></div><div class="card-b">';
-
     group.items.forEach(function(item, idx) {
       if(idx > 0) html += '<div class="sep"></div>';
       html += '<div class="li" id="li-'+item.key+'" onclick="onItemClick(\''+item.key+'\')">';
@@ -470,10 +496,8 @@ function renderCards() {
       html += '<label class="sw" onclick="event.stopPropagation()"><input type="checkbox" id="sw-'+item.key+'" onchange="onToggle(\''+item.key+'\')"><span class="sw-t"></span></label>';
       html += '</div>';
     });
-
     html += '</div></div>';
   });
-
   container.innerHTML = html;
 }
 
@@ -489,11 +513,7 @@ function getGroupIcon(name) {
 
 function getItemIcon(key) {
   var defaultIcon = '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M17 7H7c-2.76 0-5 2.24-5 5s2.24 5 5 5h10c2.76 0 5-2.24 5-5s-2.24-5-5-5zm0 8c-1.66 0-3-1.34-3-3s1.34-3 3-3 3 1.34 3 3-1.34 3-3 3z"/></svg>';
-  var icons = {
-    disable_logd: '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M20 8h-2.81a5.985 5.985 0 0 0-1.82-1.96L17 4.41 15.59 3l-2.17 2.17C12.96 5.06 12.49 5 12 5s-.96.06-1.41.17L8.41 3 7 4.41l1.62 1.63C7.88 6.55 7.26 7.22 6.81 8H4v2h2.09c-.05.33-.09.66-.09 1v1H4v2h2v1c0 .34.04.67.09 1H4v2h2.81c1.04 1.79 2.97 3 5.19 3s4.15-1.21 5.19-3H20v-2h-2.09c.05-.33.09-.66.09-1v-1h2v-2h-2v-1c0-.34-.04-.67-.09-1H20V8zm-6 8h-4v-2h4v2zm0-4h-4v-2h4v2z"/></svg>',
-    block_ota: '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M5 20h14v-2H5v2zM19 9h-4V3H9v6H5l7 7 7-7z"/></svg>',
-  };
-  return icons[key] || defaultIcon;
+  return defaultIcon;
 }
 
 // ===================== 状态渲染 =====================
@@ -503,8 +523,8 @@ function updateBadge(key) {
   var s = state[key];
   var cls = 'badge ', txt = '';
   if (s.loading) { cls += 'work'; txt = '⏳ 处理中'; }
-  else if (s.status === 'enabled') { cls += 'on'; txt = '✅ 已启用'; }
-  else if (s.status === 'disabled') { cls += 'off'; txt = '⭕ 未启用'; }
+  else if (s.status === 'enabled') { cls += 'on'; txt = '✅ 已禁用'; }
+  else if (s.status === 'disabled') { cls += 'off'; txt = '⭕ 未禁用'; }
   else if (s.status === 'error') { cls += 'err'; txt = '❌ 异常'; }
   else { cls += 'off'; txt = '⏳ 检测中'; }
   el.className = cls;
@@ -539,19 +559,22 @@ async function writeProp(key, enable) {
 async function onToggle(key) {
   var s = state[key];
   if (s.loading) return;
-
   var el = document.getElementById('sw-' + key);
   var wantOn = el ? el.checked : !s.enabled;
 
   var feature = null;
-  FEATURES.forEach(function(g) { g.items.forEach(function(item) { if (item.key === key) feature = item; }); });
+  FEATURES.forEach(function(g) {
+    g.items.forEach(function(item) {
+      if (item.key === key) feature = item;
+    });
+  });
   if (!feature) return;
 
   s.loading = true;
   s.status = 'working';
   updateBadge(key);
 
-  var action = wantOn ? '启用' : '禁用';
+  var action = wantOn ? '禁用' : '恢复';
   addLog('正在' + action + ' ' + feature.title + '...');
 
   try {
@@ -570,7 +593,6 @@ async function onToggle(key) {
     addLog(feature.title + ' 异常: ' + e, 'error');
     if (el) el.checked = !wantOn;
   }
-
   s.loading = false;
   updateBadge(key);
 }
@@ -588,7 +610,6 @@ async function checkItem(item) {
   var s = state[item.key];
   try {
     var propEnabled = await readProp(item.key);
-
     var checkR = await sh(item.checkCmd);
     var checkOut = checkR.stdout.trim();
     debugData[item.key].checkRaw = checkOut || '(空)';
@@ -598,13 +619,11 @@ async function checkItem(item) {
     debugData[item.key].verifyRaw = verifyOut || '(空)';
 
     s.enabled = propEnabled;
-
     if (propEnabled) {
       s.status = 'enabled';
     } else {
       s.status = 'disabled';
     }
-
   } catch(e) {
     s.status = 'error';
     addLog('检测 ' + item.key + ' 失败: ' + e, 'error');
@@ -624,7 +643,11 @@ async function refreshAll() {
   addLog('=== 开始全面状态检测 ===');
 
   var allItems = [];
-  FEATURES.forEach(function(g) { g.items.forEach(function(item) { allItems.push(item); }); });
+  FEATURES.forEach(function(g) {
+    g.items.forEach(function(item) {
+      allItems.push(item);
+    });
+  });
 
   for (var i = 0; i < allItems.length; i++) {
     await checkItem(allItems[i]);

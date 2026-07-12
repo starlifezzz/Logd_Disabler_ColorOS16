@@ -2,6 +2,8 @@
 # ================================================================
 # ColorOS16 优化模块 - post-fs-data 阶段脚本
 # 执行时机：data 分区挂载后、系统服务启动前
+# 注意：此阶段只有 logd/OTA 的 mount 覆盖需要在这里做
+#       内核参数统一由 service.sh 处理（受 WebUI 开关控制）
 # ================================================================
 
 MODDIR=${0%/*}
@@ -39,7 +41,6 @@ if [ "$(getprop ${PROP_PREFIX}disable_logd)" = "true" ]; then
                 log "  ✅ 覆盖成功: $TARGET"
             else
                 log "  ❌ 覆盖失败: $TARGET (尝试其他方法)"
-                # 备用方案：直接清空文件内容（如果 /system 可写）
                 cp "$DUMMY" "$TARGET" 2>/dev/null
             fi
         fi
@@ -101,67 +102,11 @@ else
     log "[OTA] 未启用，跳过"
 fi
 
-# ===================== 内核参数优化 =====================
-# post-fs-data 阶段写入内核参数（此时不会被系统服务覆盖）
-
-# 内存/IO 优化（始终执行）
-log "[Kernel] 写入内核参数..."
-
-# sched_schedstats: 关闭调度统计，减少内核开销
-echo 0 > /proc/sys/kernel/sched_schedstats 2>/dev/null
-log "  sched_schedstats=$(cat /proc/sys/kernel/sched_schedstats 2>/dev/null)"
-
-# binder debug_mask: 关闭 binder 调试
-echo 0 > /sys/module/binder/parameters/debug_mask 2>/dev/null
-log "  binder debug_mask=$(cat /sys/module/binder/parameters/debug_mask 2>/dev/null)"
-
-# compact_unevictable_allowed: 禁止压缩不可回收页
-echo 0 > /proc/sys/vm/compact_unevictable_allowed 2>/dev/null
-log "  compact_unevictable=$(cat /proc/sys/vm/compact_unevictable_allowed 2>/dev/null)"
-
-# printk: 强制写入，多次写入确保第一个值也生效
-echo "3 3 3 3" > /proc/sys/kernel/printk 2>/dev/null
-# 单独写 console_loglevel（第一个值）
-echo 3 > /proc/sys/kernel/printk_console_loglevel 2>/dev/null
-# 通过 sysctl 方式再写一次
-setprop persist.sys.kernel.printk "3 3 3 3" 2>/dev/null
-# 最终验证
-CURRENT_PRINTK=$(cat /proc/sys/kernel/printk 2>/dev/null)
-log "  printk=$CURRENT_PRINTK"
-
-# 透明大页: 禁用（某些内核需要写多次或用不同路径）
-echo never > /sys/kernel/mm/transparent_hugepage/enabled 2>/dev/null
-echo never > /sys/kernel/mm/transparent_hugepage/defrag 2>/dev/null
-# 备用路径（某些 ColorOS 内核用这个）
-echo never > /sys/kernel/mm/transparent_hugepage/khugepaged/defrag 2>/dev/null
-# 通过内核 cmdline 属性备份
-setprop persist.sys.thp.enabled never 2>/dev/null
-CURRENT_THP=$(cat /sys/kernel/mm/transparent_hugepage/enabled 2>/dev/null)
-log "  thp=$CURRENT_THP"
-
-# swappiness
-echo 30 > /proc/sys/vm/swappiness 2>/dev/null
-log "  swappiness=$(cat /proc/sys/vm/swappiness 2>/dev/null)"
-
-# dirty ratio
-echo 10 > /proc/sys/vm/dirty_ratio 2>/dev/null
-echo 5 > /proc/sys/vm/dirty_background_ratio 2>/dev/null
-log "  dirty_ratio=$(cat /proc/sys/vm/dirty_ratio 2>/dev/null)"
-
-# vfs_cache_pressure
-echo 50 > /proc/sys/vm/vfs_cache_pressure 2>/dev/null
-log "  vfs_cache_pressure=$(cat /proc/sys/vm/vfs_cache_pressure 2>/dev/null)"
-
-# IO 调度器
-for queue in /sys/block/sd*/queue/scheduler /sys/block/ufs*/queue/scheduler /sys/block/dm-*/queue/scheduler; do
-    if [ -f "$queue" ]; then
-        if grep -q "mq-deadline" "$queue" 2>/dev/null; then
-            echo "mq-deadline" > "$queue" 2>/dev/null
-        elif grep -q "none" "$queue" 2>/dev/null; then
-            echo "none" > "$queue" 2>/dev/null
-        fi
-    fi
-done
-log "  IO scheduler done"
+# ===================== 内核参数优化（已移至 service.sh）=====================
+# 不再在此阶段无条件写入内核参数
+# 所有内核参数（schedstats, binder, printk, THP, swappiness 等）
+# 统一由 service.sh 根据 WebUI 开关状态决定是否写入
+# 这样可以确保：开 → 优化，关 → 不优化（保持系统默认值）
+log "[Kernel] 内核参数已移至 service.sh 处理（受 WebUI 开关控制）"
 
 log "========== post-fs-data.sh 执行完毕 =========="
