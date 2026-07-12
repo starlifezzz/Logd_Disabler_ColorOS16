@@ -1,9 +1,9 @@
-#!/bin/sh
+#!/system/bin/sh
 # ColorOS 16 优化模块状态验证脚本
+# 使用系统属性 persist.sys.coloros16_optimize_gui.* 作为唯一配置源
 # 用于检查各项配置和功能的实际状态
 
 MODDIR=${0%/*}
-CONFIG_FILE="$MODDIR/config.yaml"
 
 echo "========================================"
 echo "ColorOS16 优化模块状态验证报告"
@@ -12,39 +12,22 @@ echo "当前时间: $(date)"
 echo "模块目录: $MODDIR"
 echo ""
 
-# 检查配置文件是否存在
-if [ -f "$CONFIG_FILE" ]; then
-    echo "✅ 配置文件存在: $CONFIG_FILE"
-    echo "配置文件大小: $(wc -c < "$CONFIG_FILE") 字节"
-else
-    echo "❌ 配置文件不存在!"
-    echo "请确保已重启设备以生成配置文件"
-    exit 1
-fi
-echo ""
-
-# 函数：检查YAML配置值（简化版）
-check_yaml_config() {
-    section="$1"
-    # 使用更简单的grep方法，直接搜索 "section_name:" 后跟 "enabled:"
-    enabled=$(grep -A 10 "^[[:space:]]*$section:" "$CONFIG_FILE" | grep "^[[:space:]]*enabled:" | head -n 1 | sed 's/.*:[[:space:]]*//')
-    
-    if [ "$enabled" = "true" ]; then
-        echo "  🟢 已启用"
-    elif [ "$enabled" = "false" ]; then
-        echo "  🔴 已禁用"
+# 函数：获取KernelSU UI设置的系统属性值
+get_ksu_setting() {
+    local key="$1"
+    local default="$2"
+    # KernelSU UI设置存储为系统属性 persist.sys.<module_id>.<key>
+    local value=$(getprop "persist.sys.coloros16_optimize_gui.$key")
+    if [ -z "$value" ]; then
+        echo "$default"
     else
-        # 如果第一种方法失败，尝试另一种模式
-        enabled=$(grep -B 5 "^[[:space:]]*enabled:[[:space:]]*true" "$CONFIG_FILE" | grep "^[[:space:]]*$section:" | wc -l)
-        if [ "$enabled" -gt 0 ]; then
-            echo "  🟢 已启用"
+        # 正确解析布尔值
+        if [ "$value" = "true" ] || [ "$value" = "1" ]; then
+            echo "true"
+        elif [ "$value" = "false" ] || [ "$value" = "0" ]; then
+            echo "false"
         else
-            enabled=$(grep -B 5 "^[[:space:]]*enabled:[[:space:]]*false" "$CONFIG_FILE" | grep "^[[:space:]]*$section:" | wc -l)
-            if [ "$enabled" -gt 0 ]; then
-                echo "  🔴 已禁用"
-            else
-                echo "  ⚠️  配置错误或未找到"
-            fi
+            echo "$value"
         fi
     fi
 }
@@ -52,69 +35,158 @@ check_yaml_config() {
 # 函数：检查进程是否运行
 check_process() {
     process_name="$1"
+    # 使用多种方法检测进程
     if pgrep -f "$process_name" > /dev/null 2>&1; then
         echo "  🔴 正在运行"
-    else
-        echo "  🟢 已停止"
+        return 0
     fi
+    
+    # 额外检查：使用pidof
+    if pidof "$process_name" > /dev/null 2>&1; then
+        echo "  🔴 正在运行"  
+        return 0
+    fi
+    
+    # 额外检查：使用ps（针对logd特殊情况）
+    if [ "$process_name" = "logd" ]; then
+        if ps -A | grep -v grep | grep -q 'logd'; then
+            echo "  🔴 正在运行"
+            return 0
+        fi
+    fi
+    
+    echo "  🟢 已停止"
+    return 1
 }
 
-# 函数：检查包是否被禁用
-check_package_disabled() {
+# 函数：检查包状态并对比用户配置（统一使用"已优化"/"未优化"）
+check_package_with_config() {
     local package="$1"
-    # 首先检查包是否存在
-    if pm list packages --user 0 | grep -q "$package"; then
+    local config_key="$2"
+    
+    # 检查用户配置
+    local user_enabled=$(get_ksu_setting "$config_key" "false")
+    
+    # 检查包是否存在
+    if pm list packages --user 0 2>/dev/null | grep -qF "package:$package"; then
         # 包存在，检查是否被禁用
-        if pm list packages -d --user 0 | grep -q "$package"; then
-            echo "  🟢 已禁用"
+        if pm list packages -d --user 0 2>/dev/null | grep -qF "package:$package"; then
+            # 包被禁用
+            if [ "$user_enabled" = "true" ]; then
+                echo "  🟢 已优化"
+            else
+                echo "  🔴 已优化（应为未优化）"
+            fi
         else
-            echo "  🔴 已启用"
+            # 包未被禁用
+            if [ "$user_enabled" = "true" ]; then
+                echo "  🔴 未优化（与用户设置冲突）"
+            else
+                echo "  🟢 未优化"
+            fi
         fi
     else
-        # 包不存在，可能是不同设备的包名差异
-        echo "  ⚠️  包不存在 (可能设备型号不同)"
+        # 包不存在
+        if [ "$user_enabled" = "true" ]; then
+            echo "  ⚠️  未优化（包不存在）"
+        else
+            echo "  🟢 未优化（包不存在）"
+        fi
     fi
 }
 
-# 函数：检查系统属性
-check_system_prop() {
-    prop="$1"
-    expected_value="$2"
+# 函数：检查系统属性状态并对比用户配置
+check_system_prop_with_config() {
+    local prop="$1"
+    local expected_value="$2"
+    local config_key="$3"
+    
+    # 检查用户配置
+    local user_enabled=$(get_ksu_setting "$config_key" "false")
+    
     actual_value=$(getprop "$prop")
     if [ "$actual_value" = "$expected_value" ]; then
-        echo "  🟢 正确 ($actual_value)"
+        # 属性值正确
+        if [ "$user_enabled" = "true" ]; then
+            echo "  🟢 已优化"
+        else
+            echo "  🔴 已优化（应为未优化）"
+        fi
     else
-        echo "  🔴 错误 (期望: $expected_value, 实际: $actual_value)"
+        # 属性值错误
+        if [ "$user_enabled" = "true" ]; then
+            echo "  🔴 未优化（期望: $expected_value, 实际: $actual_value）"
+        else
+            echo "  🟢 未优化"
+        fi
     fi
 }
 
-# 函数：检查内核参数
-check_kernel_param() {
-    param_path="$1"
-    expected_value="$2"
+# 函数：检查内核参数状态并对比用户配置
+check_kernel_param_with_config() {
+    local param_path="$1"
+    local expected_value="$2"
+    local config_key="$3"
+    
+    # 检查用户配置
+    local user_enabled=$(get_ksu_setting "$config_key" "false")
+    
     if [ -f "$param_path" ]; then
         actual_value=$(cat "$param_path" 2>/dev/null)
         if [ "$actual_value" = "$expected_value" ]; then
-            echo "  🟢 正确 ($actual_value)"
+            # 参数值正确
+            if [ "$user_enabled" = "true" ]; then
+                echo "  🟢 已优化"
+            else
+                echo "  🔴 已优化（应为未优化）"
+            fi
         else
-            echo "  🔴 错误 (期望: $expected_value, 实际: $actual_value)"
+            # 参数值错误
+            if [ "$user_enabled" = "true" ]; then
+                echo "  🔴 未优化（期望: $expected_value, 实际: $actual_value）"
+            else
+                echo "  🟢 未优化"
+            fi
         fi
     else
-        echo "  ⚠️  参数文件不存在"
+        # 参数文件不存在
+        if [ "$user_enabled" = "true" ]; then
+            echo "  ⚠️  未优化（参数文件不存在）"
+        else
+            echo "  🟢 未优化（参数文件不存在）"
+        fi
     fi
 }
 
 # 1. 日志系统优化状态
-echo "1. 日志系统优化 (disable_logd):"
-check_yaml_config "disable_logd"
+echo "1. 日志系统优化:"
+disable_logd_enabled=$(get_ksu_setting "disable_logd" "false")
+if [ "$disable_logd_enabled" = "true" ]; then
+    echo "   用户设置: 🟢 已启用"
+else
+    echo "   用户设置: 🔴 未启用"
+fi
 echo "   logd 进程状态:"
 check_process "logd"
 echo "   logd 文件状态:"
 if [ -f "/system/bin/logd" ]; then
+    # 检查是否被挂载覆盖
     if [ -L "/system/bin/logd" ] || [ ! -x "/system/bin/logd" ]; then
         echo "  🟢 已被挂载覆盖或禁用"
     else
-        echo "  🔴 仍可执行"
+        # 检查文件大小（被挂载为/dev/null时大小为0）
+        file_size=$(stat -c %s "/system/bin/logd" 2>/dev/null)
+        if [ "$file_size" = "0" ]; then
+            echo "  🟢 文件已被清空或挂载覆盖"
+        else
+            # 检查文件权限
+            file_perms=$(stat -c %a "/system/bin/logd" 2>/dev/null)
+            if [ "$file_perms" = "000" ]; then
+                echo "  🟢 文件权限已被禁用"
+            else
+                echo "  🔴 仍可执行"
+            fi
+        fi
     fi
 else
     echo "  ⚠️  logd 文件不存在"
@@ -122,59 +194,287 @@ fi
 echo ""
 
 # 2. OTA更新阻断状态
-echo "2. OTA更新阻断 (block_ota):"
-check_yaml_config "block_ota"
+echo "2. OTA更新阻断:"
+block_ota_enabled=$(get_ksu_setting "block_ota" "false")
+if [ "$block_ota_enabled" = "true" ]; then
+    echo "   用户设置: 🟢 已启用"
+else
+    echo "   用户设置: 🔴 未启用"
+fi
 echo "   update_engine 进程状态:"
 check_process "update_engine"
 echo "   OTA相关包状态:"
-check_package_disabled "com.oplus.ota"
-check_package_disabled "com.oplus.sau"
+check_package_with_config "com.oplus.ota" "block_ota"
+check_package_with_config "com.oplus.sau" "block_ota"
 echo "   系统属性状态:"
-check_system_prop "persist.ota.auto_download" "0"
-check_system_prop "persist.sys.recovery_update" "0"
+check_system_prop_with_config "persist.ota.auto_download" "0" "block_ota"
+check_system_prop_with_config "persist.sys.recovery_update" "0" "block_ota"
 echo ""
 
 # 3. 开发者选项锁定状态
-echo "3. 开发者选项锁定 (lock_developer_options):"
-check_yaml_config "lock_developer_options"
+echo "3. 开发者选项锁定:"
+lock_dev_options_enabled=$(get_ksu_setting "lock_developer_options" "false")
+if [ "$lock_dev_options_enabled" = "true" ]; then
+    echo "   用户设置: 🟢 已启用"
+else
+    echo "   用户设置: 🔴 未启用"
+fi
 echo "   系统属性状态:"
-check_system_prop "persist.dev.option.lock" "1"
+check_system_prop_with_config "persist.dev.option.lock" "1" "lock_developer_options"
 echo ""
 
 # 4. 广告与数据收集屏蔽状态
-echo "4. 广告与数据收集屏蔽 (block_ads_and_tracking):"
-check_yaml_config "block_ads_and_tracking"
+echo "4. 广告与数据收集屏蔽:"
+block_ads_enabled=$(get_ksu_setting "block_ads_and_tracking" "false")
+if [ "$block_ads_enabled" = "true" ]; then
+    echo "   用户设置: 🟢 已启用"
+else
+    echo "   用户设置: 🔴 未启用"
+fi
 echo "   相关包状态:"
-check_package_disabled "com.oplus.statistics.rom"
-check_package_disabled "com.coloros.assistant"  
-check_package_disabled "com.coloros.assistantscreen"
+check_package_with_config "com.oplus.statistics.rom" "block_ads_and_tracking"
+check_package_with_config "com.coloros.assistantscreen" "block_ads_and_tracking"
+check_package_with_config "com.coloros.sceneservice" "block_ads_and_tracking"
 echo "   系统属性状态:"
-check_system_prop "persist.sys.oplus.ad_enable" "0"
-check_system_prop "persist.sys.oplus.personalized_ad" "0"
-check_system_prop "persist.ad.track" "0"
-check_system_prop "persist.sys.usage_stat_enable" "0"
-check_system_prop "persist.oppo.collect" "0"
+check_system_prop_with_config "persist.sys.oplus.ad_enable" "0" "block_ads_and_tracking"
+check_system_prop_with_config "persist.sys.oplus.personalized_ad" "0" "block_ads_and_tracking"
+check_system_prop_with_config "persist.ad.track" "0" "block_ads_and_tracking"
+check_system_prop_with_config "persist.sys.usage_stat_enable" "0" "block_ads_and_tracking"
+check_system_prop_with_config "persist.oppo.collect" "0" "block_ads_and_tracking"
 echo ""
 
 # 5. 内存/IO优化状态
-echo "5. 内存/IO优化 (memory_io_optimization):"
-check_yaml_config "memory_io_optimization"
+echo "5. 内存/IO优化:"
+mem_io_opt_enabled=$(get_ksu_setting "memory_io_optimization" "false")
+if [ "$mem_io_opt_enabled" = "true" ]; then
+    echo "   用户设置: 🟢 已启用"
+else
+    echo "   用户设置: 🔴 未启用"
+fi
 echo "   内核参数状态:"
-check_kernel_param "/proc/sys/kernel/sched_schedstats" "0"
-check_kernel_param "/sys/module/binder/parameters/debug_mask" "0"
-check_kernel_param "/proc/sys/vm/compact_unevictable_allowed" "0"
+check_kernel_param_with_config "/proc/sys/kernel/sched_schedstats" "0" "memory_io_optimization"
+check_kernel_param_with_config "/sys/module/binder/parameters/debug_mask" "0" "memory_io_optimization"
+check_kernel_param_with_config "/proc/sys/vm/compact_unevictable_allowed" "0" "memory_io_optimization"
+echo ""
+
+# 6. 额外内核优化状态
+echo "6. 额外内核优化:"
+extra_kernel_enabled=$(get_ksu_setting "extra_kernel_optimization" "false")
+if [ "$extra_kernel_enabled" = "true" ]; then
+    echo "   用户设置: 🟢 已启用"
+else
+    echo "   用户设置: 🔴 未启用"
+fi
+echo "   内核参数状态:"
+check_kernel_param_with_config "/proc/sys/kernel/printk" "3 3 3 3" "extra_kernel_optimization"
+check_kernel_param_with_config "/sys/kernel/mm/transparent_hugepage/enabled" "never" "extra_kernel_optimization"
 echo ""
 
 # 7. 健康服务状态
-echo "7. 健康服务 (disable_health_services):"
-check_yaml_config "disable_health_services"
+echo "7. 健康服务:"
+health_services_enabled=$(get_ksu_setting "disable_health_services" "false")
+if [ "$health_services_enabled" = "true" ]; then
+    echo "   用户设置: 🟢 已启用"
+else
+    echo "   用户设置: 🔴 未启用"
+fi
 echo "   健康服务包状态:"
-check_package_disabled "com.oplus.healthservice"
-check_package_disabled "com.oplus.sports"
+check_package_with_config "com.oplus.healthservice" "disable_health_services"
+check_package_with_config "com.heytap.health" "disable_health_services"
 echo ""
 
-# 8. 冗余进程状态
-echo "8. 冗余进程状态:"
+# 8. 流量监控与网络服务状态
+echo "8. 流量监控与网络服务:"
+net_monitor_enabled=$(get_ksu_setting "disable_network_monitoring" "false")
+if [ "$net_monitor_enabled" = "true" ]; then
+    echo "   用户设置: 🟢 已启用"
+else
+    echo "   用户设置: 🔴 未启用"
+fi
+echo "   网络服务包状态:"
+check_package_with_config "com.oplus.trafficmonitor" "disable_network_monitoring"
+check_package_with_config "com.oplus.dmp" "disable_network_monitoring"
+echo ""
+
+# 9. 锁屏杂志与壁纸服务状态
+echo "9. 锁屏杂志与壁纸服务:"
+lockscreen_mag_enabled=$(get_ksu_setting "disable_lockscreen_magazine" "false")
+if [ "$lockscreen_mag_enabled" = "true" ]; then
+    echo "   用户设置: 🟢 已启用"
+else
+    echo "   用户设置: 🔴 未启用"
+fi
+echo "   锁屏杂志包状态:"
+check_package_with_config "com.heytap.pictorial" "disable_lockscreen_magazine"
+echo "   系统属性状态:"
+check_system_prop_with_config "persist.sys.lockscreen_magazine" "0" "disable_lockscreen_magazine"
+echo ""
+
+# 10. 游戏空间与性能监控状态
+echo "10. 游戏空间与性能监控:"
+gamespace_enabled=$(get_ksu_setting "disable_gamespace" "false")
+if [ "$gamespace_enabled" = "true" ]; then
+    echo "   用户设置: 🟢 已启用"
+else
+    echo "   用户设置: 🔴 未启用"
+fi
+echo "   游戏空间包状态:"
+check_package_with_config "com.oplus.games" "disable_gamespace"
+echo ""
+
+# 11. 钱包与支付服务状态
+echo "11. 钱包与支付服务:"
+wallet_services_enabled=$(get_ksu_setting "disable_wallet_services" "false")
+if [ "$wallet_services_enabled" = "true" ]; then
+    echo "   用户设置: 🟢 已启用"
+else
+    echo "   用户设置: 🔴 未启用"
+fi
+echo "   钱包服务包状态:"
+check_package_with_config "com.oplus.pay" "disable_wallet_services"
+check_package_with_config "com.coloros.securepay" "disable_wallet_services"
+check_package_with_config "com.finshell.wallet" "disable_wallet_services"
+echo ""
+
+# 12. 备份与云服务状态
+echo "12. 备份与云服务:"
+backup_services_enabled=$(get_ksu_setting "disable_backup_services" "false")
+if [ "$backup_services_enabled" = "true" ]; then
+    echo "   用户设置: 🟢 已启用"
+else
+    echo "   用户设置: 🔴 未启用"
+fi
+echo "   备份服务包状态:"
+check_package_with_config "com.oplus.wifibackuprestore" "disable_backup_services"
+check_package_with_config "com.heytap.cloud" "disable_backup_services"
+echo ""
+
+# 13. AI智能助手服务状态
+echo "13. AI智能助手服务:"
+ai_assistants_enabled=$(get_ksu_setting "disable_ai_assistants" "false")
+if [ "$ai_assistants_enabled" = "true" ]; then
+    echo "   用户设置: 🟢 已启用"
+else
+    echo "   用户设置: 🔴 未启用"
+fi
+echo "   AI助手包状态:"
+check_package_with_config "com.oplus.aimemory" "disable_ai_assistants"
+check_package_with_config "com.oplus.aiunit" "disable_ai_assistants"
+check_package_with_config "com.oplus.aiwidgets" "disable_ai_assistants"
+check_package_with_config "com.oplus.aiwriter" "disable_ai_assistants"
+# check_package_with_config "com.oplus.athena" "disable_ai_assistants"  # 不存在于services.txt
+# check_package_with_config "com.oplus.deepthinker" "disable_ai_assistants"  # 不存在于services.txt
+check_package_with_config "com.oplus.metis" "disable_ai_assistants"
+# check_package_with_config "com.oplus.smartengine" "disable_ai_assistants"  # 不存在于services.txt
+check_package_with_config "com.oplus.obrain" "disable_ai_assistants"
+echo ""
+
+# 14. 语音助手服务状态
+echo "14. 语音助手服务:"
+voice_assistant_enabled=$(get_ksu_setting "disable_voice_assistants" "false")
+if [ "$voice_assistant_enabled" = "true" ]; then
+    echo "   用户设置: 🟢 已启用"
+else
+    echo "   用户设置: 🔴 未启用"
+fi
+echo "   语音助手包状态:"
+check_package_with_config "com.oplus.ovoicemanager" "disable_voice_assistants"
+check_package_with_config "com.oplus.ovoicemanager.wakeup" "disable_voice_assistants"
+check_package_with_config "com.heytap.speechassist" "disable_voice_assistants"
+check_package_with_config "com.oplus.ttsaccessibilityengine" "disable_voice_assistants"
+echo ""
+
+# 15. 主题和个性化服务状态
+echo "15. 主题和个性化服务:"
+theme_service_enabled=$(get_ksu_setting "disable_theme_services" "false")
+if [ "$theme_service_enabled" = "true" ]; then
+    echo "   用户设置: 🟢 已启用"
+else
+    echo "   用户设置: 🔴 未启用"
+fi
+echo "   主题服务包状态:"
+check_package_with_config "com.oplus.themestore" "disable_theme_services"
+check_package_with_config "com.heytap.themestore" "disable_theme_services"
+check_package_with_config "com.oplus.keyguard.clock.magazine" "disable_theme_services"
+check_package_with_config "com.oplus.keyguard.clock.gallery" "disable_theme_services"
+check_package_with_config "com.oplus.keyguard.clock.graffiti" "disable_theme_services"
+check_package_with_config "com.oplus.keyguard.personality.clocks" "disable_theme_services"
+check_package_with_config "com.oplus.keyguard.style.widgets" "disable_theme_services"
+echo ""
+
+# 16. 网络优化服务状态
+echo "16. 网络优化服务:"
+network_optimization_enabled=$(get_ksu_setting "disable_network_optimization" "false")
+if [ "$network_optimization_enabled" = "true" ]; then
+    echo "   用户设置: 🟢 已启用"
+else
+    echo "   用户设置: 🔴 未启用"
+fi
+echo "   网络优化包状态:"
+check_package_with_config "com.oplus.networksense" "disable_network_optimization"
+check_package_with_config "com.oplus.cellularqoe" "disable_network_optimization"
+check_package_with_config "com.oplus.tai.wifiqoe" "disable_network_optimization"
+check_package_with_config "com.oplus.tai.borderpresearch" "disable_network_optimization"
+check_package_with_config "com.oplus.nearcomm" "disable_network_optimization"
+echo ""
+
+# 17. 安全和权限服务状态
+echo "17. 安全和权限服务:"
+security_service_enabled=$(get_ksu_setting "disable_security_services" "false")
+if [ "$security_service_enabled" = "true" ]; then
+    echo "   用户设置: 🟢 已启用"
+else
+    echo "   用户设置: 🔴 未启用"
+fi
+echo "   安全服务包状态:"
+check_package_with_config "com.oplus.securitykeyboard" "disable_security_services"
+check_package_with_config "com.coloros.securityguard" "disable_security_services"
+echo ""
+
+# 18. 多媒体和娱乐服务状态
+echo "18. 多媒体和娱乐服务:"
+media_services_enabled=$(get_ksu_setting "disable_media_services" "false")
+if [ "$media_services_enabled" = "true" ]; then
+    echo "   用户设置: 🟢 已启用"
+else
+    echo "   用户设置: 🔴 未启用"
+fi
+echo "   多媒体服务包状态:"
+check_package_with_config "com.oplus.games" "disable_media_services"
+check_package_with_config "com.oplus.screenrecorder" "disable_media_services"
+check_package_with_config "com.coloros.karaoke" "disable_media_services"
+check_package_with_config "com.oplus.mediacontroller" "disable_media_services"
+echo ""
+
+# 19. 系统工具和监控服务状态
+echo "19. 系统工具和监控服务:"
+system_tools_enabled=$(get_ksu_setting "disable_system_tools" "false")
+if [ "$system_tools_enabled" = "true" ]; then
+    echo "   用户设置: 🟢 已启用"
+else
+    echo "   用户设置: 🔴 未启用"
+fi
+echo "   系统工具包状态:"
+check_package_with_config "com.oplus.powermonitor" "disable_system_tools"
+check_package_with_config "com.oplus.audiomonitor" "disable_system_tools"
+check_package_with_config "com.oplus.logkit" "disable_system_tools"
+check_package_with_config "com.oplus.engineermode" "disable_system_tools"
+check_package_with_config "com.oplus.crashbox" "disable_system_tools"
+check_package_with_config "com.oplus.appplatform" "disable_system_tools"
+check_package_with_config "com.oplus.contentportal" "disable_system_tools"
+check_package_with_config "com.oplus.postmanservice" "disable_system_tools"
+check_package_with_config "com.oplus.subsys" "disable_system_tools"
+echo ""
+
+# 20. 进程查杀优化状态
+echo "20. 进程查杀优化:"
+kill_procs_enabled=$(get_ksu_setting "kill_redundant_processes" "false")
+if [ "$kill_procs_enabled" = "true" ]; then
+    echo "   用户设置: 🟢 已启用"
+else
+    echo "   用户设置: 🔴 未启用"
+fi
+echo "   冗余进程状态:"
 echo "   smartscene:"
 check_process "smartscene"
 echo "   preload:"
@@ -185,8 +485,22 @@ echo "   hotstart:"
 check_process "hotstart"
 echo ""
 
-# 9. SELinux 状态
-echo "9. SELinux 状态:"
+# 21. 系统属性开关状态
+echo "21. 系统属性开关:"
+system_props_enabled=$(get_ksu_setting "system_prop_toggles" "false")
+if [ "$system_props_enabled" = "true" ]; then
+    echo "   用户设置: 🟢 已启用"
+else
+    echo "   用户设置: 🔴 未启用"
+fi
+echo "   系统属性状态:"
+check_system_prop_with_config "persist.sys.preload" "0" "system_prop_toggles"
+check_system_prop_with_config "persist.sys.monitor" "0" "system_prop_toggles"
+check_system_prop_with_config "persist.sys.hotstart" "0" "system_prop_toggles"
+echo ""
+
+# 22. SELinux 状态
+echo "22. SELinux 状态:"
 selinux_status=$(getenforce)
 if [ "$selinux_status" = "Permissive" ]; then
     echo "  🟢 当前为 Permissive (宽容模式)"
@@ -197,8 +511,8 @@ else
 fi
 echo ""
 
-# 10. ZRAM/Swap 状态 (如果模块涉及内存优化)
-echo "10. ZRAM/Swap 状态:"
+# 23. ZRAM/Swap 状态 (如果模块涉及内存优化)
+echo "23. ZRAM/Swap 状态:"
 if [ -f "/sys/block/zram0/disksize" ]; then
     zram_size=$(cat /sys/block/zram0/disksize 2>/dev/null)
     if [ $? -eq 0 ] && [ -n "$zram_size" ] && [ "$zram_size" != "0" ]; then
@@ -221,16 +535,8 @@ else
 fi
 echo ""
 
-# 11. 关键服务禁用状态 (示例)
-echo "11. 关键系统服务状态:"
-echo "   检查是否有被禁用的优化相关服务..."
-# 这里可以添加具体的服务检查，例如：
-# pm list services | grep -i "oplus" | head -n 5
-echo "  ℹ️  如需检查特定服务，请手动使用 'pm list services'"
-echo ""
-
-# 12. 模块加载状态 (KernelSU/Magisk)
-echo "12. 模块管理器状态:"
+# 24. 模块加载状态 (KernelSU/Magisk)
+echo "24. 模块管理器状态:"
 if [ -d "/data/adb/ksu" ]; then
     echo "  🟢 检测到 KernelSU 环境"
 elif [ -d "/data/adb/magisk" ]; then

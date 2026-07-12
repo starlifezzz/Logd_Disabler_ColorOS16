@@ -8,34 +8,38 @@
     <!-- Window Safe Area Insets -->
     <link rel="stylesheet" type="text/css" href="/internal/insets.css" />
     <style>
-        .root_layout {
-            padding-top: var(--window-inset-top);
-            padding-bottom: var(--window-inset-bottom);
+        /* ===== 回退到 Fixed + Margin 方案 ===== */
+        body {
+            margin: 0;
+            padding: 0;
+            /* 移除 Flex 布局，允许 body 自然滚动 */
         }
+
         @media (prefers-color-scheme: dark) {
             body {
-                background-color: black;
+                background-color: #121212;
             }
         }
         
-        /* 固定头部 - 修复状态栏重叠问题 */
+        /* 固定头部 - 使用 position: fixed */
         .fixed-header {
             position: fixed;
-            top: var(--window-inset-top, 0px); /* 使用安全区域顶部内边距 */
+            top: 0;
             left: 0;
             right: 0;
-            background-color: #f5f5f5; /* 设置与页面背景一致的颜色 */
-            padding: 16px;
+            background-color: #f5f5f5;
+            /* 使用安全区域顶部内边距 */
+            padding: calc(16px + var(--window-inset-top, 0px)) 16px 16px 16px;
             z-index: 1000;
             box-shadow: 0 2px 8px rgba(0,0,0,0.1);
             display: flex;
             justify-content: space-between;
-            align-items: center;
+            align-items: flex-start;
         }
 
         @media (prefers-color-scheme: dark) {
             .fixed-header {
-                background-color: #1a1a1a; /* 暗色模式下的背景颜色 */
+                background-color: #1a1a1a;
                 box-shadow: 0 2px 8px rgba(0,0,0,0.3);
             }
         }
@@ -95,56 +99,48 @@
             box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
             transform: none;
         }
-
+        
+        /* 警告信息样式 */
+        .warning-message {
+            margin: 8px 0 0 0;
+            padding: 8px 12px;
+            background-color: #fff3cd;
+            color: #856404;
+            border: 1px solid #ffeaa7;
+            border-radius: 4px;
+            font-size: 12px;
+            line-height: 1.4;
+        }
+        
         @media (prefers-color-scheme: dark) {
-            .save-button-top {
-                background: linear-gradient(135deg, #64FFDA, #6E7FFC);
-                color: #1A1A1A;
-                box-shadow: 0 4px 8px rgba(0, 0, 0, 0.4);
-            }
-
-            .save-button-top:hover:not(:disabled) {
-                background: linear-gradient(135deg, #6E7FFC, #64FFDA);
-                box-shadow: 0 6px 12px rgba(0, 0, 0, 0.5);
-            }
-
-            .save-button-top:disabled {
-                background: linear-gradient(135deg, #555555, #333333);
-                color: #888;
-                box-shadow: 0 2px 4px rgba(0, 0, 0, 0.4);
+            .warning-message {
+                background-color: #332700;
+                color: #ffec99;
+                border-color: #ffd43b;
             }
         }
         
-        /* 页面内容区域 - 调整顶部间距 */
+        /* #app 容器不再需要 Flex 布局 */
+        #app {
+            width: 100%;
+        }
+        
+        /* ===== 关键修改：页面内容区域 ===== */
         .page-content {
-            margin-top: calc(90px + var(--window-inset-top, 0px)); /* 头部高度 + 状态栏高度 */
+            /* 让内容区域回归正常文档流 */
+            margin-top: calc(100px + var(--window-inset-top, 0px)); /* 增加顶部间距，避免标题被盖住 */
+            /* 为固定底部导航栏预留足够空间 (70px height + padding-bottom + extra buffer) */
+            margin-bottom: calc(100px + var(--window-inset-bottom, 0px) + 30px); 
             padding: 0 16px;
+            /* 确保 body 可以滚动 */
+            min-height: calc(100vh - 100px - 100px - var(--window-inset-top, 0px) - var(--window-inset-bottom, 0px));
         }
         
-        /* 底部导航栏 - iOS 26 液态玻璃效果 */
-        .bottom-nav {
-            position: fixed;
-            bottom: 0;
-            left: 0;
-            right: 0;
-            display: flex;
-            justify-content: space-around;
-            align-items: center;
-            height: 70px;
-            background: rgba(255, 255, 255, 0.8);
-            backdrop-filter: blur(20px);
-            -webkit-backdrop-filter: blur(20px);
-            border-top: 1px solid rgba(255, 255, 255, 0.3);
-            box-shadow: 0 -2px 20px rgba(0,0,0,0.1);
-            z-index: 1000;
-        }
-        
-        @media (prefers-color-scheme: dark) {
-            .bottom-nav {
-                background: rgba(30, 30, 30, 0.8);
-                border-top-color: rgba(60, 60, 60, 0.3);
-                box-shadow: 0 -2px 20px rgba(0,0,0,0.3);
-            }
+        /* 调整验证页按钮容器 */
+        .button-container {
+            text-align: center;
+            margin-top: 20px;
+            margin-bottom: 20px;
         }
         
         .nav-item {
@@ -244,6 +240,34 @@
                 border-left-color: #444;
             }
         }
+        
+        /* 增加默认启用选项区域的顶部内边距 */
+        .section-enabled {
+            margin-top: 30px;
+        }
+        
+        /* 新增底部导航栏样式 */
+        .bottom-nav {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            display: flex;
+            justify-content: space-around;
+            align-items: center;
+            height: 70px;
+            /* 处理底部安全区域 */
+            padding-bottom: max(var(--window-inset-bottom, 0px), 10px);
+            background: rgba(255, 255, 255, 0.8);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            border-top: 1px solid rgba(255, 255, 255, 0.3);
+            box-shadow: 0 -2px 20px rgba(0,0,0,0.1);
+            z-index: 1000;
+            /* 确保始终可见 */
+            opacity: 1;
+            visibility: visible;
+        }
     </style>
 </head>
 <body>
@@ -333,16 +357,17 @@
         // 检查包是否被禁用
         async function checkPackageDisabled(packageName) {
             try {
-                // 首先检查包是否存在
-                const listResult = await executeShell(`pm list packages --user 0 | grep "${packageName}"`);
+                // 首先检查包是否存在 - 使用 pm list packages 并精确匹配完整包名
+                const listResult = await executeShell(`pm list packages --user 0 | grep -F "package:${packageName}"`);
                 if (listResult.stdout.trim() === "") {
                     return "not_exists"; // 包不存在
                 }
                 
-                // 检查是否被禁用
-                const disabledResult = await executeShell(`pm list packages -d --user 0 | grep "${packageName}"`);
+                // 检查是否被禁用 - 同样使用精确匹配
+                const disabledResult = await executeShell(`pm list packages -d --user 0 | grep -F "package:${packageName}"`);
                 return disabledResult.stdout.trim() !== "";
             } catch (error) {
+                console.error("Package check failed:", packageName, error);
                 return "error";
             }
         }
@@ -526,6 +551,57 @@
                 description: '禁用备份与云服务（如不需要自动备份）',
                 defaultValue: false,
                 category: 'disabled'
+            },
+            {
+                key: 'disable_ai_assistants',
+                name: '禁用AI智能助手',
+                description: '禁用AI智能助手相关服务（减少后台AI计算和数据收集）',
+                defaultValue: false,
+                category: 'disabled'
+            },
+            {
+                key: 'disable_voice_assistants',
+                name: '禁用语音助手',
+                description: '禁用语音助手和TTS相关服务（如不需要语音功能）',
+                defaultValue: false,
+                category: 'disabled'
+            },
+            {
+                key: 'disable_theme_services',
+                name: '禁用主题服务',
+                description: '禁用主题商店和个性化服务（节省存储空间）',
+                defaultValue: false,
+                category: 'disabled'
+            },
+            {
+                key: 'disable_network_optimization',
+                name: '禁用网络优化',
+                description: '禁用网络优化和感知服务（减少后台网络活动）',
+                defaultValue: false,
+                category: 'disabled'
+            },
+            {
+                key: 'disable_security_services',
+                name: '禁用安全服务',
+                description: '禁用额外的安全和权限服务（如不需要额外安全功能）',
+                defaultValue: false,
+                category: 'disabled'
+            },
+            {
+                key: 'disable_media_services',
+                name: '禁用多媒体服务',
+                description: '禁用多媒体和娱乐相关服务（如不需要游戏、录屏等功能）',
+                defaultValue: false,
+                category: 'disabled'
+            },
+            {
+                key: 'disable_system_tools',
+                name: '禁用系统工具',
+                description: '禁用系统工具和监控服务（减少后台监控）',
+                defaultValue: false,
+                category: 'disabled',
+                // 注意：部分系统工具包可能无法禁用，如 com.oplus.subsys, com.oplus.appplatform, com.oplus.contentportal
+                warning: '部分系统工具包可能无法禁用'
             }
         ];
         
@@ -533,9 +609,9 @@
         async function verifyFunctionality() {
             const results = {};
             
-            // 1. 日志系统优化
+            // 1. 日志系统
             results.disable_logd = {
-                title: "日志系统优化",
+                title: "日志系统",
                 status: "checking",
                 details: []
             };
@@ -559,9 +635,9 @@
                 results.disable_logd.details.push({ name: "logd 文件", status: "error", message: "仍可执行" });
             }
             
-            // 2. OTA更新阻断
+            // 2. OTA更新
             results.block_ota = {
-                title: "OTA更新阻断",
+                title: "OTA更新",
                 status: "checking",
                 details: []
             };
@@ -573,7 +649,7 @@
                 results.block_ota.details.push({ name: "update_engine 进程", status: "error", message: "仍在运行" });
             }
             
-            // 检查 OTA 相关包
+            // 检查 OTA 相关包 - 使用 services.txt 中的准确包名
             const otaPackages = ["com.oplus.ota", "com.oplus.sau"];
             for (const pkg of otaPackages) {
                 const pkgStatus = await checkPackageDisabled(pkg);
@@ -600,9 +676,9 @@
                 }
             }
             
-            // 3. 开发者选项锁定
+            // 3. 开发者选项
             results.lock_developer_options = {
-                title: "开发者选项锁定",
+                title: "开发者选项",
                 status: "checking",
                 details: []
             };
@@ -614,9 +690,9 @@
                 results.lock_developer_options.details.push({ name: "persist.dev.option.lock", status: "error", message: `错误 (期望: 1, 实际: ${devLockProp})` });
             }
             
-            // 4. 广告与数据收集屏蔽
+            // 4. 广告与数据收集
             results.block_ads_and_tracking = {
-                title: "广告与数据收集屏蔽",
+                title: "广告与数据收集",
                 status: "checking",
                 details: []
             };
@@ -649,9 +725,9 @@
                 }
             }
             
-            // 5. 内存/IO优化
+            // 5. 内存/IO
             results.memory_io_optimization = {
-                title: "内存/IO优化",
+                title: "内存/IO",
                 status: "checking",
                 details: []
             };
@@ -670,9 +746,42 @@
                 }
             }
             
-            // 6. 冗余进程状态
+            // 6. 额外内核
+            results.extra_kernel_optimization = {
+                title: "额外内核",
+                status: "checking",
+                details: []
+            };
+            
+            const extraKernelParams = [
+                { path: "/proc/sys/kernel/printk", expected: "3 3 3 3" },
+                { path: "/sys/kernel/mm/transparent_hugepage/enabled", expected: "never" }
+            ];
+            for (const param of extraKernelParams) {
+                const isCorrect = await checkKernelParam(param.path, param.expected);
+                const userIntentProp = await getSystemProperty("persist.sys.coloros16_optimize_gui.extra_kernel_optimization", "true");
+                const isUserIntended = userIntentProp === "true";
+
+                if (isUserIntended) {
+                    // 用户启用了功能 - 应该显示"已优化"
+                    if (isCorrect) {
+                        results.extra_kernel_optimization.details.push({ name: param.path, status: "success", message: "已优化" });
+                    } else {
+                        results.extra_kernel_optimization.details.push({ name: param.path, status: "error", message: `未优化（期望: ${param.expected}）` });
+                    }
+                } else {
+                    // 用户禁用了功能 - 应该显示"未优化"
+                    if (isCorrect) {
+                        results.extra_kernel_optimization.details.push({ name: param.path, status: "error", message: "已优化（应为未优化）" });
+                    } else {
+                        results.extra_kernel_optimization.details.push({ name: param.path, status: "success", message: "未优化" });
+                    }
+                }
+            }
+            
+            // 7. 冗余进程
             results.kill_redundant_processes = {
-                title: "冗余进程状态",
+                title: "冗余进程",
                 status: "checking",
                 details: []
             };
@@ -687,28 +796,77 @@
                 }
             }
             
-            // 7. 健康服务状态
-            results.disable_health_services = {
-                title: "健康服务状态",
+            // 8. 网络监控
+            results.disable_network_monitoring = {
+                title: "网络监控",
                 status: "checking",
                 details: []
             };
             
-            const healthPackages = ["com.oplus.healthservice", "com.oplus.sports"];
-            for (const pkg of healthPackages) {
+            const networkPackages = ["com.oplus.trafficmonitor", "com.oplus.dmp"];
+            for (const pkg of networkPackages) {
                 const pkgStatus = await checkPackageDisabled(pkg);
-                if (pkgStatus === true) {
-                    results.disable_health_services.details.push({ name: pkg, status: "success", message: "已禁用" });
-                } else if (pkgStatus === "not_exists") {
-                    results.disable_health_services.details.push({ name: pkg, status: "warning", message: "包不存在" });
+                const userIntentProp = await getSystemProperty("persist.sys.coloros16_optimize_gui.disable_network_monitoring", "false");
+                const isUserIntended = userIntentProp === "true";
+
+                if (isUserIntended) {
+                    // 用户启用了功能 - 应该显示"已优化"
+                    if (pkgStatus === true) {
+                        results.disable_network_monitoring.details.push({ name: pkg, status: "success", message: "已优化" });
+                    } else if (pkgStatus === "not_exists") {
+                        results.disable_network_monitoring.details.push({ name: pkg, status: "warning", message: "包不存在" });
+                    } else {
+                        results.disable_network_monitoring.details.push({ name: pkg, status: "error", message: "未优化（与用户设置冲突）" });
+                    }
                 } else {
-                    results.disable_health_services.details.push({ name: pkg, status: "error", message: "未禁用" });
+                    // 用户禁用了功能 - 应该显示"未优化"
+                    if (pkgStatus === true) {
+                        results.disable_network_monitoring.details.push({ name: pkg, status: "error", message: "已优化（应为未优化）" });
+                    } else if (pkgStatus === "not_exists") {
+                        results.disable_network_monitoring.details.push({ name: pkg, status: "warning", message: "包不存在" });
+                    } else {
+                        results.disable_network_monitoring.details.push({ name: pkg, status: "success", message: "未优化" });
+                    }
                 }
             }
             
-            // 8. SELinux 状态
+            // 9. 锁屏杂志
+            results.disable_lockscreen_magazine = {
+                title: "锁屏杂志",
+                status: "checking",
+                details: []
+            };
+            
+            const magazinePackages = ["com.heytap.pictorial", "com.oplus.wallpapers"];
+            for (const pkg of magazinePackages) {
+                const pkgStatus = await checkPackageDisabled(pkg);
+                const userIntentProp = await getSystemProperty("persist.sys.coloros16_optimize_gui.disable_lockscreen_magazine", "false");
+                const isUserIntended = userIntentProp === "true";
+
+                if (isUserIntended) {
+                    // 用户启用了功能 - 应该显示"已优化"
+                    if (pkgStatus === true) {
+                        results.disable_lockscreen_magazine.details.push({ name: pkg, status: "success", message: "已优化" });
+                    } else if (pkgStatus === "not_exists") {
+                        results.disable_lockscreen_magazine.details.push({ name: pkg, status: "warning", message: "包不存在" });
+                    } else {
+                        results.disable_lockscreen_magazine.details.push({ name: pkg, status: "error", message: "未优化（与用户设置冲突）" });
+                    }
+                } else {
+                    // 用户禁用了功能 - 应该显示"未优化"
+                    if (pkgStatus === true) {
+                        results.disable_lockscreen_magazine.details.push({ name: pkg, status: "error", message: "已优化（应为未优化）" });
+                    } else if (pkgStatus === "not_exists") {
+                        results.disable_lockscreen_magazine.details.push({ name: pkg, status: "warning", message: "包不存在" });
+                    } else {
+                        results.disable_lockscreen_magazine.details.push({ name: pkg, status: "success", message: "未优化" });
+                    }
+                }
+            }
+            
+            // 10. SELinux
             results.selinux_status = {
-                title: "SELinux 状态",
+                title: "SELinux",
                 status: "checking",
                 details: []
             };
@@ -722,9 +880,9 @@
                 results.selinux_status.details.push({ name: "SELinux", status: "error", message: `未知状态: ${selinuxStatus}` });
             }
             
-            // 9. ZRAM 状态
+            // 11. ZRAM/Swap
             results.zram_status = {
-                title: "ZRAM/Swap 状态",
+                title: "ZRAM/Swap",
                 status: "checking",
                 details: []
             };
@@ -738,7 +896,7 @@
                 results.zram_status.details.push({ name: "ZRAM", status: "error", message: "检测失败" });
             }
             
-            // 10. Root 环境
+            // 12. Root 环境
             results.root_environment = {
                 title: "Root 环境",
                 status: "checking",
@@ -752,6 +910,279 @@
                 results.root_environment.details.push({ name: "Root 管理器", status: "success", message: "Magisk" });
             } else {
                 results.root_environment.details.push({ name: "Root 管理器", status: "error", message: "未检测到" });
+            }
+            
+            // 20. 系统属性
+            results.system_prop_toggles = {
+                title: "系统属性",
+                status: "checking",
+                details: []
+            };
+            
+            // 检查系统属性
+            const systemProps = [
+                { prop: "persist.sys.preload", expected: "0" },
+                { prop: "persist.sys.monitor", expected: "0" },
+                { prop: "persist.sys.hotstart", expected: "0" }
+            ];
+            for (const propInfo of systemProps) {
+                const actual = await getSystemProperty(propInfo.prop, "");
+                const userIntentProp = await getSystemProperty("persist.sys.coloros16_optimize_gui.system_prop_toggles", "true");
+                const isUserIntended = userIntentProp === "true";
+
+                if (isUserIntended) {
+                    // 用户启用了功能 - 应该显示"已优化"
+                    if (actual === propInfo.expected) {
+                        results.system_prop_toggles.details.push({ name: propInfo.prop, status: "success", message: "已优化" });
+                    } else {
+                        results.system_prop_toggles.details.push({ name: propInfo.prop, status: "error", message: `未优化（期望: ${propInfo.expected}, 实际: ${actual}）` });
+                    }
+                } else {
+                    // 用户禁用了功能 - 应该显示"未优化"
+                    if (actual === propInfo.expected) {
+                        results.system_prop_toggles.details.push({ name: propInfo.prop, status: "error", message: "已优化（应为未优化）" });
+                    } else {
+                        results.system_prop_toggles.details.push({ name: propInfo.prop, status: "success", message: "未优化" });
+                    }
+                }
+            }
+            
+            // 12. AI智能助手
+            results.disable_ai_assistants = {
+                title: "AI智能助手",
+                status: "checking",
+                details: []
+            };
+            
+            const aiAssistantPackages = ["com.oplus.aimemory", "com.oplus.aiunit", "com.oplus.aiwidgets", "com.oplus.aiwriter", "com.oplus.athena", "com.oplus.deepthinker", "com.oplus.metis", "com.oplus.smartengine", "com.oplus.obrain"];
+            for (const pkg of aiAssistantPackages) {
+                const pkgStatus = await checkPackageDisabled(pkg);
+                const userIntentProp = await getSystemProperty("persist.sys.coloros16_optimize_gui.disable_ai_assistants", "false");
+                const isUserIntended = userIntentProp === "true";
+
+                if (isUserIntended) {
+                    // 用户启用了功能
+                    if (pkgStatus === true) {
+                        results.disable_ai_assistants.details.push({ name: pkg, status: "success", message: "已禁用" });
+                    } else if (pkgStatus === "not_exists") {
+                        results.disable_ai_assistants.details.push({ name: pkg, status: "warning", message: "包不存在" });
+                    } else {
+                        results.disable_ai_assistants.details.push({ name: pkg, status: "error", message: "未禁用（与用户设置冲突）" });
+                    }
+                } else {
+                    // 用户禁用了功能
+                    if (pkgStatus === true) {
+                        results.disable_ai_assistants.details.push({ name: pkg, status: "error", message: "已禁用（应已恢复）" });
+                    } else if (pkgStatus === "not_exists") {
+                        results.disable_ai_assistants.details.push({ name: pkg, status: "warning", message: "包不存在" });
+                    } else {
+                        results.disable_ai_assistants.details.push({ name: pkg, status: "success", message: "已恢复" });
+                    }
+                }
+            }
+            
+            // 13. 语音助手
+            results.disable_voice_assistants = {
+                title: "语音助手",
+                status: "checking",
+                details: []
+            };
+            
+            const voiceAssistantPackages = ["com.oplus.ovoicemanager", "com.oplus.ovoicemanager.wakeup", "com.heytap.speechassist", "com.oplus.ttsaccessibilityengine"];
+            for (const pkg of voiceAssistantPackages) {
+                const pkgStatus = await checkPackageDisabled(pkg);
+                const userIntentProp = await getSystemProperty("persist.sys.coloros16_optimize_gui.disable_voice_assistants", "false");
+                const isUserIntended = userIntentProp === "true";
+
+                if (isUserIntended) {
+                    // 用户启用了功能
+                    if (pkgStatus === true) {
+                        results.disable_voice_assistants.details.push({ name: pkg, status: "success", message: "已禁用" });
+                    } else if (pkgStatus === "not_exists") {
+                        results.disable_voice_assistants.details.push({ name: pkg, status: "warning", message: "包不存在" });
+                    } else {
+                        results.disable_voice_assistants.details.push({ name: pkg, status: "error", message: "未禁用（与用户设置冲突）" });
+                    }
+                } else {
+                    // 用户禁用了功能
+                    if (pkgStatus === true) {
+                        results.disable_voice_assistants.details.push({ name: pkg, status: "error", message: "已禁用（应已恢复）" });
+                    } else if (pkgStatus === "not_exists") {
+                        results.disable_voice_assistants.details.push({ name: pkg, status: "warning", message: "包不存在" });
+                    } else {
+                        results.disable_voice_assistants.details.push({ name: pkg, status: "success", message: "已恢复" });
+                    }
+                }
+            }
+            
+            // 14. 主题服务
+            results.disable_theme_services = {
+                title: "主题服务",
+                status: "checking",
+                details: []
+            };
+            
+            const themePackages = ["com.oplus.themestore", "com.heytap.themestore", "com.oplus.keyguard.clock.magazine", "com.oplus.keyguard.clock.gallery", "com.oplus.keyguard.clock.graffiti", "com.oplus.keyguard.personality.clocks", "com.oplus.keyguard.style.widgets"];
+            for (const pkg of themePackages) {
+                const pkgStatus = await checkPackageDisabled(pkg);
+                const userIntentProp = await getSystemProperty("persist.sys.coloros16_optimize_gui.disable_theme_services", "false");
+                const isUserIntended = userIntentProp === "true";
+
+                if (isUserIntended) {
+                    // 用户启用了功能
+                    if (pkgStatus === true) {
+                        results.disable_theme_services.details.push({ name: pkg, status: "success", message: "已禁用" });
+                    } else if (pkgStatus === "not_exists") {
+                        results.disable_theme_services.details.push({ name: pkg, status: "warning", message: "包不存在" });
+                    } else {
+                        results.disable_theme_services.details.push({ name: pkg, status: "error", message: "未禁用（与用户设置冲突）" });
+                    }
+                } else {
+                    // 用户禁用了功能
+                    if (pkgStatus === true) {
+                        results.disable_theme_services.details.push({ name: pkg, status: "error", message: "已禁用（应已恢复）" });
+                    } else if (pkgStatus === "not_exists") {
+                        results.disable_theme_services.details.push({ name: pkg, status: "warning", message: "包不存在" });
+                    } else {
+                        results.disable_theme_services.details.push({ name: pkg, status: "success", message: "已恢复" });
+                    }
+                }
+            }
+            
+            // 15. 网络优化
+            results.disable_network_optimization = {
+                title: "网络优化",
+                status: "checking",
+                details: []
+            };
+            
+            const networkOptPackages = ["com.oplus.networksense", "com.oplus.cellularqoe", "com.oplus.tai.wifiqoe", "com.oplus.tai.borderpresearch", "com.oplus.nearcomm"];
+            for (const pkg of networkOptPackages) {
+                const pkgStatus = await checkPackageDisabled(pkg);
+                const userIntentProp = await getSystemProperty("persist.sys.coloros16_optimize_gui.disable_network_optimization", "false");
+                const isUserIntended = userIntentProp === "true";
+
+                if (isUserIntended) {
+                    // 用户启用了功能
+                    if (pkgStatus === true) {
+                        results.disable_network_optimization.details.push({ name: pkg, status: "success", message: "已禁用" });
+                    } else if (pkgStatus === "not_exists") {
+                        results.disable_network_optimization.details.push({ name: pkg, status: "warning", message: "包不存在" });
+                    } else {
+                        results.disable_network_optimization.details.push({ name: pkg, status: "error", message: "未禁用（与用户设置冲突）" });
+                    }
+                } else {
+                    // 用户禁用了功能
+                    if (pkgStatus === true) {
+                        results.disable_network_optimization.details.push({ name: pkg, status: "error", message: "已禁用（应已恢复）" });
+                    } else if (pkgStatus === "not_exists") {
+                        results.disable_network_optimization.details.push({ name: pkg, status: "warning", message: "包不存在" });
+                    } else {
+                        results.disable_network_optimization.details.push({ name: pkg, status: "success", message: "已恢复" });
+                    }
+                }
+            }
+            
+            // 16. 安全服务
+            results.disable_security_services = {
+                title: "安全服务",
+                status: "checking",
+                details: []
+            };
+            
+            const securityPackages = ["com.oplus.securitypermission", "com.oplus.securitykeyboard", "com.coloros.securityguard", "com.coloros.remoteguardservice"];
+            for (const pkg of securityPackages) {
+                const pkgStatus = await checkPackageDisabled(pkg);
+                const userIntentProp = await getSystemProperty("persist.sys.coloros16_optimize_gui.disable_security_services", "false");
+                const isUserIntended = userIntentProp === "true";
+
+                if (isUserIntended) {
+                    // 用户启用了功能
+                    if (pkgStatus === true) {
+                        results.disable_security_services.details.push({ name: pkg, status: "success", message: "已禁用" });
+                    } else if (pkgStatus === "not_exists") {
+                        results.disable_security_services.details.push({ name: pkg, status: "warning", message: "包不存在" });
+                    } else {
+                        results.disable_security_services.details.push({ name: pkg, status: "error", message: "未禁用（与用户设置冲突）" });
+                    }
+                } else {
+                    // 用户禁用了功能
+                    if (pkgStatus === true) {
+                        results.disable_security_services.details.push({ name: pkg, status: "error", message: "已禁用（应已恢复）" });
+                    } else if (pkgStatus === "not_exists") {
+                        results.disable_security_services.details.push({ name: pkg, status: "warning", message: "包不存在" });
+                    } else {
+                        results.disable_security_services.details.push({ name: pkg, status: "success", message: "已恢复" });
+                    }
+                }
+            }
+            
+            // 17. 多媒体服务
+            results.disable_media_services = {
+                title: "多媒体服务",
+                status: "checking",
+                details: []
+            };
+            
+            const mediaPackages = ["com.oplus.games", "com.oplus.screenrecorder", "com.coloros.karaoke", "com.oplus.mediacontroller"];
+            for (const pkg of mediaPackages) {
+                const pkgStatus = await checkPackageDisabled(pkg);
+                const userIntentProp = await getSystemProperty("persist.sys.coloros16_optimize_gui.disable_media_services", "false");
+                const isUserIntended = userIntentProp === "true";
+
+                if (isUserIntended) {
+                    // 用户启用了功能
+                    if (pkgStatus === true) {
+                        results.disable_media_services.details.push({ name: pkg, status: "success", message: "已禁用" });
+                    } else if (pkgStatus === "not_exists") {
+                        results.disable_media_services.details.push({ name: pkg, status: "warning", message: "包不存在" });
+                    } else {
+                        results.disable_media_services.details.push({ name: pkg, status: "error", message: "未禁用（与用户设置冲突）" });
+                    }
+                } else {
+                    // 用户禁用了功能
+                    if (pkgStatus === true) {
+                        results.disable_media_services.details.push({ name: pkg, status: "error", message: "已禁用（应已恢复）" });
+                    } else if (pkgStatus === "not_exists") {
+                        results.disable_media_services.details.push({ name: pkg, status: "warning", message: "包不存在" });
+                    } else {
+                        results.disable_media_services.details.push({ name: pkg, status: "success", message: "已恢复" });
+                    }
+                }
+            }
+            
+            // 18. 系统工具
+            results.disable_system_tools = {
+                title: "系统工具",
+                status: "checking",
+                details: []
+            };
+            
+            const systemToolPackages = ["com.oplus.powermonitor", "com.oplus.audiomonitor", "com.oplus.logkit", "com.oplus.engineermode", "com.oplus.crashbox", "com.oplus.appplatform", "com.oplus.contentportal", "com.oplus.postmanservice", "com.oplus.subsys"];
+            for (const pkg of systemToolPackages) {
+                const pkgStatus = await checkPackageDisabled(pkg);
+                const userIntentProp = await getSystemProperty("persist.sys.coloros16_optimize_gui.disable_system_tools", "false");
+                const isUserIntended = userIntentProp === "true";
+
+                if (isUserIntended) {
+                    // 用户启用了功能
+                    if (pkgStatus === true) {
+                        results.disable_system_tools.details.push({ name: pkg, status: "success", message: "已禁用" });
+                    } else if (pkgStatus === "not_exists") {
+                        results.disable_system_tools.details.push({ name: pkg, status: "warning", message: "包不存在" });
+                    } else {
+                        results.disable_system_tools.details.push({ name: pkg, status: "error", message: "未禁用（与用户设置冲突）" });
+                    }
+                } else {
+                    // 用户禁用了功能
+                    if (pkgStatus === true) {
+                        results.disable_system_tools.details.push({ name: pkg, status: "error", message: "已禁用（应已恢复）" });
+                    } else if (pkgStatus === "not_exists") {
+                        results.disable_system_tools.details.push({ name: pkg, status: "warning", message: "包不存在" });
+                    } else {
+                        results.disable_system_tools.details.push({ name: pkg, status: "success", message: "已恢复" });
+                    }
+                }
             }
             
             // 计算整体状态
@@ -964,6 +1395,7 @@
                                             {{ option.name }}
                                         </label>
                                         <p class="description">{{ option.description }}</p>
+                                        <p v-if="option.warning" class="warning-message">⚠️ {{ option.warning }}</p>
                                     </div>
                                 </div>
                             </div>
@@ -987,28 +1419,29 @@
                                         <div class="verification-title">
                                             <span :class="{
                                                 'status-success': result.status === 'success',
-                                                'status-error': result.status === 'error',
-                                                'status-warning': result.status === 'warning'
+                                                'status-error': result.status !== 'success'
                                             }">
-                                                {{ result.status === 'success' ? '🟢' : result.status === 'error' ? '🔴' : '🟡' }}
+                                                {{ result.status === 'success' ? '✅' : '❌' }}
                                             </span>
                                             {{ result.title }}
+                                            <span v-if="result.status !== 'success'" style="font-size: 0.8em; color: #f44336; margin-left: 8px;">(未优化)</span>
+                                            <span v-else style="font-size: 0.8em; color: #4caf50; margin-left: 8px;">(已优化)</span>
                                         </div>
                                         <div class="verification-detail" v-for="detail in result.details" :key="detail.name">
                                             <div class="verification-subitem">
                                                 <strong>{{ detail.name }}:</strong> 
                                                 <span :class="{
                                                     'status-success': detail.status === 'success',
-                                                    'status-error': detail.status === 'error',
-                                                    'status-warning': detail.status === 'warning'
+                                                    'status-error': detail.status !== 'success'
                                                 }">
-                                                    {{ detail.message }}
+                                                    {{ detail.status === 'success' ? '已优化' : '未优化' }}
                                                 </span>
                                             </div>
                                         </div>
                                     </div>
                                     
-                                    <div class="button-container">
+                                    <!-- 调整“重新检测”按钮的位置 -->
+                                    <div class="button-container" style="margin-top: 20px;">
                                         <button 
                                             @click="verifyFunctionalityUI" 
                                             :disabled="verifying"

@@ -1,12 +1,12 @@
 #!/system/bin/sh
-# Test service script
-echo "Test module loaded" >&2
+# 添加执行权限检查
+if [ ! -x "$0" ]; then
+    chmod +x "$0"
+fi
 # ColorOS 16 优化模块 - 后期服务脚本
-# 在late_start阶段执行，用于处理需要完整系统环境的功能
+# 在late_start阶段执行，用于处理需要完整系统环境的功能（如包禁用）
 
 MODDIR=${0%/*}
-CONFIG_FILE="$MODDIR/config.yaml"
-CONFIG_DEFAULT="$MODDIR/system/etc/coloros16_optimize_config.yaml"
 
 # 日志函数
 log_info() {
@@ -27,107 +27,121 @@ get_ksu_setting() {
     fi
 }
 
-# 更新YAML配置文件中的单个配置项
-update_yaml_config_item() {
-    local section="$1"
-    local new_value="$2"
-    local config_file="$3"
+# 禁用指定的包（带错误处理和重试）
+disable_package_if_enabled() {
+    local package="$1"
+    local config_key="$2"
+    local enabled=$(get_ksu_setting "$config_key" "false")
     
-    # 创建临时文件
-    local temp_file="${config_file}.tmp"
-    
-    # 复制原文件到临时文件
-    cp "$config_file" "$temp_file"
-    
-    # 使用更可靠的sed命令更新配置项
-    # 先删除原有的enabled行，再插入新的
-    sed -i "/^[[:space:]]*$section:/,/^[[:space:]]*[^[:space:]]/{
-        /^[[:space:]]*enabled:/d
-    }" "$temp_file"
-    
-    # 在section后插入新的enabled行
-    sed -i "/^[[:space:]]*$section:/a \    enabled: $new_value" "$temp_file"
-    
-    # 验证临时文件是否有效，然后替换原文件
-    if [ -f "$temp_file" ] && [ -s "$temp_file" ]; then
-        mv "$temp_file" "$config_file"
-        chmod 644 "$config_file"
-        log_info "Updated $section to $new_value"
+    if [ "$enabled" = "true" ]; then
+        log_info "Disabling package: $package"
+        # 尝试禁用包，最多重试3次
+        for i in 1 2 3; do
+            if pm disable-user --user 0 "$package" 2>/dev/null; then
+                log_info "Successfully disabled $package on attempt $i"
+                break
+            else
+                log_info "Failed to disable $package on attempt $i, retrying..."
+                sleep 1
+            fi
+        done
     else
-        log_info "Failed to update $section, keeping original config"
-        rm -f "$temp_file"
+        log_info "Enabling package: $package (user disabled the feature)"
+        # 尝试启用包，最多重试3次
+        for i in 1 2 3; do
+            if pm enable --user 0 "$package" 2>/dev/null; then
+                log_info "Successfully enabled $package on attempt $i"
+                break
+            else
+                log_info "Failed to enable $package on attempt $i, retrying..."
+                sleep 1
+            fi
+        done
     fi
 }
 
-# 从KernelSU UI设置更新YAML配置
-update_config_from_ksu_ui() {
-    log_info "Updating config from KernelSU UI settings"
-    
-    # 读取UI设置并更新YAML配置
-    local disable_logd=$(get_ksu_setting "disable_logd" "true")
-    local block_ota=$(get_ksu_setting "block_ota" "true")
-    local lock_dev_options=$(get_ksu_setting "lock_developer_options" "true")
-    local block_ads=$(get_ksu_setting "block_ads_and_tracking" "true")
-    local mem_io_opt=$(get_ksu_setting "memory_io_optimization" "true")
-    local extra_kernel=$(get_ksu_setting "extra_kernel_optimization" "true")
-    local kill_procs=$(get_ksu_setting "kill_redundant_processes" "true")
-    local sys_props=$(get_ksu_setting "system_prop_toggles" "true")
-    local health_services=$(get_ksu_setting "disable_health_services" "false")
-    local net_monitor=$(get_ksu_setting "disable_network_monitoring" "false")
-    local lockscreen_mag=$(get_ksu_setting "disable_lockscreen_magazine" "false")
-    local gamespace=$(get_ksu_setting "disable_gamespace" "false")
-    local wallet_services=$(get_ksu_setting "disable_wallet_services" "false")
-    local backup_services=$(get_ksu_setting "disable_backup_services" "false")
-    
-    # 更新YAML配置文件 - 使用更可靠的方法
-    update_yaml_config_item "disable_logd" "$disable_logd" "$CONFIG_FILE"
-    update_yaml_config_item "block_ota" "$block_ota" "$CONFIG_FILE"
-    update_yaml_config_item "lock_developer_options" "$lock_dev_options" "$CONFIG_FILE"
-    update_yaml_config_item "block_ads_and_tracking" "$block_ads" "$CONFIG_FILE"
-    update_yaml_config_item "memory_io_optimization" "$mem_io_opt" "$CONFIG_FILE"
-    update_yaml_config_item "extra_kernel_optimization" "$extra_kernel" "$CONFIG_FILE"
-    update_yaml_config_item "kill_redundant_processes" "$kill_procs" "$CONFIG_FILE"
-    update_yaml_config_item "system_prop_toggles" "$sys_props" "$CONFIG_FILE"
-    update_yaml_config_item "disable_health_services" "$health_services" "$CONFIG_FILE"
-    update_yaml_config_item "disable_network_monitoring" "$net_monitor" "$CONFIG_FILE"
-    update_yaml_config_item "disable_lockscreen_magazine" "$lockscreen_mag" "$CONFIG_FILE"
-    update_yaml_config_item "disable_gamespace" "$gamespace" "$CONFIG_FILE"
-    update_yaml_config_item "disable_wallet_services" "$wallet_services" "$CONFIG_FILE"
-    update_yaml_config_item "disable_backup_services" "$backup_services" "$CONFIG_FILE"
-}
+# 主要执行逻辑
+log_info "Starting ColorOS16 optimization service script"
 
-# 创建或使用配置文件，并从UI设置更新
-create_config_with_ui_sync() {
-    if [ ! -f "$CONFIG_FILE" ]; then
-        log_info "Creating configuration file: $CONFIG_FILE"
-        cp "$CONFIG_DEFAULT" "$CONFIG_FILE" 2>/dev/null
-        if [ $? -eq 0 ]; then
-            log_info "Configuration created successfully"
-            chmod 644 "$CONFIG_FILE" 2>/dev/null
-        else
-            log_info "Failed to create configuration"
-            return 1
-        fi
-    else
-        log_info "Using existing configuration: $CONFIG_FILE"
-    fi
-    
-    # 从KernelSU UI设置更新YAML配置
-    update_config_from_ksu_ui
-}
+# 等待PackageManager服务完全启动
+sleep 5
 
-# 主执行逻辑
-main() {
-    log_info "Starting ColorOS16 optimization service"
-    
-    # 创建或使用配置文件，并同步UI设置
-    create_config_with_ui_sync
-    
-    # 应用配置
-    "$MODDIR/apply_yaml_config.sh"
-    
-    log_info "Service completed"
-}
+# 处理主题和个性化服务
+disable_package_if_enabled "com.oplus.themestore" "disable_theme_services"
+disable_package_if_enabled "com.heytap.themestore" "disable_theme_services"
+disable_package_if_enabled "com.oplus.keyguard.clock.magazine" "disable_theme_services"
+disable_package_if_enabled "com.oplus.keyguard.clock.gallery" "disable_theme_services"
+disable_package_if_enabled "com.oplus.keyguard.clock.graffiti" "disable_theme_services"
+disable_package_if_enabled "com.oplus.keyguard.personality.clocks" "disable_theme_services"
+disable_package_if_enabled "com.oplus.keyguard.style.widgets" "disable_theme_services"
 
-# 执行主函数
-main "$@"
+# 处理网络优化服务
+disable_package_if_enabled "com.oplus.networksense" "disable_network_optimization"
+disable_package_if_enabled "com.oplus.cellularqoe" "disable_network_optimization"
+disable_package_if_enabled "com.oplus.tai.wifiqoe" "disable_network_optimization"
+disable_package_if_enabled "com.oplus.tai.borderpresearch" "disable_network_optimization"
+disable_package_if_enabled "com.oplus.nearcomm" "disable_network_optimization"
+
+# 处理安全和权限服务
+disable_package_if_enabled "com.oplus.securitypermission" "disable_security_services"
+disable_package_if_enabled "com.oplus.securitykeyboard" "disable_security_services"
+disable_package_if_enabled "com.coloros.securityguard" "disable_security_services"
+disable_package_if_enabled "com.coloros.remoteguardservice" "disable_security_services"
+
+# 处理多媒体和娱乐服务
+disable_package_if_enabled "com.oplus.games" "disable_media_services"
+disable_package_if_enabled "com.oplus.screenrecorder" "disable_media_services"
+disable_package_if_enabled "com.coloros.karaoke" "disable_media_services"
+disable_package_if_enabled "com.oplus.mediacontroller" "disable_media_services"
+
+# 处理系统工具和监控服务
+disable_package_if_enabled "com.oplus.powermonitor" "disable_system_tools"
+disable_package_if_enabled "com.oplus.audiomonitor" "disable_system_tools"
+disable_package_if_enabled "com.oplus.logkit" "disable_system_tools"
+disable_package_if_enabled "com.oplus.engineermode" "disable_system_tools"
+disable_package_if_enabled "com.oplus.crashbox" "disable_system_tools"
+disable_package_if_enabled "com.oplus.appplatform" "disable_system_tools"
+disable_package_if_enabled "com.oplus.contentportal" "disable_system_tools"
+disable_package_if_enabled "com.oplus.postmanservice" "disable_system_tools"
+disable_package_if_enabled "com.oplus.subsys" "disable_system_tools"
+
+# 处理AI智能助手服务
+disable_package_if_enabled "com.oplus.aimemory" "disable_ai_assistants"
+disable_package_if_enabled "com.oplus.aiunit" "disable_ai_assistants"
+disable_package_if_enabled "com.oplus.aiwidgets" "disable_ai_assistants"
+disable_package_if_enabled "com.oplus.aiwriter" "disable_ai_assistants"
+disable_package_if_enabled "com.oplus.metis" "disable_ai_assistants"
+disable_package_if_enabled "com.oplus.obrain" "disable_ai_assistants"
+
+# 处理语音助手服务
+disable_package_if_enabled "com.oplus.ovoicemanager" "disable_voice_assistants"
+disable_package_if_enabled "com.oplus.ovoicemanager.wakeup" "disable_voice_assistants"
+disable_package_if_enabled "com.heytap.speechassist" "disable_voice_assistants"
+disable_package_if_enabled "com.oplus.ttsaccessibilityengine" "disable_voice_assistants"
+
+# 处理流量监控与网络服务
+disable_package_if_enabled "com.oplus.trafficmonitor" "disable_network_monitoring"
+disable_package_if_enabled "com.oplus.dmp" "disable_network_monitoring"
+
+# 处理健康服务（修正）
+disable_package_if_enabled "com.oplus.healthservice" "disable_health_services"
+disable_package_if_enabled "com.heytap.health" "disable_health_services"
+
+# 处理游戏空间服务（修正）
+disable_package_if_enabled "com.oplus.games" "disable_gamespace"
+
+# 处理钱包服务（修正）
+disable_package_if_enabled "com.oplus.pay" "disable_wallet_services"
+disable_package_if_enabled "com.coloros.securepay" "disable_wallet_services"
+disable_package_if_enabled "com.finshell.wallet" "disable_wallet_services"
+
+# 处理备份服务（修正）
+disable_package_if_enabled "com.oplus.wifibackuprestore" "disable_backup_services"
+disable_package_if_enabled "com.heytap.cloud" "disable_backup_services"
+
+# 处理锁屏杂志服务（修正）
+disable_package_if_enabled "com.heytap.pictorial" "disable_lockscreen_magazine"
+
+# 系统属性开关已在post-fs-data.sh中处理，此处无需重复
+
+log_info "ColorOS16 optimization service script completed"

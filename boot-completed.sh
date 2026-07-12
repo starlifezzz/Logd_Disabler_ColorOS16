@@ -4,5 +4,5 @@
 
 MODDIR=${0%/*}
 
-# 最终应用配置，确保所有优化都已生效
-"$MODDIR/apply_yaml_config.sh"
+# 此阶段通常不需要重复应用配置，service.sh已在late_start阶段完成
+# 如需特殊处理可在此添加

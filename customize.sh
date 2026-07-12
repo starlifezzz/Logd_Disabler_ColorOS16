@@ -1,13 +1,16 @@
 #!/system/bin/sh
-# KernelSU customize.sh - 必需的模块入口文件
-# 此脚本在模块安装时执行，用于提取webroot目录
+# ColorOS16 优化模块 - 自定义脚本
+# 在模块安装时自动设置脚本执行权限
 
 MODDIR=${0%/*}
 
-# 提取Web UI文件
-unzip -o "$ZIPFILE" 'webroot/*' -d "$MODDIR" >&2
+# 为所有脚本文件添加执行权限
+chmod +x "$MODDIR"/*.sh
 
-# 设置Web UI文件权限
-chmod 644 "$MODDIR/webroot/index.html"
-chmod 644 "$MODDIR/webroot/assets/style.css"
-chmod 644 "$MODDIR/webroot/assets/script.js"
+# 确保配置文件存在
+if [ ! -f "$MODDIR/system/etc/coloros16_optimize_config.yaml" ]; then
+    # 如果需要复制默认配置，可以在这里添加逻辑
+    echo "Default config file not found, skipping..."
+fi
+
+echo "ColorOS16 optimization module permissions set successfully"

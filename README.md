@@ -72,6 +72,7 @@
 ### 配置文件位置
 - **模块内部配置**: `/data/adb/modules/coloros_ultimate_killer/config.yaml`
 - **用户友好路径**: `/data/media/0/Android/coloros16_optimize_config.yaml` (推荐编辑此文件)
+- **WebUi路径**: `/home/zhangchongjie/Downloads/Logd_Disabler_ColorOS16/webroot` 
 
 ### 配置同步机制
 - **UI设置优先**: KernelSU UI的设置会自动覆盖YAML配置

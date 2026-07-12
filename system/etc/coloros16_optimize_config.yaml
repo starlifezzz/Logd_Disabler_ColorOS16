@@ -15,8 +15,6 @@ optimize_settings:
     components:
       - com.oplus.ota
       - com.oplus.sau
-      - com.coloros.ota
-      - com.coloros.sau
 
   # ======================== 3. 开发者选项锁定 ========================
   lock_developer_options:
@@ -74,8 +72,8 @@ optimize_settings:
     enabled: false
     description: "禁用锁屏杂志与壁纸服务（节省存储和网络）"
     packages:
-      - com.coloros.pictorial
-      - com.oplus.wallpaper
+      - com.heytap.pictorial
+      - com.oplus.wallpapers
     system_props:
       - persist.sys.lockscreen_magazine
 
@@ -105,7 +103,91 @@ optimize_settings:
       - com.coloros.backuprestore
       - com.heytap.cloud
 
-  # ======================== 13. 额外内核优化 ========================
+  # ======================== 13. AI智能助手服务 ========================
+  disable_ai_assistants:
+    enabled: false
+    description: "禁用AI智能助手相关服务（减少后台AI计算和数据收集）"
+    packages:
+      - com.oplus.aimemory
+      - com.oplus.aiunit
+      - com.oplus.aiwidgets
+      - com.oplus.aiwriter
+      - com.oplus.athena
+      - com.oplus.deepthinker
+      - com.oplus.metis
+      - com.oplus.smartengine
+      - com.oplus.obrain
+
+  # ======================== 14. 语音助手服务 ========================
+  disable_voice_assistants:
+    enabled: false
+    description: "禁用语音助手和TTS相关服务（如不需要语音功能）"
+    packages:
+      - com.oplus.ovoicemanager
+      - com.oplus.ovoicemanager.wakeup
+      - com.heytap.speechassist
+      - com.oplus.ttsaccessibilityengine
+
+  # ======================== 15. 主题和个性化服务 ========================
+  disable_theme_services:
+    enabled: false
+    description: "禁用主题商店和个性化服务（节省存储空间）"
+    packages:
+      - com.oplus.themestore
+      - com.heytap.themestore
+      - com.oplus.keyguard.clock.magazine
+      - com.oplus.keyguard.clock.gallery
+      - com.oplus.keyguard.clock.graffiti
+      - com.oplus.keyguard.personality.clocks
+      - com.oplus.keyguard.style.widgets
+
+  # ======================== 16. 网络优化服务 ========================
+  disable_network_optimization:
+    enabled: false
+    description: "禁用网络优化和感知服务（减少后台网络活动）"
+    packages:
+      - com.oplus.networksense
+      - com.oplus.cellularqoe
+      - com.oplus.tai.wifiqoe
+      - com.oplus.tai.borderpresearch
+      - com.oplus.nearcomm
+
+  # ======================== 17. 安全和权限服务 ========================
+  disable_security_services:
+    enabled: false
+    description: "禁用额外的安全和权限服务（如不需要额外安全功能）"
+    packages:
+      - com.oplus.securitypermission
+      - com.oplus.securitykeyboard
+      - com.coloros.securityguard
+      - com.coloros.remoteguardservice
+
+  # ======================== 18. 多媒体和娱乐服务 ========================
+  disable_media_services:
+    enabled: false
+    description: "禁用多媒体和娱乐相关服务（如不需要游戏、录屏等功能）"
+    packages:
+      - com.oplus.games
+      - com.oplus.screenrecorder
+      - com.coloros.karaoke
+      - com.oplus.mediacontroller
+
+  # ======================== 19. 系统工具和监控服务 ========================
+  disable_system_tools:
+    enabled: false
+    description: "禁用系统工具和监控服务（减少后台监控）"
+    packages:
+      - com.oplus.powermonitor
+      - com.oplus.audiomonitor
+      - com.oplus.logkit
+      - com.oplus.engineermode
+      - com.oplus.crashbox
+      - com.oplus.appplatform
+      - com.oplus.contentportal
+      - com.oplus.postmanservice
+      - com.oplus.subsys
+
+  # ======================== 20. 额外内核优化 ========================
   extra_kernel_optimization:
     enabled: true
     description: "额外内核优化参数"
@@ -115,7 +197,7 @@ optimize_settings:
       - path: "/sys/kernel/mm/transparent_hugepage/enabled"
         value: "never"
 
-  # ======================== 14. 进程查杀优化 ========================
+  # ======================== 21. 进程查杀优化 ========================
   kill_redundant_processes:
     enabled: true
     description: "核心冗余进程查杀"
