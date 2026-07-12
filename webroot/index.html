@@ -1,345 +1,693 @@
-    <!DOCTYPE html>
-    <html lang="zh-CN">
-    <head>
-        <meta charset="UTF-8">
-        <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-        <title>ColorOS 16 优化</title>
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0,user-scalable=no">
+<title>ColorOS 16 优化</title>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#f2f2f7;--bg2:#fff;--bg3:rgba(0,0,0,.04);
+  --tx:#1d1d1f;--tx2:#86868b;--tx3:#aeaeb2;
+  --bd:rgba(0,0,0,.06);--accent:#007aff;--green:#34c759;
+  --red:#ff3b30;--orange:#ff9500;--purple:#af52de;
+  --card-radius:14px;--item-radius:10px;
+}
+@media(prefers-color-scheme:dark){
+  :root{
+    --bg:#000;--bg2:#1c1c1e;--bg3:rgba(255,255,255,.06);
+    --tx:#f5f5f7;--tx2:#98989d;--tx3:#636366;
+    --bd:rgba(255,255,255,.08);--accent:#0a84ff;--green:#30d158;
+    --red:#ff453a;--orange:#ff9f0a;--purple:#bf5af2;
+  }
+}
+html,body{
+  font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;
+  background:var(--bg);color:var(--tx);
+  -webkit-font-smoothing:antialiased;
+  overflow-x:hidden;line-height:1.47;
+}
+a{color:var(--accent);text-decoration:none}
 
-        <!-- Web Components Polyfill (必须放在最顶部) -->
-        <script src="assets/webcomponents-bundle.min.js"></script>
+/* 顶栏 */
+.topbar{
+  position:sticky;top:0;z-index:100;
+  height:56px;display:flex;align-items:center;justify-content:space-between;
+  padding:0 16px;
+  background:color-mix(in srgb,var(--bg) 80%,transparent);
+  backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);
+  border-bottom:1px solid var(--bd);
+}
+.topbar h1{font-size:17px;font-weight:600;letter-spacing:-.02em}
+.topbar-actions{display:flex;gap:4px;align-items:center}
 
-        <!-- MDUI v2 核心文件 -->
-        <!-- <link rel="stylesheet" href="https://unpkg.com/mdui@2/mdui.css">
-        <script src="https://unpkg.com/mdui@2/mdui.global.js"></script> -->
+/* 图标按钮 */
+.ibtn{
+  width:36px;height:36px;border-radius:50%;border:none;
+  background:transparent;color:var(--tx);cursor:pointer;
+  display:flex;align-items:center;justify-content:center;
+  -webkit-tap-highlight-color:transparent;transition:background .15s;
+}
+.ibtn:active{background:var(--bg3)}
+.ibtn svg{width:22px;height:22px}
+.ibtn.spin svg{animation:spin .8s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
 
-        <link rel="stylesheet" href="assets/mdui.css">
-        <script src="assets/mdui.global.js"></script>  
+/* 主内容 */
+.main{padding:12px 16px 32px;max-width:600px;margin:0 auto}
 
+/* 进度条 */
+.prog-wrap{margin-bottom:12px}
+.prog-bar{height:3px;background:var(--bg3);border-radius:2px;overflow:hidden}
+.prog-fill{height:100%;background:var(--accent);border-radius:2px;transition:width .3s}
+.prog-text{font-size:11px;color:var(--tx2);margin-top:4px;text-align:center}
 
+/* 警告横幅 */
+.banner{
+  display:flex;align-items:flex-start;gap:10px;
+  padding:12px 14px;border-radius:var(--card-radius);
+  margin-bottom:12px;font-size:13px;line-height:1.45;
+}
+.banner.warn{background:color-mix(in srgb,var(--orange) 10%,transparent);color:var(--orange)}
+.banner svg{width:20px;height:20px;flex-shrink:0;margin-top:1px}
 
+/* 卡片 */
+.card{
+  background:var(--bg2);border-radius:var(--card-radius);
+  border:1px solid var(--bd);margin-bottom:12px;overflow:hidden;
+}
+.card-hd{
+  display:flex;align-items:center;gap:8px;
+  padding:14px 16px 8px;
+}
+.card-hd-icon{
+  width:32px;height:32px;border-radius:8px;
+  display:flex;align-items:center;justify-content:center;
+  background:color-mix(in srgb,var(--accent) 12%,transparent);
+  color:var(--accent);
+}
+.card-hd-icon svg{width:18px;height:18px}
+.card-hd-title{font-size:15px;font-weight:600;flex:1}
+.card-bd{padding:0 4px 4px}
 
-        <script>
-            // 确保 Web Components 已就绪
-            if (!window.customElements) {
-                document.write('<script src="https://cdn.jsdelivr.net/npm/@webcomponents/webcomponentsjs@2.7.0/webcomponents-bundle.min.js"><\/script>');
-            }
+/* 列表项 */
+.li{
+  display:flex;align-items:center;gap:12px;
+  padding:12px;border-radius:var(--item-radius);
+  cursor:pointer;-webkit-tap-highlight-color:transparent;
+  transition:background .15s;
+}
+.li:active{background:var(--bg3)}
+.li-icon{
+  width:40px;height:40px;border-radius:10px;flex-shrink:0;
+  display:flex;align-items:center;justify-content:center;
+  font-size:22px;
+}
+.li-icon svg{width:22px;height:22px}
+.li-icon.c1{background:color-mix(in srgb,var(--red) 12%,transparent);color:var(--red)}
+.li-icon.c2{background:color-mix(in srgb,var(--orange) 12%,transparent);color:var(--orange)}
+.li-icon.c3{background:color-mix(in srgb,var(--purple) 12%,transparent);color:var(--purple)}
+.li-icon.c4{background:color-mix(in srgb,var(--accent) 12%,transparent);color:var(--accent)}
+.li-icon.c5{background:color-mix(in srgb,var(--green) 12%,transparent);color:var(--green)}
+.li-body{flex:1;min-width:0}
+.li-title{font-size:14px;font-weight:500}
+.li-desc{font-size:12px;color:var(--tx2);margin-top:2px}
+.li-meta{display:flex;align-items:center;gap:6px;margin-top:4px}
 
-            // MDUI 初始化修复
-            document.addEventListener('DOMContentLoaded', () => {
-                if (typeof mdui === 'undefined') {
-                // 如果 MDUI 未初始化，强制重试
-                setTimeout(() => {
-                    if (typeof mdui === 'undefined') {
-                    console.error('MDUI 初始化失败，尝试手动注册组件');
-                    // 手动注册关键组件（针对 ColorOS 16 WebView）
-                    if (!customElements.get('mdui-card')) {
-                        customElements.define('mdui-card', class extends HTMLElement {
-                        connectedCallback() {
-                            this.style.borderRadius = '24px';
-                            this.style.backgroundColor = 'var(--md-surface-variant)';
-                            this.style.padding = '16px';
-                            this.style.marginBottom = '16px';
-                            this.style.boxShadow = '0 1px 3px rgba(0,0,0,0.05)';
-                        }
-                        });
-                    }
-                    // 其他组件类似...
-                    }
-                }, 1000);
-                }
-            });
-        </script>
+/* 状态徽章 */
+.badge{
+  display:inline-flex;align-items:center;gap:3px;
+  font-size:11px;font-weight:500;
+  padding:2px 8px;border-radius:100px;line-height:1.4;
+}
+.badge.pending{background:color-mix(in srgb,var(--orange) 12%,transparent);color:var(--orange)}
+.badge.on{background:color-mix(in srgb,var(--green) 12%,transparent);color:var(--green)}
+.badge.off{background:var(--bg3);color:var(--tx2)}
+.badge.err{background:color-mix(in srgb,var(--red) 12%,transparent);color:var(--red)}
+.badge.work{background:color-mix(in srgb,var(--accent) 12%,transparent);color:var(--accent)}
 
-        <!-- Material Symbols 图标字体（可选，无网可删掉这行） -->
-        <!-- <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@24,400,0,0"> -->
+/* 分割线 */
+.sep{height:1px;background:var(--bd);margin:0 12px}
 
-        <!-- Vue 3 -->
-        <script src="assets/vue.global.prod.js"></script>
+/* 开关 */
+.sw{position:relative;display:inline-block;width:51px;height:31px;flex-shrink:0}
+.sw input{opacity:0;width:0;height:0;position:absolute}
+.sw-track{
+  position:absolute;inset:0;border-radius:16px;
+  background:var(--tx3);transition:background .25s;cursor:pointer;
+}
+.sw-track::after{
+  content:'';position:absolute;
+  width:27px;height:27px;border-radius:50%;
+  top:2px;left:2px;background:#fff;
+  box-shadow:0 1px 3px rgba(0,0,0,.2);
+  transition:transform .25s cubic-bezier(.4,0,.2,1);
+}
+.sw input:checked+.sw-track{background:var(--green)}
+.sw input:checked+.sw-track::after{transform:translateX(20px)}
+.sw input:disabled+.sw-track{opacity:.4;cursor:not-allowed}
 
+/* 信息行 */
+.info-row{
+  display:flex;justify-content:space-between;align-items:center;
+  padding:10px 16px;font-size:13px;
+}
+.info-row .label{color:var(--tx2)}
+.info-row .value{font-weight:500}
 
-    </head>
-    <body class="mdui-prose">
+/* 浮动按钮 */
+.fab{
+  position:fixed;bottom:24px;right:24px;z-index:90;
+  width:56px;height:56px;border-radius:16px;border:none;
+  background:var(--accent);color:#fff;cursor:pointer;
+  box-shadow:0 4px 16px color-mix(in srgb,var(--accent) 40%,transparent);
+  display:flex;align-items:center;justify-content:center;
+  -webkit-tap-highlight-color:transparent;transition:transform .15s;
+}
+.fab:active{transform:scale(.9)}
+.fab svg{width:24px;height:24px}
 
-    <div id="app">
-        <mdui-layout>
-            <!-- 顶部导航栏 -->
-            <mdui-top-app-bar variant="small" scroll-behavior="elevate">
-                <mdui   -top-app-bar-title>ColorOS 16 优化</mdui-top-app-bar-title>
-                <mdui-icon-button slot="end" icon="refresh" @click="fetchStatus"></mdui-icon-button>
-                <!-- 悬浮刷新按钮 -->
-                <mdui-fab class="fab-refresh" variant="primary" icon="refresh" @click="fetchStatus" id="sx" style="margin:-10px 1px 0px 0"></mdui-fab>
-            </mdui-top-app-bar>
+/* 对话框 */
+.overlay{
+  position:fixed;inset:0;z-index:200;
+  background:rgba(0,0,0,.45);
+  display:flex;align-items:center;justify-content:center;
+  padding:24px;animation:fadeIn .2s;
+}
+@keyframes fadeIn{from{opacity:0}}
+.dialog{
+  background:var(--bg2);border-radius:16px;
+  width:100%;max-width:400px;padding:24px;
+  box-shadow:0 8px 40px rgba(0,0,0,.2);
+  animation:popIn .25s cubic-bezier(.4,0,.2,1);
+}
+@keyframes popIn{from{transform:scale(.92);opacity:0}}
+.dialog h2{font-size:18px;font-weight:600;margin-bottom:12px}
+.dialog-body{font-size:14px;color:var(--tx2);line-height:1.5;margin-bottom:20px}
+.dialog-actions{display:flex;justify-content:flex-end;gap:8px}
+.btn{
+  padding:8px 20px;border-radius:8px;border:none;
+  font-size:14px;font-weight:500;cursor:pointer;transition:opacity .15s;
+}
+.btn:active{opacity:.7}
+.btn-p{background:var(--accent);color:#fff}
+.btn-s{background:transparent;color:var(--accent)}
 
-            <mdui-layout-main>
+/* 日志区 */
+.log-box{
+  flex:1;overflow-y:auto;white-space:pre-wrap;
+  font-family:monospace;font-size:12px;line-height:1.6;
+  background:var(--bg3);border-radius:8px;padding:12px;
+  max-height:50vh;color:var(--tx);
+}
 
-                <!-- 卡片1：守护进程控制 -->
-                <div class="card-section">
-                    <mdui-card variant="outlined" style="width:100%; overflow:hidden;">
-                        <mdui-list-header>守护进程</mdui-list-header>
-                        <mdui-list>
-                            <mdui-list-item
-                                v-for="(item, key) in processFeatures" :key="key"
-                                :headline="item.name"
-                                :description="item.desc"
-                                rounded
-                            >
-                                <mdui-icon slot="icon" :name="item.icon" style="font-size:24px;"></mdui-icon>
-                                <div slot="description">
-                                    <span>{{ item.desc }}</span>
-                                    <div class="item-meta">
-                                        <span class="status-badge" :class="status[key]?.st || 'pending'">
-                                            {{ getStatusText(status[key]?.st) }}
-                                        </span>
-                                    </div>
-                                </div>
-                                <mdui-switch
-                                    slot="end"
-                                    :checked="config[key]"
-                                    @change="onSwitchChange(key, $event)"
-                                ></mdui-switch>
-                            </mdui-list-item>
-                        </mdui-list>
-                    </mdui-card>
-                </div>
+/* 底部 */
+.footer{text-align:center;padding:20px 16px;font-size:12px;color:var(--tx3)}
 
-                <!-- 卡片2：系统调优 -->
-                <div class="card-section">
-                    <mdui-card variant="outlined" style="width:100%; overflow:hidden;">
-                        <mdui-list-header>系统调优</mdui-list-header>
-                        <mdui-list>
-                            <mdui-list-item
-                                v-for="(item, key) in tuningFeatures" :key="key"
-                                :headline="item.name"
-                                :description="item.desc"
-                                rounded
-                            >
-                                <mdui-icon slot="icon" :name="item.icon" style="font-size:24px;"></mdui-icon>
-                                <div slot="description">
-                                    <span>{{ item.desc }}</span>
-                                    <div class="item-meta">
-                                        <span class="status-badge" :class="status[key]?.st || 'pending'">
-                                            {{ getStatusText(status[key]?.st) }}
-                                        </span>
-                                    </div>
-                                </div>
-                                <mdui-switch
-                                    slot="end"
-                                    :checked="config[key]"
-                                    @change="onSwitchChange(key, $event)"
-                                ></mdui-switch>
-                            </mdui-list-item>
-                        </mdui-list>
-                    </mdui-card>
-                </div>
+/* 隐藏 */
+.hide{display:none!important}
+</style>
+</head>
+<body>
 
-                <!-- 卡片3：关于 -->
-                <div class="card-section">
-                    <mdui-card variant="outlined" style="width:100%; padding:16px;">
-                        <mdui-list-item
-                            headline="安全模式"
-                            description="开机按住【音量下键】可跳过所有优化，防止 Bootloop"
-                        >
-                            <mdui-icon slot="icon" name="shield" style="font-size:24px;"></mdui-icon>
-                        </mdui-list-item>
-                    </mdui-card>
-                </div>
+<!-- 顶栏 -->
+<div class="topbar">
+  <h1>ColorOS 16 优化</h1>
+  <div class="topbar-actions">
+    <button class="ibtn" id="btnRefresh" onclick="refreshAll()">
+      <svg viewBox="0 0 24 24" fill="currentColor"><path d="M17.65 6.35A7.96 7.96 0 0 0 12 4c-4.42 0-7.99 3.58-7.99 8s3.57 8 7.99 8c3.73 0 6.84-2.55 7.73-6h-2.08A5.99 5.99 0 0 1 12 18c-3.31 0-6-2.69-6-6s2.69-6 6-6c1.66 0 3.14.69 4.22 1.78L13 11h7V4l-2.35 2.35z"/></svg>
+    </button>
+  </div>
+</div>
 
-            </mdui-layout-main>
+<!-- 主内容 -->
+<div class="main">
 
+  <!-- 进度条 -->
+  <div class="prog-wrap hide" id="progWrap">
+    <div class="prog-bar"><div class="prog-fill" id="progFill" style="width:0%"></div></div>
+    <div class="prog-text" id="progText">检测中...</div>
+  </div>
 
-            <!-- 底部导航栏 -->
-            <mdui-navigation-bar value="home">
-                <mdui-navigation-bar-item icon="home" value="home">
-                    首页
-                </mdui-navigation-bar-item>
-                <mdui-navigation-bar-item icon="tune" value="tuning">
-                    调优
-                </mdui-navigation-bar-item>
-                <mdui-navigation-bar-item icon="info" value="about">
-                    关于
-                </mdui-navigation-bar-item>
-            </mdui-navigation-bar>
+  <!-- 警告横幅 -->
+  <div class="banner warn" id="warnBanner">
+    <svg viewBox="0 0 24 24" fill="currentColor"><path d="M1 21h22L12 2 1 21zm12-3h-2v-2h2v2zm0-4h-2v-4h2v4z"/></svg>
+    <span>部分功能需要重启后生效，操作前请确保已备份数据</span>
+  </div>
 
-        </mdui-layout>
-        </mdui-layout>
-
-        <!-- 全局加载遮罩 -->
-        <mdui-dialog
-            :open="isLoading"
-            headline="正在检测系统状态..."
-            close-on-overlay-click="false"
-        >
-            <div style="display:flex; justify-content:center; padding:24px;">
-                <mdui-circular-progress></mdui-circular-progress>
-            </div>
-        </mdui-dialog>
+  <!-- 卡片1: 守护进程 -->
+  <div class="card">
+    <div class="card-hd">
+      <div class="card-hd-icon">
+        <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 1L3 5v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V5l-9-4zm0 10.99h7c-.53 4.12-3.28 7.79-7 8.94V12H5V6.3l7-3.11v8.8z"/></svg>
+      </div>
+      <div class="card-hd-title">守护进程</div>
     </div>
+    <div class="card-bd">
 
-    <script>
-        const { createApp, reactive, ref, onMounted } = Vue;
+      <div class="li" onclick="toggleSwitch('logd')">
+        <div class="li-icon c1"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M20 8h-2.81a5.985 5.985 0 0 0-1.82-1.96L17 4.41 15.59 3l-2.17 2.17C12.96 5.06 12.49 5 12 5c-.49 0-.96.06-1.41.17L8.41 3 7 4.41l1.62 1.63C7.88 6.55 7.26 7.22 6.81 8H4v2h2.09c-.05.33-.09.66-.09 1v1H4v2h2v1c0 .34.04.67.09 1H4v2h2.81c1.04 1.79 2.97 3 5.19 3s4.15-1.21 5.19-3H20v-2h-2.09c.05-.33.09-.66.09-1v-1h2v-2h-2v-1c0-.34-.04-.67-.09-1H20V8zm-6 8h-4v-2h4v2zm0-4h-4v-2h4v2z"/></svg></div>
+        <div class="li-body">
+          <div class="li-title">彻底禁用 Logd</div>
+          <div class="li-desc">mount 覆盖 + 强杀进程，永久封死复活</div>
+          <div class="li-meta"><span class="badge pending" id="badge-logd">⏳ 检测中</span></div>
+        </div>
+        <label class="sw" onclick="event.stopPropagation()"><input type="checkbox" id="sw-logd" onchange="onToggle('logd')"><span class="sw-track"></span></label>
+      </div>
 
-        // 定义功能配置（分为两组卡片）
-        const PROCESS_FEATURES = {
-            disable_logd: {
-                name: "彻底禁用 Logd",
-                desc: "mount 覆盖 + 强杀进程，永久封死复活",
-                icon: "bug_report"
-            },
-            block_ota: {
-                name: "阻断 OTA 更新",
-                desc: "覆盖 update_engine + 清除 OTA 缓存",
-                icon: "system_update"
-            },
-            kill_redundant_processes: {
-                name: "查杀冗余进程",
-                desc: "smartscene / sysmonitor / hotstart 等",
-                icon: "memory"
-            },
-            block_ads_and_tracking: {
-                name: "关闭广告与数据收集",
-                desc: "关闭个性化广告、用户体验计划、数据统计",
-                icon: "visibility_off"
-            }
+      <div class="sep"></div>
+
+      <div class="li" onclick="toggleSwitch('ota')">
+        <div class="li-icon c2"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M5 20h14v-2H5v2zM19 9h-4V3H9v6H5l7 7 7-7z"/></svg></div>
+        <div class="li-body">
+          <div class="li-title">阻断 OTA 更新</div>
+          <div class="li-desc">覆盖 update_engine + 清除 OTA 缓存</div>
+          <div class="li-meta"><span class="badge pending" id="badge-ota">⏳ 检测中</span></div>
+        </div>
+        <label class="sw" onclick="event.stopPropagation()"><input type="checkbox" id="sw-ota" onchange="onToggle('ota')"><span class="sw-track"></span></label>
+      </div>
+
+      <div class="sep"></div>
+
+      <div class="li" onclick="toggleSwitch('procs')">
+        <div class="li-icon c3"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M15 9H9v6h6V9zm-2 4h-2v-2h2v2zm8-2V9h-2V7c0-1.1-.9-2-2-2h-2V3h-2v2h-2V3H9v2H7c-1.1 0-2 .9-2 2v2H3v2h2v2H3v2h2v2c0 1.1.9 2 2 2h2v2h2v-2h2v2h2v-2h2c1.1 0 2-.9 2-2v-2h2v-2h-2v-2h2zm-4 6H7V7h10v10z"/></svg></div>
+        <div class="li-body">
+          <div class="li-title">查杀冗余进程</div>
+          <div class="li-desc">smartscene / sysmonitor / hotstart 等</div>
+          <div class="li-meta"><span class="badge pending" id="badge-procs">⏳ 检测中</span></div>
+        </div>
+        <label class="sw" onclick="event.stopPropagation()"><input type="checkbox" id="sw-procs" onchange="onToggle('procs')"><span class="sw-track"></span></label>
+      </div>
+
+      <div class="sep"></div>
+
+      <div class="li" onclick="toggleSwitch('ads')">
+        <div class="li-icon c4"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 7c2.76 0 5 2.24 5 5 0 .65-.13 1.26-.36 1.83l2.92 2.92c1.51-1.26 2.7-2.89 3.43-4.75-1.73-4.39-6-7.5-11-7.5-1.4 0-2.74.25-3.98.7l2.16 2.16C10.74 7.13 11.35 7 12 7zM2 4.27l2.28 2.28.46.46A11.804 11.804 0 0 0 1 12c1.73 4.39 6 7.5 11 7.5 1.55 0 3.03-.3 4.38-.84l.42.42L19.73 22 21 20.73 3.27 3 2 4.27zM7.53 9.8l1.55 1.55c-.05.21-.08.43-.08.65 0 1.66 1.34 3 3 3 .22 0 .44-.03.65-.08l1.55 1.55c-.67.33-1.41.53-2.2.53-2.76 0-5-2.24-5-5 0-.79.2-1.53.53-2.2zm4.31-.78l3.15 3.15.02-.16c0-1.66-1.34-3-3-3l-.17.01z"/></svg></div>
+        <div class="li-body">
+          <div class="li-title">关闭广告与数据收集</div>
+          <div class="li-desc">关闭个性化广告、用户体验计划、数据统计</div>
+          <div class="li-meta"><span class="badge pending" id="badge-ads">⏳ 检测中</span></div>
+        </div>
+        <label class="sw" onclick="event.stopPropagation()"><input type="checkbox" id="sw-ads" onchange="onToggle('ads')"><span class="sw-track"></span></label>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- 卡片2: 系统优化 -->
+  <div class="card">
+    <div class="card-hd">
+      <div class="card-hd-icon">
+        <svg viewBox="0 0 24 24" fill="currentColor"><path d="M3 17v2h6v-2H3zM3 5v2h10V5H3zm10 16v-2h8v-2h-8v-2h-2v6h2zM7 9v2H3v2h4v2h2V9H7zm14 4v-2H11v2h10zm-6-4h2V7h4V5h-4V3h-2v6z"/></svg>
+      </div>
+      <div class="card-hd-title">系统优化</div>
+    </div>
+    <div class="card-bd">
+
+      <div class="li" onclick="toggleSwitch('anim')">
+        <div class="li-icon c5"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M15 2l-3.5 3.5L13 7l-5 5-2-2-4 4v2h2l4-4-2-2 5-5 1.5 1.5L15 2zM3 20h18v2H3v-2z"/></svg></div>
+        <div class="li-body">
+          <div class="li-title">动画精简</div>
+          <div class="li-desc">关闭窗口动画缩放、减少过渡特效</div>
+          <div class="li-meta"><span class="badge pending" id="badge-anim">⏳ 检测中</span></div>
+        </div>
+        <label class="sw" onclick="event.stopPropagation()"><input type="checkbox" id="sw-anim" onchange="onToggle('anim')"><span class="sw-track"></span></label>
+      </div>
+
+      <div class="sep"></div>
+
+      <div class="li" onclick="toggleSwitch('thermal')">
+        <div class="li-icon c1"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M15 13V5c0-1.66-1.34-3-3-3S9 3.34 9 5v8c-1.12.93-1.84 2.31-1.84 3.84C7.16 19.1 9.16 21 11.5 21h1c2.34 0 4.34-1.9 4.34-4.16 0-1.53-.72-2.91-1.84-3.84zm-3-11c.55 0 1 .45 1 1v4h-2V3c0-.55.45-1 1-1z"/></svg></div>
+        <div class="li-body">
+          <div class="li-title">温控策略调整</div>
+          <div class="li-desc">放宽 CPU/GPU 温控阈值，减少降频</div>
+          <div class="li-meta"><span class="badge pending" id="badge-thermal">⏳ 检测中</span></div>
+        </div>
+        <label class="sw" onclick="event.stopPropagation()"><input type="checkbox" id="sw-thermal" onchange="onToggle('thermal')"><span class="sw-track"></span></label>
+      </div>
+
+      <div class="sep"></div>
+
+      <div class="li" onclick="toggleSwitch('mem')">
+        <div class="li-icon c2"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M2 7v9c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2H4c-1.1 0-2 .9-2 2zm4 7H4v-2h2v2zm4 0H8v-2h2v2zm4 0h-2v-2h2v2zm4 0h-2v-2h2v2z"/></svg></div>
+        <div class="li-body">
+          <div class="li-title">内存管理优化</div>
+          <div class="li-desc">调整 LMK 参数、禁用 zRAM 压缩</div>
+          <div class="li-meta"><span class="badge pending" id="badge-mem">⏳ 检测中</span></div>
+        </div>
+        <label class="sw" onclick="event.stopPropagation()"><input type="checkbox" id="sw-mem" onchange="onToggle('mem')"><span class="sw-track"></span></label>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- 卡片3: 网络优化 -->
+  <div class="card">
+    <div class="card-hd">
+      <div class="card-hd-icon">
+        <svg viewBox="0 0 24 24" fill="currentColor"><path d="M1 9l2 2c4.97-4.97 13.03-4.97 18 0l2-2C16.93 2.93 7.08 2.93 1 9zm8 8l3 3 3-3c-1.65-1.66-4.34-1.66-6 0zm-4-4l2 2c2.76-2.76 7.24-2.76 10 0l2-2C15.14 9.14 8.87 9.14 5 13z"/></svg>
+      </div>
+      <div class="card-hd-title">网络优化</div>
+    </div>
+    <div class="card-bd">
+
+      <div class="li" onclick="toggleSwitch('dns')">
+        <div class="li-icon c4"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 17.93c-3.95-.49-7-3.85-7-7.93 0-.62.08-1.21.21-1.79L9 15v1c0 1.1.9 2 2 2v1.93zm6.9-2.54c-.26-.81-1-1.39-1.9-1.39h-1v-3c0-.55-.45-1-1-1H8v-2h2c.55 0 1-.45 1-1V7h2c1.1 0 2-.9 2-2v-.41c2.93 1.19 5 4.06 5 7.41 0 2.08-.8 3.97-2.1 5.39z"/></svg></div>
+        <div class="li-body">
+          <div class="li-title">DNS 优选</div>
+          <div class="li-desc">替换为高效 DNS，屏蔽广告域名</div>
+          <div class="li-meta"><span class="badge pending" id="badge-dns">⏳ 检测中</span></div>
+        </div>
+        <label class="sw" onclick="event.stopPropagation()"><input type="checkbox" id="sw-dns" onchange="onToggle('dns')"><span class="sw-track"></span></label>
+      </div>
+
+      <div class="sep"></div>
+
+      <div class="li" onclick="toggleSwitch('telemetry')">
+        <div class="li-icon c3"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-2h2v2zm0-4h-2V7h2v6z"/></svg></div>
+        <div class="li-body">
+          <div class="li-title">遥测数据拦截</div>
+          <div class="li-desc">拦截 OPPO/ColorOS 遥测上报域名</div>
+          <div class="li-meta"><span class="badge pending" id="badge-telemetry">⏳ 检测中</span></div>
+        </div>
+        <label class="sw" onclick="event.stopPropagation()"><input type="checkbox" id="sw-telemetry" onchange="onToggle('telemetry')"><span class="sw-track"></span></label>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- 卡片4: 模块信息 -->
+  <div class="card">
+    <div class="card-hd">
+      <div class="card-hd-icon">
+        <svg viewBox="0 0 24 24" fill="currentColor"><path d="M11 7h2v2h-2zm0 4h2v6h-2zm1-9C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8z"/></svg>
+      </div>
+      <div class="card-hd-title">模块信息</div>
+    </div>
+    <div style="padding:4px 0 8px">
+      <div class="info-row"><span class="label">模块版本</span><span class="value">v1.0</span></div>
+      <div class="sep" style="margin:0"></div>
+      <div class="info-row"><span class="label">KernelSU</span><span class="value" id="ksuVer">检测中...</span></div>
+      <div class="sep" style="margin:0"></div>
+      <div class="info-row"><span class="label">设备</span><span class="value">OnePlus Ace5</span></div>
+      <div class="sep" style="margin:0"></div>
+      <div class="info-row"><span class="label">系统</span><span class="value">ColorOS 16</span></div>
+    </div>
+  </div>
+
+  <div class="footer">
+    Logd Disabler for ColorOS16<br>Designed for KernelSU
+  </div>
+
+</div>
+
+<!-- 浮动日志按钮 -->
+<button class="fab" onclick="showLog()">
+  <svg viewBox="0 0 24 24" fill="currentColor"><path d="M20 4H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 14H4V8h16v10zm-8-2h4v-2h-4v2zm-6-4h10v-2H6v2zm0 4h4v-2H6v2z"/></svg>
+</button>
+
+<!-- 日志对话框 -->
+<div class="overlay hide" id="logOverlay" onclick="if(event.target===this)hideLog()">
+  <div class="dialog" style="max-width:480px;display:flex;flex-direction:column">
+    <h2>操作日志</h2>
+    <div class="log-box" id="logBox">暂无日志</div>
+    <div class="dialog-actions" style="margin-top:16px">
+      <button class="btn btn-s" onclick="clearLog()">清空</button>
+      <button class="btn btn-p" onclick="hideLog()">关闭</button>
+    </div>
+  </div>
+</div>
+
+<!-- 确认对话框 -->
+<div class="overlay hide" id="confirmOverlay" onclick="if(event.target===this)cancelConfirm()">
+  <div class="dialog">
+    <h2 id="confirmTitle">确认</h2>
+    <div class="dialog-body" id="confirmMsg"></div>
+    <div class="dialog-actions">
+      <button class="btn btn-s" onclick="cancelConfirm()">取消</button>
+      <button class="btn btn-p" onclick="doConfirm()">确认</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ==================== KernelSU 通信 ====================
+function ksuExec(cmd) {
+  return new Promise(function(resolve) {
+    try {
+      if (typeof ksu !== 'undefined' && ksu.exec) {
+        var cb = '_cb' + Date.now() + Math.random().toString(36).slice(2);
+        window[cb] = function(errno, stdout, stderr) {
+          resolve({ errno: errno, stdout: stdout || '', stderr: stderr || '' });
+          delete window[cb];
         };
+        ksu.exec(cmd, '{}', cb);
+      } else {
+        console.log('[Mock]', cmd);
+        resolve({ errno: 0, stdout: 'mock', stderr: '' });
+      }
+    } catch(e) {
+      resolve({ errno: -1, stdout: '', stderr: String(e) });
+    }
+  });
+}
 
-        const TUNING_FEATURES = {
-            lock_developer_options: {
-                name: "锁定开发者选项",
-                desc: "防止系统重置开发者选项与 ADB 状态",
-                icon: "developer_mode"
-            },
-            memory_io_optimization: {
-                name: "内存 / IO 优化",
-                desc: "关闭 schedstats / binder debug / 限制内存压缩",
-                icon: "speed"
-            },
-            extra_kernel_optimization: {
-                name: "额外内核优化",
-                desc: "降低 printk 日志级别 + 禁用透明大页",
-                icon: "settings_suggest"
-            }
-        };
+function sh(cmd) {
+  return ksuExec("sh -c '" + cmd.replace(/'/g, "'\\''") + "'");
+}
 
-        const app = createApp({
-            setup() {
-                const isLoading = ref(false);
+// ==================== 功能项定义 ====================
+var ITEMS = {
+  logd: {
+    name: '彻底禁用 Logd',
+    en: 'mount -o bind /dev/null /system/bin/logd 2>/dev/null;mount -o bind /dev/null /system/bin/logcat 2>/dev/null;pkill -9 logd 2>/dev/null;pkill -9 logcat 2>/dev/null;setprop persist.logd.disabled 1;echo "[Logd] 已禁用" >> /data/adb/logd_disabler.log',
+    dis: 'umount /system/bin/logd 2>/dev/null;umount /system/bin/logcat 2>/dev/null;setprop persist.logd.disabled 0;echo "[Logd] 已恢复" >> /data/adb/logd_disabler.log',
+    chk: 'mount | grep -q "logd" && echo enabled || echo disabled'
+  },
+  ota: {
+    name: '阻断 OTA 更新',
+    en: 'mount -o bind /dev/null /system/bin/update_engine 2>/dev/null;mount -o bind /dev/null /system/bin/update_engine_client 2>/dev/null;rm -rf /data/data/com.oplus.ota/cache/* 2>/dev/null;rm -rf /data/ota_package/* 2>/dev/null;pkill -9 update_engine 2>/dev/null;setprop persist.sys.ota.disabled 1;echo "[OTA] 已阻断" >> /data/adb/logd_disabler.log',
+    dis: 'umount /system/bin/update_engine 2>/dev/null;umount /system/bin/update_engine_client 2>/dev/null;setprop persist.sys.ota.disabled 0;echo "[OTA] 已恢复" >> /data/adb/logd_disabler.log',
+    chk: 'mount | grep -q "update_engine" && echo enabled || echo disabled'
+  },
+  procs: {
+    name: '查杀冗余进程',
+    en: 'pkill -9 smartscene 2>/dev/null;pkill -9 sysmonitor 2>/dev/null;pkill -9 hotstart 2>/dev/null;pkill -9 oplus_permission 2>/dev/null;pkill -9 oplus_appstore 2>/dev/null;pkill -9 com.oplus.exsystemservice 2>/dev/null;setprop persist.sys.bloatware.killed 1;echo "[Procs] 已查杀" >> /data/adb/logd_disabler.log',
+    dis: 'setprop persist.sys.bloatware.killed 0;echo "[Procs] 已停止" >> /data/adb/logd_disabler.log',
+    chk: 'getprop persist.sys.bloatware.killed | grep -q "1" && echo enabled || echo disabled'
+  },
+  ads: {
+    name: '关闭广告与数据收集',
+    en: 'settings put global oppo_ad_enabled 0 2>/dev/null;settings put secure oppo_ad_personalization 0 2>/dev/null;settings put global oppo_experience_plan 0 2>/dev/null;settings put global oppo_data_collection 0 2>/dev/null;setprop persist.sys.ad.disable 1;setprop persist.sys.oppo.experience 0;echo "[Ads] 已关闭" >> /data/adb/logd_disabler.log',
+    dis: 'settings put global oppo_ad_enabled 1 2>/dev/null;setprop persist.sys.ad.disable 0;setprop persist.sys.oppo.experience 1;echo "[Ads] 已恢复" >> /data/adb/logd_disabler.log',
+    chk: 'getprop persist.sys.ad.disable | grep -q "1" && echo enabled || echo disabled'
+  },
+  anim: {
+    name: '动画精简',
+    en: 'settings put global window_animation_scale 0.5;settings put global transition_animation_scale 0.5;settings put global animator_duration_scale 0.5;echo "[Anim] 动画已精简" >> /data/adb/logd_disabler.log',
+    dis: 'settings put global window_animation_scale 1.0;settings put global transition_animation_scale 1.0;settings put global animator_duration_scale 1.0;echo "[Anim] 动画已恢复" >> /data/adb/logd_disabler.log',
+    chk: 'test "$(settings get global window_animation_scale 2>/dev/null)" = "0.5" && echo enabled || echo disabled'
+  },
+  thermal: {
+    name: '温控策略调整',
+    en: 'echo 95000 > /sys/class/thermal/thermal_zone0/trip_point_4_temp 2>/dev/null;echo 95000 > /sys/class/thermal/thermal_zone1/trip_point_4_temp 2>/dev/null;setprop persist.sys.thermal.relaxed 1;echo "[Thermal] 温控已放宽" >> /data/adb/logd_disabler.log',
+    dis: 'setprop persist.sys.thermal.relaxed 0;echo "[Thermal] 温控已恢复" >> /data/adb/logd_disabler.log',
+    chk: 'getprop persist.sys.thermal.relaxed | grep -q "1" && echo enabled || echo disabled'
+  },
+  mem: {
+    name: '内存管理优化',
+    en: 'echo "0,1,2,4,7,15" > /sys/module/lowmemorykiller/parameters/adj 2>/dev/null;echo "8192,12288,16384,24576,32768,65536" > /sys/module/lowmemorykiller/parameters/minfree 2>/dev/null;swapoff /dev/block/zram0 2>/dev/null;setprop persist.sys.mem_opt 1;echo "[Mem] 内存优化已启用" >> /data/adb/logd_disabler.log',
+    dis: 'setprop persist.sys.mem_opt 0;echo "[Mem] 内存优化已恢复" >> /data/adb/logd_disabler.log',
+    chk: 'getprop persist.sys.mem_opt | grep -q "1" && echo enabled || echo disabled'
+  },
+  dns: {
+    name: 'DNS 优选',
+    en: 'setprop net.dns1 223.5.5.5;setprop net.dns2 119.29.29.29;echo "0.0.0.0 adsmodule.oppomobile.com" >> /system/etc/hosts;echo "0.0.0.0 adsfs.oppomobile.com" >> /system/etc/hosts;setprop persist.sys.dns_opt 1;echo "[DNS] DNS 优选已启用" >> /data/adb/logd_disabler.log',
+    dis: 'setprop persist.sys.dns_opt 0;echo "[DNS] DNS 已恢复" >> /data/adb/logd_disabler.log',
+    chk: 'getprop persist.sys.dns_opt | grep -q "1" && echo enabled || echo disabled'
+  },
+  telemetry: {
+    name: '遥测数据拦截',
+    en: 'echo "0.0.0.0 stat.oppomobile.com" >> /system/etc/hosts;echo "0.0.0.0 analytics.oppomobile.com" >> /system/etc/hosts;echo "0.0.0.0 log.oppomobile.com" >> /system/etc/hosts;echo "0.0.0.0 data.oppomobile.com" >> /system/etc/hosts;setprop persist.sys.telemetry.blocked 1;echo "[Telemetry] 遥测已拦截" >> /data/adb/logd_disabler.log',
+    dis: 'setprop persist.sys.telemetry.blocked 0;echo "[Telemetry] 遥测已恢复" >> /data/adb/logd_disabler.log',
+    chk: 'getprop persist.sys.telemetry.blocked | grep -q "1" && echo enabled || echo disabled'
+  }
+};
 
-                const config = reactive({
-                    disable_logd: false,
-                    block_ota: false,
-                    lock_developer_options: false,
-                    kill_redundant_processes: false,
-                    block_ads_and_tracking: false,
-                    memory_io_optimization: false,
-                    extra_kernel_optimization: false
-                });
+var keys = Object.keys(ITEMS);
 
-                const status = reactive({});
+// ==================== 日志 ====================
+var logLines = [];
 
-                // ========== Shell 执行封装（兼容所有管理器） ==========
-                const execShell = async (cmd) => {
-                    return new Promise((resolve) => {
-                        if (typeof ksu !== 'undefined' && ksu.exec) {
-                            const res = ksu.exec(cmd);
-                            if (res && typeof res.then === 'function') {
-                                res.then(stdout => resolve({ code: 0, stdout: stdout.trim() }))
-                                .catch(err => resolve({ code: 1, stdout: "", stderr: String(err) }));
-                            } else if (typeof ksu.exec === 'function' && ksu.exec.length >= 2) {
-                                ksu.exec(cmd, "", (code, stdout, stderr) => resolve({ code, stdout: (stdout||"").trim(), stderr }));
-                            } else {
-                                resolve({ code: 0, stdout: String(res).trim(), stderr: "" });
-                            }
-                        } else {
-                            // 浏览器 Mock（本地调试用）
-                            resolve({
-                                code: 0,
-                                stdout: JSON.stringify({
-                                    disable_logd: {cfg:true, st:"success"},
-                                    block_ota: {cfg:false, st:"success"},
-                                    lock_developer_options: {cfg:true, st:"success"},
-                                    kill_redundant_processes: {cfg:true, st:"success"},
-                                    block_ads_and_tracking: {cfg:true, st:"success"},
-                                    memory_io_optimization: {cfg:false, st:"success"},
-                                    extra_kernel_optimization: {cfg:true, st:"success"}
-                                }),
-                                stderr: ""
-                            });
-                        }
-                    });
-                };
+function addLog(msg) {
+  var t = new Date();
+  var ts = ('0'+t.getHours()).slice(-2)+':'+('0'+t.getMinutes()).slice(-2)+':'+('0'+t.getSeconds()).slice(-2);
+  logLines.push('[' + ts + '] ' + msg);
+  var box = document.getElementById('logBox');
+  if (box) box.textContent = logLines.join('\n');
+}
 
-                // ========== 获取状态 ==========
-                const fetchStatus = async () => {
-                    isLoading.value = true;
-                    try {
-                        const res = await execShell("sh /data/adb/modules/coloros16_optimize/get_status_json.sh");
-                        if (res.code === 0 && res.stdout) {
-                            const jsonMatch = res.stdout.match(/\{[\s\S]*\}/);
-                            if (jsonMatch) {
-                                const data = JSON.parse(jsonMatch[0]);
-                                Object.assign(status, data);
-                                // 同步 UI 开关
-                                for (let key in config) {
-                                    if (data[key]) config[key] = data[key].cfg;
-                                }
-                            }
-                        }
-                    } catch (e) {
-                        console.error("状态解析失败:", e);
-                        showToast("⚠️ 状态获取异常，请检查脚本权限");
-                    } finally {
-                        isLoading.value = false;
-                    }
-                };
+function showLog() {
+  document.getElementById('logOverlay').classList.remove('hide');
+  var box = document.getElementById('logBox');
+  if (box) box.scrollTop = box.scrollHeight;
+}
+function hideLog() { document.getElementById('logOverlay').classList.add('hide'); }
+function clearLog() { logLines = []; document.getElementById('logBox').textContent = '暂无日志'; }
 
-                // ========== 保存配置 ==========
-                const onSwitchChange = async (key, event) => {
-                    const newVal = event.target.checked;
-                    config[key] = newVal; // 先乐观更新 UI
-                    const propVal = newVal ? "true" : "false";
-                    await execShell(`setprop persist.sys.coloros16_optimize_gui.${key} ${propVal}`);
-                    showToast(newVal ? "✅ 已开启，重启后生效" : "⭕ 已关闭，重启后生效");
-                    // 延迟刷新状态
-                    setTimeout(fetchStatus, 600);
-                };
+// ==================== 确认对话框 ====================
+var _confirmCb = null;
+function showConfirm(title, msg) {
+  return new Promise(function(resolve) {
+    document.getElementById('confirmTitle').textContent = title;
+    document.getElementById('confirmMsg').textContent = msg;
+    document.getElementById('confirmOverlay').classList.remove('hide');
+    _confirmCb = resolve;
+  });
+}
+function doConfirm() {
+  document.getElementById('confirmOverlay').classList.add('hide');
+  if (_confirmCb) { _confirmCb(true); _confirmCb = null; }
+}
+function cancelConfirm() {
+  document.getElementById('confirmOverlay').classList.add('hide');
+  if (_confirmCb) { _confirmCb(false); _confirmCb = null; }
+}
 
-                // ========== Toast 提示（优先 MDUI snackbar，回退 ksu.toast） ==========
-                const showToast = (msg) => {
-                    if (typeof mdui !== 'undefined' && mdui.snackbar) {
-                        mdui.snackbar({
-                            message: msg,
-                            position: 'bottom',
-                            autoCloseDelay: 2000
-                        });
-                    } else if (typeof ksu !== 'undefined' && ksu.toast) {
-                        ksu.toast(msg);
-                    }
-                };
+// ==================== 状态管理 ====================
+var state = {};
+keys.forEach(function(k) { state[k] = { enabled: false, loading: false, status: 'pending' }; });
 
-                // ========== 状态文本映射 ==========
-                const getStatusText = (st) => {
-                    switch(st) {
-                        case 'success': return '✅ 已生效';
-                        case 'pending': return '⏳ 等待重启';
-                        default: return '⏳ 检测中';
-                    }
-                };
+function setBadge(key) {
+  var el = document.getElementById('badge-' + key);
+  if (!el) return;
+  var s = state[key];
+  var cls = 'badge ', txt = '';
+  if (s.loading) { cls += 'work'; txt = '⏳ 处理中'; }
+  else if (s.status === 'enabled') { cls += 'on'; txt = '✅ 已启用'; }
+  else if (s.status === 'disabled') { cls += 'off'; txt = '⭕ 未启用'; }
+  else if (s.status === 'error') { cls += 'err'; txt = '❌ 异常'; }
+  else { cls += 'pending'; txt = '⏳ 检测中'; }
+  el.className = cls;
+  el.textContent = txt;
+}
 
-                onMounted(fetchStatus);
+function setSwitch(key) {
+  var el = document.getElementById('sw-' + key);
+  if (el) el.checked = state[key].enabled;
+}
 
-                return {
-                    isLoading, config, status,
-                    processFeatures: PROCESS_FEATURES,
-                    tuningFeatures: TUNING_FEATURES,
-                    fetchStatus, onSwitchChange, getStatusText
-                };
-            }
-        });
+// ==================== 开关切换 ====================
+function toggleSwitch(key) {
+  var el = document.getElementById('sw-' + key);
+  if (el && !state[key].loading) {
+    el.checked = !el.checked;
+    onToggle(key);
+  }
+}
 
-        // 关键：告诉 Vue 3 不要拦截 mdui-* 自定义元素标签
-        app.config.compilerOptions.isCustomElement = (tag) => tag.startsWith('mdui-');
-        app.mount('#app');
-    </script>
-    </body>
+async function onToggle(key) {
+  var s = state[key];
+  if (s.loading) return;
 
-    </html>
+  var el = document.getElementById('sw-' + key);
+  var wantOn = el ? el.checked : !s.enabled;
+
+  s.loading = true;
+  s.status = 'working';
+  setBadge(key);
+
+  var action = wantOn ? '启用' : '禁用';
+  addLog('正在' + action + ' ' + ITEMS[key].name + '...');
+
+  try {
+    var cmd = wantOn ? ITEMS[key].en : ITEMS[key].dis;
+    var r = await sh(cmd);
+    if (r.errno === 0) {
+      s.enabled = wantOn;
+      s.status = wantOn ? 'enabled' : 'disabled';
+      addLog(ITEMS[key].name + ' ' + action + '成功');
+    } else {
+      s.status = 'error';
+      addLog(ITEMS[key].name + ' ' + action + '失败: ' + r.stderr);
+      if (el) el.checked = !wantOn;
+    }
+  } catch(e) {
+    s.status = 'error';
+    addLog(ITEMS[key].name + ' 异常: ' + e);
+    if (el) el.checked = !wantOn;
+  }
+
+  s.loading = false;
+  setBadge(key);
+}
+
+// ==================== 状态检测 ====================
+async function checkItem(key) {
+  try {
+    var r = await sh(ITEMS[key].chk);
+    var out = r.stdout.trim();
+    if (out === 'enabled') {
+      state[key].enabled = true;
+      state[key].status = 'enabled';
+    } else {
+      state[key].enabled = false;
+      state[key].status = 'disabled';
+    }
+  } catch(e) {
+    state[key].status = 'error';
+  }
+  setBadge(key);
+  setSwitch(key);
+}
+
+async function refreshAll() {
+  var btn = document.getElementById('btnRefresh');
+  if (btn) btn.classList.add('spin');
+
+  var pw = document.getElementById('progWrap');
+  var pf = document.getElementById('progFill');
+  var pt = document.getElementById('progText');
+  if (pw) pw.classList.remove('hide');
+
+  addLog('=== 开始全面状态检测 ===');
+
+  for (var i = 0; i < keys.length; i++) {
+    await checkItem(keys[i]);
+    var pct = Math.round(((i + 1) / keys.length) * 100);
+    if (pf) pf.style.width = pct + '%';
+    if (pt) pt.textContent = '检测中... ' + pct + '%';
+    await new Promise(function(r) { setTimeout(r, 80); });
+  }
+
+  addLog('=== 状态检测完成 ===');
+  if (pw) setTimeout(function() { pw.classList.add('hide'); }, 1000);
+  if (btn) btn.classList.remove('spin');
+}
+
+// ==================== 初始化 ====================
+async function init() {
+  addLog('WebUI 初始化完成');
+
+  // 检测 KSU 版本
+  try {
+    var r = await sh('cat /data/adb/modules/*/module.prop 2>/dev/null | grep "^version=" | head -1');
+    var m = r.stdout.match(/version=(.+)/);
+    var ver = m ? m[1].trim() : 'v3.2.4';
+    document.getElementById('ksuVer').textContent = ver;
+  } catch(e) {
+    document.getElementById('ksuVer').textContent = 'v3.2.4';
+  }
+
+  await refreshAll();
+}
+
+// 页面加载完成后初始化
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', init);
+} else {
+  init();
+}
+</script>
+</body>
+</html>

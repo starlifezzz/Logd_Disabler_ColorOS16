@@ -1,1 +1,1 @@
-nix-shell -p zip --run 'rm -f Logd_Disabler_ColorOS16.zip && zip -r Logd_Disabler_ColorOS16.zip . -x ".git/*" ".github/*" ".lingma/*" ".gitignore" "README.md" "Logd_Disabler_ColorOS16.zip" "zip.sh" '
+nix-shell -p zip --run 'rm -f Logd_Disabler_ColorOS16.zip && zip -r Logd_Disabler_ColorOS16.zip . -x ".git/*" ".github/*" ".lingma/*" ".gitignore" "README.md" "Logd_Disabler_ColorOS16.zip" "zip.sh" "services.txt" '

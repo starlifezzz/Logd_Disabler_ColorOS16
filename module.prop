@@ -5,3 +5,4 @@ versionCode=1
 author=zhangchongjie
 description=基于Web UI的ColorOS16系统优化模块
 webui=true
+code=dev

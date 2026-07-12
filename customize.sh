@@ -16,4 +16,4 @@ if ! grep -qE "ColorOS|oplus|OnePlus" /system/build.prop /system_ext/build.prop 
     abort "❌ 错误：此模块仅适用于 ColorOS / OnePlus (OPPO) 设备！"
 fi
 
-ui_print "✅ 安装完成！请在 KernelSU 管理器中打开 WebUI 进行配置。"
+ui_print "✅ 安装完成！重启后请在 KernelSU 管理器中打开 WebUI 进行配置。"
