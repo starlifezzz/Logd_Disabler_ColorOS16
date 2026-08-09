@@ -16,4 +16,5 @@ if ! grep -qE "ColorOS|oplus|OnePlus" /system/build.prop /system_ext/build.prop 
 fi
 
 
+
 ui_print "✅ 安装完成！重启后请在 KernelSU 管理器中打开 WebUI 进行配置。"
