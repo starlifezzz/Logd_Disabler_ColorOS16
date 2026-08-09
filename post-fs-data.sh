@@ -28,25 +28,26 @@ fi
 # ===================== SELinux 规则注入 =====================
 # 【关键修复】允许 late_start service 执行 pm disable-user / pm uninstall
 # 这些规则在 post-fs-data 阶段注入，确保 service.sh 阶段有权限
+# 注意：实际执行 pm 的进程是 su/magisk/shell 域，目标 type 是 servicemanager（binder 服务注册表）
+#      以及 system_server（PackageManagerService 所在进程）
 log "[SELinux] 注入包管理相关规则..."
 
-# 允许 system_server 和 system_app 执行包管理操作
-# 使用 magiskpolicy 或直接写入 sepolicy（KernelSU 环境）
-MAGISK_POLICY=""
+# KernelSU 的 ksud sepolicy 需要 --live 参数实时生效
+# Magisk 的 magiskpolicy 使用 --live 参数
 if [ -f "/data/adb/ksu/bin/ksud" ]; then
-    MAGISK_POLICY="/data/adb/ksu/bin/ksud sepolicy"
+    KSU_POLICY="/data/adb/ksu/bin/ksud sepolicy --live"
 elif [ -f "/data/adb/magisk/magiskpolicy" ]; then
-    MAGISK_POLICY="/data/adb/magisk/magiskpolicy --live"
+    KSU_POLICY="/data/adb/magisk/magiskpolicy --live"
 fi
 
-if [ -n "$MAGISK_POLICY" ]; then
-    # 允许 init shell 执行 pm 命令
-    $MAGISK_POLICY "allow init package_manager_service binder { call transfer }" 2>/dev/null
-    $MAGISK_POLICY "allow system_server package_manager_service binder { call transfer }" 2>/dev/null
-    $MAGISK_POLICY "allow system_app package_manager_service binder { call transfer }" 2>/dev/null
-    # 允许 late_start service 的 shell context 调用 PMS
-    $MAGISK_POLICY "allow u:r:su:s0 package_manager_service binder { call transfer }" 2>/dev/null
-    $MAGISK_POLICY "allow u:r:magisk:s0 package_manager_service binder { call transfer }" 2>/dev/null
+if [ -n "$KSU_POLICY" ]; then
+    # 允许 su/magisk/shell 域通过 servicemanager 查找并调用 PMS binder
+    $KSU_POLICY "allow su servicemanager binder { call transfer }" 2>/dev/null
+    $KSU_POLICY "allow su system_server binder { call transfer }" 2>/dev/null
+    $KSU_POLICY "allow magisk servicemanager binder { call transfer }" 2>/dev/null
+    $KSU_POLICY "allow magisk system_server binder { call transfer }" 2>/dev/null
+    $KSU_POLICY "allow shell servicemanager binder { call transfer }" 2>/dev/null
+    $KSU_POLICY "allow shell system_server binder { call transfer }" 2>/dev/null
     log "[SELinux] 规则注入完成"
 else
     log "[SELinux] 未找到 sepolicy 工具，跳过"

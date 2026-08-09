@@ -94,7 +94,7 @@ if [ "$(getprop ${PROP_PREFIX}disable_logd)" = "true" ]; then
     done
     stop logd 2>/dev/null
     pkill -9 -x logd 2>/dev/null
-    pkill -9 -f "logd" 2>/dev/null
+    pkill -9 -x logpersistd 2>/dev/null
     pkill -9 -x logcat 2>/dev/null
     pkill -9 -x logtagd 2>/dev/null
     setprop ctl.stop logd 2>/dev/null
@@ -107,7 +107,12 @@ else
         TARGET="/system/bin/$bin"
         umount "$TARGET" 2>/dev/null
     done
+    for bin in logd logcat; do
+        TARGET="/system/xbin/$bin"
+        umount "$TARGET" 2>/dev/null
+    done
     setprop logd.logpersistd.enable true 2>/dev/null
+    setprop persist.logd.disabled 0 2>/dev/null
     start logd 2>/dev/null
     log "[Logd] 恢复完成"
 fi
@@ -118,10 +123,12 @@ if [ "$(getprop ${PROP_PREFIX}block_ota)" = "true" ]; then
     stop update_engine 2>/dev/null
     pkill -9 -x update_engine 2>/dev/null
     setprop ctl.stop update_engine 2>/dev/null
+    # 依据 services.txt：一加Ace5 真实存在的 OTA 相关包
     disable_pkg "com.oplus.ota"
     disable_pkg "com.oplus.sau"
-    disable_pkg "com.coloros.ota"
-    disable_pkg "com.oplus.otaex"
+    disable_pkg "com.oplus.cota"
+    disable_pkg "com.oplus.romupdate"
+    disable_pkg "com.oplus.upgradeguide"
     setprop persist.ota.auto_download 0
     setprop persist.sys.recovery_update 0
     setprop persist.sys.ota.disabled 1
@@ -130,11 +137,21 @@ else
     log "[OTA] 关闭：启用包 + 恢复属性..."
     enable_pkg "com.oplus.ota"
     enable_pkg "com.oplus.sau"
-    enable_pkg "com.coloros.ota"
-    enable_pkg "com.oplus.otaex"
+    enable_pkg "com.oplus.cota"
+    enable_pkg "com.oplus.romupdate"
+    enable_pkg "com.oplus.upgradeguide"
     setprop persist.ota.auto_download 1
     setprop persist.sys.recovery_update 1
     setprop persist.sys.ota.disabled 0
+    setprop persist.ota.auto_download 1 2>/dev/null
+    # 解除 post-fs-data.sh 中挂载覆盖的二进制与 OTA 目录
+    for bin in update_engine update_engine_client; do
+        TARGET="/system/bin/$bin"
+        umount "$TARGET" 2>/dev/null
+    done
+    for apk_dir in /system/app/OTA /system/priv-app/OTA /system/app/OplusOTA /system/priv-app/OplusOTA; do
+        umount "$apk_dir" 2>/dev/null
+    done
     start update_engine 2>/dev/null
     log "[OTA] 恢复完成"
 fi
