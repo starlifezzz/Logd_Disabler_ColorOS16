@@ -1,1 +1,74 @@
+name: Build Module and Release
 
+# 触发条件：推送 v* 格式的 tag（如 v1.1），或手动触发
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+
+# 需要写权限：上传 Release 资产 + 推送 update.json 回 main 分支
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      # 从 module.prop 提取版本信息，供 update.json 使用
+      - name: Read module.prop version info
+        id: module_info
+        run: |
+          echo "version=$(grep '^version=' module.prop | cut -d= -f2)" >> "$GITHUB_OUTPUT"
+          echo "version_code=$(grep '^versionCode=' module.prop | cut -d= -f2)" >> "$GITHUB_OUTPUT"
+          echo "tag=${{ github.ref_name }}"
+
+      # 打包可刷 zip：只包含模块运行必需文件
+      # 排除规则与本地 zip.sh 保持一致（不含 update.json，它是仓库级文件不是模块文件）
+      - name: Package module zip
+        run: |
+          zip -r Logd_Disabler_ColorOS16.zip \
+            module.prop customize.sh service.sh post-fs-data.sh boot-completed.sh \
+            apply_yaml_config.sh verify_status.sh \
+            system webroot \
+            -x "*.git*" "*.github*" "*.lingma*" ".gitignore" "README.md" \
+            "Logd_Disabler_ColorOS16.zip" "zip.sh" "services.txt" "update.json"
+          echo "--- zip contents ---"
+          unzip -l Logd_Disabler_ColorOS16.zip
+
+      # 生成 update.json 到临时位置（不污染当前工作区）
+      - name: Generate update.json
+        run: |
+          cat > /tmp/update.json <<EOF
+          {
+            "version": "${{ steps.module_info.outputs.version }}",
+            "versionCode": ${{ steps.module_info.outputs.version_code }},
+            "zipUrl": "https://github.com/starlifezzz/Logd_Disabler_ColorOS16/releases/download/${{ github.ref_name }}/Logd_Disabler_ColorOS16.zip",
+            "changelog": "https://github.com/starlifezzz/Logd_Disabler_ColorOS16/releases/tag/${{ github.ref_name }}"
+          }
+          EOF
+          cat /tmp/update.json
+
+      # 把 update.json 推回 main 分支（module.prop 的 updateJson 指向 main 分支文件）
+      - name: Commit update.json back to main
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git fetch origin main
+          git checkout main
+          cp /tmp/update.json update.json
+          git add update.json
+          git diff --cached --quiet || git commit -m "chore: update update.json for ${{ github.ref_name }}"
+          git push origin main
+
+      # 上传 zip 到 GitHub Release（tag 对应版本）
+      - name: Create Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: Logd_Disabler_ColorOS16.zip
+          generate_release_notes: true

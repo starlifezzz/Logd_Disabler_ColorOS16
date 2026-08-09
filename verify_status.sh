@@ -1,6 +1,7 @@
 #!/system/bin/sh
 # ColorOS 16 优化模块状态验证脚本
-# 【核心修复】使用 pm list packages --user 0 检测包是否被卸载（与 service.sh 的 pm uninstall 对齐）
+# 【修复】同时检查 pm list packages --user 0 和 pm list packages -d --user 0
+# 因为 pm disable-user 的包仍在列表中，但会出现在 -d 列表中
 
 MODDIR=${0%/*}
 
@@ -51,29 +52,59 @@ check_process() {
 }
 
 # 函数：检查包状态并对比用户配置
-# 【核心修复】使用 pm list packages --user 0 检测（与 pm uninstall --user 0 对齐）
-# 逻辑：
-#   包不在 pm list packages --user 0 中 → 已被卸载 → 已优化 ✅
-#   包在 pm list packages --user 0 中 → 仍然存在 → 未优化 🔴
+# 【核心修复】同时检查三种情况：
+# 1. 包不在 pm list packages --user 0 中 → 已被 uninstall → 已优化
+# 2. 包在 pm list packages -d --user 0 中 → 已被 disable-user → 已优化
+# 3. 包在列表中且不在 -d 列表中 → 正常运行 → 未优化
 check_package_with_config() {
     local package="$1"
     local config_key="$2"
     local user_enabled=$(get_ksu_setting "$config_key" "false")
 
-    # 检查包是否对用户可见（存在于用户包列表中）
-    if pm list packages --user 0 2>/dev/null | grep -qF "package:$package"; then
-        # 包还在 → 未被卸载
+    # 检查包是否存在于系统中（任何用户）
+    if ! pm list packages 2>/dev/null | grep -qF "package:$package"; then
+        # 包完全不存在（可能是设备不包含此包）
         if [ "$user_enabled" = "true" ]; then
-            echo "  🔴 未优化（包仍存在，与用户设置冲突）"
+            echo "  ⚠️ 包不存在于此设备"
         else
-            echo "  🟢 未禁用（符合预期）"
+            echo "  ⚠️ 包不存在于此设备"
         fi
-    else
-        # 包不在 → 已被 pm uninstall --user 0 卸载
+        return
+    fi
+
+    # 检查包是否对用户可见
+    local in_user_list=false
+    if pm list packages --user 0 2>/dev/null | grep -qF "package:$package"; then
+        in_user_list=true
+    fi
+
+    # 检查包是否在 disabled 列表中
+    local in_disabled_list=false
+    if pm list packages -d --user 0 2>/dev/null | grep -qF "package:$package"; then
+        in_disabled_list=true
+    fi
+
+    # 判断包的实际状态
+    if [ "$in_user_list" = "false" ]; then
+        # 包已被 uninstall
         if [ "$user_enabled" = "true" ]; then
             echo "  🟢 已卸载（已优化）"
         else
-            echo "  ⚠️ 已卸载（但用户未要求禁用，可能需要恢复）"
+            echo "  ⚠️ 已卸载（但用户未要求禁用）"
+        fi
+    elif [ "$in_disabled_list" = "true" ]; then
+        # 包已被 disable-user
+        if [ "$user_enabled" = "true" ]; then
+            echo "  🟢 已禁用（已优化）"
+        else
+            echo "  ⚠️ 已禁用（但用户未要求禁用）"
+        fi
+    else
+        # 包正常运行中
+        if [ "$user_enabled" = "true" ]; then
+            echo "  🔴 未优化（包仍在运行，与用户设置冲突）"
+        else
+            echo "  🟢 正常运行（符合预期）"
         fi
     fi
 }

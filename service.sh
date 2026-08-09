@@ -21,38 +21,62 @@ log "========== service.sh 开始执行 =========="
 
 # ===================== 辅助函数 =====================
 
-# 禁用包：使用 pm uninstall -k --user 0 (ColorOS16 唯一可靠方法)
+# 禁用包：优先 pm disable-user，失败则 fallback 到 pm uninstall
 disable_pkg() {
     local pkg="$1"
-    # 检查包是否对当前用户可见
+    # 检查包是否存在
     if ! pm list packages 2>/dev/null | grep -qF "$pkg"; then
-        log "  ⏭️ 跳过（包不存在或已禁用）: $pkg"
+        log "  ⏭️ 跳过（包不存在）: $pkg"
         return 0
     fi
-    # 使用 pm uninstall -k --user 0 卸载（保留数据缓存，仅移除用户安装）
-    result=$(pm uninstall -k --user 0 "$pkg" 2>&1)
-    if echo "$result" | grep -q "Success"; then
-        log "  ✅ 卸载成功: $pkg"
-    else
-        log "  ⚠️ 卸载失败: $pkg ($result)"
+    # 检查包是否已经被禁用或卸载
+    if ! pm list packages --user 0 2>/dev/null | grep -qF "$pkg"; then
+        log "  ⏭️ 已禁用/卸载（跳过）: $pkg"
+        return 0
     fi
+    # 方法1：pm disable-user --user 0（SELinux 权限要求较低）
+    result=$(pm disable-user --user 0 "$pkg" 2>&1)
+    if echo "$result" | grep -qiE "new state: disabled|Success"; then
+        log "  ✅ disable-user 成功: $pkg"
+        return 0
+    fi
+    log "  ⚠️ disable-user 失败: $pkg ($result)"
+    # 方法2：pm uninstall -k --user 0（fallback）
+    result2=$(pm uninstall -k --user 0 "$pkg" 2>&1)
+    if echo "$result2" | grep -q "Success"; then
+        log "  ✅ uninstall fallback 成功: $pkg"
+        return 0
+    fi
+    log "  ❌ 两种方法均失败: $pkg"
+    return 1
 }
 
-# 恢复包：使用 cmd package install-existing
+# 恢复包：优先 pm enable，失败则 fallback 到 cmd package install-existing
 enable_pkg() {
     local pkg="$1"
-    # 检查包是否已经对当前用户可见
-    if pm list packages 2>/dev/null | grep -qF "$pkg"; then
-        log "  ✅ 已经是启用状态: $pkg"
+    # 检查包是否已经对用户可见且未被禁用
+    if pm list packages --user 0 2>/dev/null | grep -qF "$pkg"; then
+        # 还需检查是否在 disabled 列表中
+        if ! pm list packages -d --user 0 2>/dev/null | grep -qF "$pkg"; then
+            log "  ✅ 已启用（跳过）: $pkg"
+            return 0
+        fi
+    fi
+    # 方法1：pm enable --user 0
+    result=$(pm enable --user 0 "$pkg" 2>&1)
+    if echo "$result" | grep -qiE "new state: enabled|Success"; then
+        log "  ✅ enable 成功: $pkg"
         return 0
     fi
-    # 使用 cmd package install-existing 恢复
-    result=$(cmd package install-existing "$pkg" 2>&1)
-    if echo "$result" | grep -q "installed for user"; then
-        log "  ✅ 恢复成功: $pkg"
-    else
-        log "  ⚠️ 恢复失败: $pkg ($result)"
+    log "  ⚠️ enable 失败: $pkg ($result)"
+    # 方法2：cmd package install-existing（fallback）
+    result2=$(cmd package install-existing "$pkg" 2>&1)
+    if echo "$result2" | grep -q "installed for user"; then
+        log "  ✅ install-existing fallback 成功: $pkg"
+        return 0
     fi
+    log "  ❌ 两种恢复方法均失败: $pkg"
+    return 1
 }
 
 # ===================== 1. Logd =====================
@@ -255,7 +279,7 @@ fi
 
 # ===================== 9-21. 可选禁用服务 =====================
 
-# 9. 健康服务（com.heytap.health 在一加Ace5不存在，已移除）
+# 9. 健康服务
 if [ "$(getprop ${PROP_PREFIX}disable_health_services)" = "true" ]; then
     log "[Health] 禁用..."
     disable_pkg "com.oplus.healthservice"
@@ -295,7 +319,7 @@ else
     enable_pkg "com.oplus.games"
 fi
 
-# 13. 钱包（com.finshell.wallet 在一加Ace5不存在，已移除）
+# 13. 钱包
 if [ "$(getprop ${PROP_PREFIX}disable_wallet_services)" = "true" ]; then
     log "[Wallet] 禁用..."
     disable_pkg "com.oplus.pay"

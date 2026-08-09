@@ -218,7 +218,7 @@ var FEATURES = [
     desc: '覆盖 update_engine + 卸载 OTA 相关包',
     type: 'toggle',
     checkCmd: 'pgrep -x update_engine >/dev/null 2>&1 && echo running || echo stopped',
-    verifyCmd: 'echo "进程:"; pgrep -x update_engine >/dev/null 2>&1 && echo running || echo stopped; echo "包:"; for p in com.oplus.ota com.oplus.sau; do pm list packages --user 0 2>/dev/null | grep -qF "package:$p" && echo "$p:存在" || echo "$p:已卸载"; done; echo "属性:"; echo "ota_dl=$(getprop persist.ota.auto_download 2>/dev/null)"; echo "recovery=$(getprop persist.sys.recovery_update 2>/dev/null)"'
+    verifyCmd: 'echo "进程:"; pgrep -x update_engine >/dev/null 2>&1 && echo running || echo stopped; echo "包:"; for p in com.oplus.ota com.oplus.sau; do (pm list packages -d --user 0 2>/dev/null | grep -qF "package:$p" || ! pm list packages --user 0 2>/dev/null | grep -qF "package:$p") && echo "$p:已禁用" || echo "$p:运行中"; done; echo "属性:"; echo "ota_dl=$(getprop persist.ota.auto_download 2>/dev/null)"; echo "recovery=$(getprop persist.sys.recovery_update 2>/dev/null)"'
   },
   { key: 'lock_developer_options', title: '禁用开发者选项访问',
     desc: '防止系统重置开发者选项状态',
@@ -244,7 +244,7 @@ var FEATURES = [
     desc: '关闭个性化广告、用户体验计划、数据统计',
     type: 'toggle',
     checkCmd: 'test "$(getprop persist.sys.oplus.ad_enable 2>/dev/null)" = "0" && echo disabled || echo enabled',
-    verifyCmd: 'echo "包:"; for p in com.oplus.statistics.rom com.coloros.assistantscreen com.coloros.sceneservice; do pm list packages --user 0 2>/dev/null | grep -qF "package:$p" && echo "$p:存在" || echo "$p:已卸载"; done; echo "属性:"; echo "ad=$(getprop persist.sys.oplus.ad_enable 2>/dev/null)"; echo "pad=$(getprop persist.sys.oplus.personalized_ad 2>/dev/null)"; echo "track=$(getprop persist.ad.track 2>/dev/null)"; echo "usage=$(getprop persist.sys.usage_stat_enable 2>/dev/null)"; echo "collect=$(getprop persist.oppo.collect 2>/dev/null)"'
+    verifyCmd: 'echo "包:"; for p in com.oplus.statistics.rom com.coloros.assistantscreen com.coloros.sceneservice; do (pm list packages -d --user 0 2>/dev/null | grep -qF "package:$p" || ! pm list packages --user 0 2>/dev/null | grep -qF "package:$p") && echo "$p:已禁用" || echo "$p:运行中"; done; echo "属性:"; echo "ad=$(getprop persist.sys.oplus.ad_enable 2>/dev/null)"; echo "pad=$(getprop persist.sys.oplus.personalized_ad 2>/dev/null)"; echo "track=$(getprop persist.ad.track 2>/dev/null)"; echo "usage=$(getprop persist.sys.usage_stat_enable 2>/dev/null)"; echo "collect=$(getprop persist.oppo.collect 2>/dev/null)"'
   }
 ]},
 { group: '性能优化', groupIcon: 'tune', groupColor: 'c-green', items: [
@@ -266,7 +266,7 @@ var FEATURES = [
     desc: 'com.oplus.trafficmonitor / com.oplus.dmp',
     type: 'toggle',
     checkCmd: 'pm list packages --user 0 2>/dev/null | grep -qF "com.oplus.trafficmonitor" && echo enabled || echo disabled',
-    verifyCmd: 'for p in com.oplus.trafficmonitor com.oplus.dmp; do pm list packages --user 0 2>/dev/null | grep -qF "package:$p" && echo "$p:存在" || echo "$p:已卸载"; done'
+    verifyCmd: 'for p in com.oplus.trafficmonitor com.oplus.dmp; do (pm list packages -d --user 0 2>/dev/null | grep -qF "package:$p" || ! pm list packages --user 0 2>/dev/null | grep -qF "package:$p") && echo "$p:已禁用" || echo "$p:运行中"; done'
   },
   { key: 'disable_lockscreen_magazine', title: '禁用锁屏杂志',
     desc: 'com.heytap.pictorial',
@@ -284,49 +284,49 @@ var FEATURES = [
     desc: 'com.oplus.wifibackuprestore / com.heytap.cloud',
     type: 'toggle',
     checkCmd: 'pm list packages --user 0 2>/dev/null | grep -qF "com.heytap.cloud" && echo enabled || echo disabled',
-    verifyCmd: 'for p in com.oplus.wifibackuprestore com.heytap.cloud; do pm list packages --user 0 2>/dev/null | grep -qF "package:$p" && echo "$p:存在" || echo "$p:已卸载"; done'
+    verifyCmd: 'for p in com.oplus.wifibackuprestore com.heytap.cloud; do (pm list packages -d --user 0 2>/dev/null | grep -qF "package:$p" || ! pm list packages --user 0 2>/dev/null | grep -qF "package:$p") && echo "$p:已禁用" || echo "$p:运行中"; done'
   },
   { key: 'disable_ai_assistants', title: '禁用 AI 智能助手',
     desc: 'aimemory / aiunit / aiwidgets / aiwriter / metis / obrain',
     type: 'toggle',
     checkCmd: 'pm list packages --user 0 2>/dev/null | grep -qF "com.oplus.aimemory" && echo enabled || echo disabled',
-    verifyCmd: 'for p in com.oplus.aimemory com.oplus.aiunit com.oplus.aiwidgets com.oplus.aiwriter com.oplus.metis com.oplus.obrain; do pm list packages --user 0 2>/dev/null | grep -qF "package:$p" && echo "$p:存在" || echo "$p:已卸载"; done'
+    verifyCmd: 'for p in com.oplus.aimemory com.oplus.aiunit com.oplus.aiwidgets com.oplus.aiwriter com.oplus.metis com.oplus.obrain; do (pm list packages -d --user 0 2>/dev/null | grep -qF "package:$p" || ! pm list packages --user 0 2>/dev/null | grep -qF "package:$p") && echo "$p:已禁用" || echo "$p:运行中"; done'
   },
   { key: 'disable_voice_assistants', title: '禁用语音助手',
     desc: 'ovoicemanager / speechassist / ttsaccessibilityengine',
     type: 'toggle',
     checkCmd: 'pm list packages --user 0 2>/dev/null | grep -qF "com.oplus.ovoicemanager" && echo enabled || echo disabled',
-    verifyCmd: 'for p in com.oplus.ovoicemanager com.oplus.ovoicemanager.wakeup com.heytap.speechassist com.oplus.ttsaccessibilityengine; do pm list packages --user 0 2>/dev/null | grep -qF "package:$p" && echo "$p:存在" || echo "$p:已卸载"; done'
+    verifyCmd: 'for p in com.oplus.ovoicemanager com.oplus.ovoicemanager.wakeup com.heytap.speechassist com.oplus.ttsaccessibilityengine; do (pm list packages -d --user 0 2>/dev/null | grep -qF "package:$p" || ! pm list packages --user 0 2>/dev/null | grep -qF "package:$p") && echo "$p:已禁用" || echo "$p:运行中"; done'
   },
   { key: 'disable_theme_services', title: '禁用主题和个性化服务',
     desc: 'themestore / keyguard.clock 等 7 个包',
     type: 'toggle',
     checkCmd: 'pm list packages --user 0 2>/dev/null | grep -qF "com.oplus.themestore" && echo enabled || echo disabled',
-    verifyCmd: 'for p in com.oplus.themestore com.heytap.themestore com.oplus.keyguard.clock.magazine com.oplus.keyguard.clock.gallery com.oplus.keyguard.clock.graffiti com.oplus.keyguard.personality.clocks com.oplus.keyguard.style.widgets; do pm list packages --user 0 2>/dev/null | grep -qF "package:$p" && echo "$p:存在" || echo "$p:已卸载"; done'
+    verifyCmd: 'for p in com.oplus.themestore com.heytap.themestore com.oplus.keyguard.clock.magazine com.oplus.keyguard.clock.gallery com.oplus.keyguard.clock.graffiti com.oplus.keyguard.personality.clocks com.oplus.keyguard.style.widgets; do (pm list packages -d --user 0 2>/dev/null | grep -qF "package:$p" || ! pm list packages --user 0 2>/dev/null | grep -qF "package:$p") && echo "$p:已禁用" || echo "$p:运行中"; done'
   },
   { key: 'disable_network_optimization', title: '禁用网络优化服务',
     desc: 'networksense / cellularqoe / tai.wifiqoe 等',
     type: 'toggle',
     checkCmd: 'pm list packages --user 0 2>/dev/null | grep -qF "com.oplus.networksense" && echo enabled || echo disabled',
-    verifyCmd: 'for p in com.oplus.networksense com.oplus.cellularqoe com.oplus.tai.wifiqoe com.oplus.tai.borderpresearch com.oplus.nearcomm; do pm list packages --user 0 2>/dev/null | grep -qF "package:$p" && echo "$p:存在" || echo "$p:已卸载"; done'
+    verifyCmd: 'for p in com.oplus.networksense com.oplus.cellularqoe com.oplus.tai.wifiqoe com.oplus.tai.borderpresearch com.oplus.nearcomm; do (pm list packages -d --user 0 2>/dev/null | grep -qF "package:$p" || ! pm list packages --user 0 2>/dev/null | grep -qF "package:$p") && echo "$p:已禁用" || echo "$p:运行中"; done'
   },
   { key: 'disable_security_services', title: '禁用安全和权限服务',
     desc: 'com.oplus.securitykeyboard / com.coloros.securityguard',
     type: 'toggle',
     checkCmd: 'pm list packages --user 0 2>/dev/null | grep -qF "com.oplus.securitykeyboard" && echo enabled || echo disabled',
-    verifyCmd: 'for p in com.oplus.securitykeyboard com.coloros.securityguard; do pm list packages --user 0 2>/dev/null | grep -qF "package:$p" && echo "$p:存在" || echo "$p:已卸载"; done'
+    verifyCmd: 'for p in com.oplus.securitykeyboard com.coloros.securityguard; do (pm list packages -d --user 0 2>/dev/null | grep -qF "package:$p" || ! pm list packages --user 0 2>/dev/null | grep -qF "package:$p") && echo "$p:已禁用" || echo "$p:运行中"; done'
   },
   { key: 'disable_media_services', title: '禁用多媒体和娱乐服务',
     desc: 'com.oplus.screenrecorder / com.coloros.karaoke / com.oplus.mediacontroller',
     type: 'toggle',
     checkCmd: 'pm list packages --user 0 2>/dev/null | grep -qF "com.oplus.screenrecorder" && echo enabled || echo disabled',
-    verifyCmd: 'for p in com.oplus.screenrecorder com.coloros.karaoke com.oplus.mediacontroller; do pm list packages --user 0 2>/dev/null | grep -qF "package:$p" && echo "$p:存在" || echo "$p:已卸载"; done'
+    verifyCmd: 'for p in com.oplus.screenrecorder com.coloros.karaoke com.oplus.mediacontroller; do (pm list packages -d --user 0 2>/dev/null | grep -qF "package:$p" || ! pm list packages --user 0 2>/dev/null | grep -qF "package:$p") && echo "$p:已禁用" || echo "$p:运行中"; done'
   },
   { key: 'disable_system_tools', title: '禁用系统工具和监控服务',
     desc: 'powermonitor / logkit / crashbox 等 9 个包',
     type: 'toggle',
     checkCmd: 'pm list packages --user 0 2>/dev/null | grep -qF "com.oplus.powermonitor" && echo enabled || echo disabled',
-    verifyCmd: 'for p in com.oplus.powermonitor com.oplus.audiomonitor com.oplus.logkit com.oplus.engineermode com.oplus.crashbox com.oplus.appplatform com.oplus.contentportal com.oplus.postmanservice com.oplus.subsys; do pm list packages --user 0 2>/dev/null | grep -qF "package:$p" && echo "$p:存在" || echo "$p:已卸载"; done'
+    verifyCmd: 'for p in com.oplus.powermonitor com.oplus.audiomonitor com.oplus.logkit com.oplus.engineermode com.oplus.crashbox com.oplus.appplatform com.oplus.contentportal com.oplus.postmanservice com.oplus.subsys; do (pm list packages -d --user 0 2>/dev/null | grep -qF "package:$p" || ! pm list packages --user 0 2>/dev/null | grep -qF "package:$p") && echo "$p:已禁用" || echo "$p:运行中"; done'
   }
 ]}
 ];
