@@ -153,6 +153,21 @@ sh /data/adb/modules/Logd_Disabler_ColorOS16/verify_status.sh
 ### 卸载恢复
 在KernelSU管理器中**禁用或卸载模块**，mount bind 覆盖会随重启消失，pm disable 的包需手动恢复或重启后重新 enable（建议卸载前先在 WebUI 中关闭所有开关）。
 
+## 🚀 更新日志
+
+### v1.5 (2026-08-09)
+- **修复**：彻底解决"包不存在"误判问题——service.sh 不再以 `service check` 判断 PMS 就绪（那只是 binder 服务注册），改为轮询 `pm list packages --user 0` 直到真正能列出包（实测等待约 6 秒），55 个系统包全部 `disable-user 成功`
+- **修复**：`pmx()` su 提升机制，统一通过 su 域执行 pm 命令，绕过 ksu 域 SELinux 限制
+- **修复**：包存在性检查统一加 `--user 0`，避免多用户环境下输出为空导致误判
+- **改进**：新增 `pmx_verbose`（保留 stderr），失败时输出真实错误详情，便于排障
+- **改进**：enable 恢复逻辑新增分支——包被卸载时直接走 `install-existing` 恢复
+- **安全**：移除 `services.txt` 追踪（涉及设备私有包列表，不再入库）
+- **WebUI**：修复 mdui 图标渲染问题（`--outlined` 后缀），全部按钮图标正常显示
+
+### v1.4
+- 支持 WebUI 图形化设置界面
+- 引入 `persist.sys.coloros16_optimize_gui.*` 属性配置机制
+
 ## 📱 兼容性
 
 ### 支持设备
