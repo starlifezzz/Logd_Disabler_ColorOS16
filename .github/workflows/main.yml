@@ -72,3 +72,4 @@ jobs:
         with:
           files: Logd_Disabler_ColorOS16.zip
           generate_release_notes: true
+ 
