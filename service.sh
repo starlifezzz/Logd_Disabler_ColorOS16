@@ -532,6 +532,7 @@ else
 fi
 
 # 21. 系统工具
+# 注意：com.oplus.appplatform（应用服务）涉及短信收发，永不禁用（v1.6 移除）
 if [ "$(getprop ${PROP_PREFIX}disable_system_tools)" = "true" ]; then
     log "[SysTools] 禁用..."
     disable_pkg "com.oplus.powermonitor"
@@ -539,7 +540,6 @@ if [ "$(getprop ${PROP_PREFIX}disable_system_tools)" = "true" ]; then
     disable_pkg "com.oplus.logkit"
     disable_pkg "com.oplus.engineermode"
     disable_pkg "com.oplus.crashbox"
-    disable_pkg "com.oplus.appplatform"
     disable_pkg "com.oplus.contentportal"
     disable_pkg "com.oplus.postmanservice"
     disable_pkg "com.oplus.subsys"
@@ -550,7 +550,6 @@ else
     enable_pkg "com.oplus.logkit"
     enable_pkg "com.oplus.engineermode"
     enable_pkg "com.oplus.crashbox"
-    enable_pkg "com.oplus.appplatform"
     enable_pkg "com.oplus.contentportal"
     enable_pkg "com.oplus.postmanservice"
     enable_pkg "com.oplus.subsys"
