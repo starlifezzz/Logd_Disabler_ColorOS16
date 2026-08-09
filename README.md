@@ -10,16 +10,18 @@
 ### ✨ **UI控制界面（KernelSU 0.7.0+）**
 - **内置图形化设置界面**：在KernelSU管理器中直接开关各项功能
 - **无需编辑配置文件**：通过直观的UI界面控制所有优化选项
-- **实时配置同步**：UI设置自动同步到YAML配置文件
+- **本地框架渲染**：WebUI 基于 Vue 3 + mdui 2（全部资源随模块本地打包，不依赖 CDN/在线组件库）
+- **配置实时持久化**：UI 设置写入 `persist.sys.coloros16_optimize_gui.*` 系统属性，重启后由脚本读取生效
 
-### 🔧 **传统配置文件支持**
-- **YAML配置文件**：仍支持手动编辑配置文件进行高级配置
-- **双重配置方式**：UI设置优先，兼容传统配置方式
+### 🔧 **配置机制说明**
+- **唯一配置源**：系统属性 `persist.sys.coloros16_optimize_gui.*`
+- **UI 修改即时生效**：开关状态即写即存，重启设备后由 service.sh 执行实际优化
+- **双向操作**：每个功能都支持"开启优化 / 关闭恢复"
 
 ### 🔒 **安全可靠**
-- **零系统修改**：所有优化都是systemless的，卸载即完全复原
-- **符合KernelSU规范**：配置文件存储在模块目录中，确保稳定性
-- **多阶段执行**：在post-fs-data、service和boot-completed阶段分别执行
+- **Systemless 设计**：所有优化基于 mount bind / pm 命令，卸载模块后大部分修改自动复原
+- **多阶段执行**：post-fs-data（挂载覆盖 + SELinux 规则）、service（包管理 + 参数）、boot-completed（健康校验）
+- **完整日志**：操作日志记录在 `/data/adb/logd_disabler/*.log`
 
 ### ⚡ **深度优化**
 - 彻底禁用logd日志系统
@@ -67,17 +69,30 @@
 - **性能优化**: 内存/IO优化、内核调优、进程查杀
 - **可选服务**: 健康服务、网络监控、锁屏杂志等
 
-## 📂 配置文件管理
+## 📂 配置管理
 
-### 配置文件位置
-- **模块内部配置**: `/data/adb/modules/coloros_ultimate_killer/config.yaml`
-- **用户友好路径**: `/data/media/0/Android/coloros16_optimize_config.yaml` (推荐编辑此文件)
-- **WebUi路径**: `/home/zhangchongjie/Downloads/Logd_Disabler_ColorOS16/webroot` 
+### 配置存储机制
+- **配置源**：系统属性 `persist.sys.coloros16_optimize_gui.*`（如 `disable_logd`、`block_ota` 等）
+- **属性前缀**：`persist.` 保证重启后仍保留
+- **读取时机**：post-fs-data 和 service 阶段读取属性决定是否执行优化
+- **修改方式**：仅通过 WebUI 开关修改（推荐），或 adb 手动 `setprop`
 
-### 配置同步机制
-- **UI设置优先**: KernelSU UI的设置会自动覆盖YAML配置
-- **手动编辑兼容**: 仍可手动编辑YAML文件，但重启后会被UI设置覆盖
-- **首次安装**: 自动创建默认配置文件
+### 手动设置属性（高级用户）
+```bash
+# 通过 adb 修改配置（示例：禁用日志）
+adb shell
+su
+setprop persist.sys.coloros16_optimize_gui.disable_logd true
+# 重启生效
+reboot
+```
+
+### 验证状态
+```bash
+# 执行验证脚本
+su
+sh /data/adb/modules/Logd_Disabler_ColorOS16/verify_status.sh
+```
 
 ## 🚀 快速开始
 
@@ -88,19 +103,22 @@
 4. 通过UI界面调整设置
 5. 再次重启设备
 
-### 方法2: 手动编辑配置
+### 方法2: 手动设置属性
 ```bash
-# 编辑配置文件
+# 查看当前所有配置
 adb shell
 su
-nano /data/media/0/Android/coloros16_optimize_config.yaml
+getprop | grep coloros16_optimize_gui
+
+# 示例：启用 OTA 阻断
+setprop persist.sys.coloros16_optimize_gui.block_ota true
 ```
 
 ### 验证状态
 ```bash
 # 执行验证脚本
 su
-/data/adb/modules/coloros_ultimate_killer/verify_status.sh
+sh /data/adb/modules/Logd_Disabler_ColorOS16/verify_status.sh
 ```
 
 ## 🔧 高级功能
@@ -121,18 +139,19 @@ su
 
 ### 必读警告
 - **修改配置后必须重启**才能生效
-- **UI设置优先级高于手动配置**
-- **部分功能可能影响系统某些特性**（如健康数据同步、自动备份等）
+- **部分功能可能影响系统某些特性**（如健康数据同步、自动备份、语音助手等）
+- **禁用系统工具类服务**（如 engineermode、crashbox）可能影响问题诊断
 
 ### 故障排除
 如果遇到问题：
 1. 检查KernelSU模块是否已启用
-2. 确认KernelSU版本 >= 0.7.0（UI功能需要）
-3. 查看系统日志：`dmesg | grep ColorOS16-Optimize`
-4. 运行验证脚本诊断问题
+2. 确认KernelSU版本 >= 0.7.0（WebUI功能需要）
+3. 查看模块日志：`cat /data/adb/logd_disabler/service.log` 和 `post-fs-data.log`
+4. 查看 SELinux 拒绝：`dmesg | grep avc`
+5. 运行验证脚本诊断问题
 
 ### 卸载恢复
-在KernelSU管理器中**禁用或卸载模块**，所有修改将立即还原，无需额外操作。
+在KernelSU管理器中**禁用或卸载模块**，mount bind 覆盖会随重启消失，pm disable 的包需手动恢复或重启后重新 enable（建议卸载前先在 WebUI 中关闭所有开关）。
 
 ## 📱 兼容性
 
@@ -162,4 +181,4 @@ This module is for personal use only. Redistribution or commercial use without p
 
 ---
 
-**💡 提示**: 推荐使用KernelSU UI界面进行配置，简单直观且不易出错。高级用户仍可手动编辑YAML配置文件进行更精细的控制。
+**💡 提示**: 推荐使用KernelSU UI界面进行配置，简单直观且不易出错。高级用户可通过 `setprop` 命令精细控制每个开关。

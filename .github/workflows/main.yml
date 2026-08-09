@@ -32,10 +32,11 @@ jobs:
       # 排除规则与本地 zip.sh 保持一致（不含 update.json，它是仓库级文件不是模块文件）
       - name: Package module zip
         run: |
+          sudo apt-get update && sudo apt-get install -y zip
           zip -r Logd_Disabler_ColorOS16.zip \
             module.prop customize.sh service.sh post-fs-data.sh boot-completed.sh \
-            apply_yaml_config.sh verify_status.sh \
-            system webroot \
+            verify_status.sh \
+            webroot \
             -x "*.git*" "*.github*" "*.lingma*" ".gitignore" "README.md" \
             "Logd_Disabler_ColorOS16.zip" "zip.sh" "services.txt" "update.json"
           echo "--- zip contents ---"

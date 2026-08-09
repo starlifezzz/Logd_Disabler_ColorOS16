@@ -4,177 +4,244 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0,user-scalable=no">
 <title>ColorOS 16 优化</title>
+<!-- ========== 本地资源（全部走模块内本地文件，不引用 CDN / 在线组件库）==========
+     引入顺序有讲究：
+     1. webcomponents polyfill 必须先于 mdui（mdui2 依赖 Web Components）
+     2. mdui.css 提供 Material 3 主题
+     3. outlined.css 提供 Material Icons Outlined 字体（@font-face 指向本地 woff2）
+     4. mdui.global.js 提供 window.mdui 组件
+     5. vue.global.prod.js 提供 window.Vue（全局构建版，可直接 script 引入）
+-->
+<script src="./assets/webcomponents-bundle.min.js"></script>
+<link rel="stylesheet" href="./assets/mdui.css">
+<link rel="stylesheet" href="./assets/outlined.css">
+<script src="./assets/mdui.global.js"></script>
+<script src="./assets/vue.global.prod.js"></script>
 <style>
-*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
-:root{
-  --bg:#f2f2f7;--bg2:#fff;--bg3:rgba(0,0,0,.04);
-  --tx:#1d1d1f;--tx2:#86868b;--tx3:#aeaeb2;
-  --bd:rgba(0,0,0,.06);--accent:#007aff;--green:#34c759;
-  --red:#ff3b30;--orange:#ff9500;--purple:#af52de;--teal:#5ac8fa;
-  --card-r:14px;--item-r:10px;
-}
-@media(prefers-color-scheme:dark){
-  :root{--bg:#000;--bg2:#1c1c1e;--bg3:rgba(255,255,255,.06);--tx:#f5f5f7;--tx2:#98989d;--tx3:#636366;--bd:rgba(255,255,255,.08);--accent:#0a84ff;--green:#30d158;--red:#ff453a;--orange:#ff9f0a;--purple:#bf5af2;--teal:#64d2ff}
-}
-html,body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;background:var(--bg);color:var(--tx);-webkit-font-smoothing:antialiased;overflow-x:hidden;line-height:1.47}
-.topbar{position:sticky;top:0;z-index:100;height:56px;display:flex;align-items:center;justify-content:space-between;padding:0 16px;background:color-mix(in srgb,var(--bg) 80%,transparent);backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);border-bottom:1px solid var(--bd)}
-.topbar h1{font-size:17px;font-weight:600}
-.topbar-r{display:flex;gap:4px;align-items:center}
-.ibtn{width:36px;height:36px;border-radius:50%;border:none;background:transparent;color:var(--tx);cursor:pointer;display:flex;align-items:center;justify-content:center;-webkit-tap-highlight-color:transparent}
-.ibtn:active{background:var(--bg3)}
-.ibtn svg{width:22px;height:22px}
-.ibtn.spin svg{animation:spin .8s linear infinite}
-@keyframes spin{to{transform:rotate(360deg)}}
-.main{padding:12px 16px 100px;max-width:600px;margin:0 auto}
-.prog-w{margin-bottom:12px}
-.prog-b{height:3px;background:var(--bg3);border-radius:2px;overflow:hidden}
-.prog-f{height:100%;background:var(--accent);border-radius:2px;transition:width .3s}
-.prog-t{font-size:11px;color:var(--tx2);margin-top:4px;text-align:center}
-.banner{display:flex;align-items:flex-start;gap:10px;padding:12px 14px;border-radius:var(--card-r);margin-bottom:12px;font-size:13px}
-.banner.warn{background:color-mix(in srgb,var(--orange) 10%,transparent);color:var(--orange)}
-.banner svg{width:20px;height:20px;flex-shrink:0;margin-top:1px}
-.card{background:var(--bg2);border-radius:var(--card-r);border:1px solid var(--bd);margin-bottom:12px;overflow:hidden}
-.card-h{display:flex;align-items:center;gap:8px;padding:14px 16px 8px}
-.card-ic{width:32px;height:32px;border-radius:8px;display:flex;align-items:center;justify-content:center}
-.card-ic svg{width:18px;height:18px}
-.card-ic.c-red{background:color-mix(in srgb,var(--red) 12%,transparent);color:var(--red)}
-.card-ic.c-orange{background:color-mix(in srgb,var(--orange) 12%,transparent);color:var(--orange)}
-.card-ic.c-purple{background:color-mix(in srgb,var(--purple) 12%,transparent);color:var(--purple)}
-.card-ic.c-accent{background:color-mix(in srgb,var(--accent) 12%,transparent);color:var(--accent)}
-.card-ic.c-green{background:color-mix(in srgb,var(--green) 12%,transparent);color:var(--green)}
-.card-ic.c-teal{background:color-mix(in srgb,var(--teal) 12%,transparent);color:var(--teal)}
-.card-t{font-size:15px;font-weight:600;flex:1}
-.card-b{padding:0 4px 4px}
-.li{display:flex;align-items:center;gap:12px;padding:12px;border-radius:var(--item-r);cursor:pointer;-webkit-tap-highlight-color:transparent;transition:background .15s}
-.li:active{background:var(--bg3)}
-.li-ic{width:36px;height:36px;border-radius:8px;flex-shrink:0;display:flex;align-items:center;justify-content:center;background:var(--bg3);color:var(--tx2)}
-.li-ic svg{width:20px;height:20px}
-.li-body{flex:1;min-width:0}
-.li-t{font-size:14px;font-weight:500}
-.li-d{font-size:12px;color:var(--tx2);margin-top:1px}
-.li-m{display:flex;align-items:center;gap:6px;margin-top:3px}
-.badge{display:inline-flex;align-items:center;font-size:11px;font-weight:500;padding:2px 8px;border-radius:100px}
-.badge.on{background:color-mix(in srgb,var(--green) 12%,transparent);color:var(--green)}
-.badge.off{background:var(--bg3);color:var(--tx2)}
-.badge.err{background:color-mix(in srgb,var(--red) 12%,transparent);color:var(--red)}
-.badge.work{background:color-mix(in srgb,var(--accent) 12%,transparent);color:var(--accent)}
-.sep{height:1px;background:var(--bd);margin:0 12px}
-.sw{position:relative;display:inline-block;width:51px;height:31px;flex-shrink:0}
-.sw input{opacity:0;width:0;height:0;position:absolute}
-.sw-t{position:absolute;inset:0;border-radius:16px;background:var(--tx3);transition:background .25s;cursor:pointer}
-.sw-t::after{content:'';position:absolute;width:27px;height:27px;border-radius:50%;top:2px;left:2px;background:#fff;box-shadow:0 1px 3px rgba(0,0,0,.2);transition:transform .25s cubic-bezier(.4,0,.2,1)}
-.sw input:checked+.sw-t{background:var(--green)}
-.sw input:checked+.sw-t::after{transform:translateX(20px)}
-.sw input:disabled+.sw-t{opacity:.4;cursor:not-allowed}
-.info-r{display:flex;justify-content:space-between;align-items:center;padding:10px 16px;font-size:13px}
-.info-r .l{color:var(--tx2)}
-.info-r .v{font-weight:500}
-.fab{position:fixed;bottom:24px;right:24px;z-index:90;width:56px;height:56px;border-radius:16px;border:none;background:var(--accent);color:#fff;cursor:pointer;box-shadow:0 4px 16px color-mix(in srgb,var(--accent) 40%,transparent);display:flex;align-items:center;justify-content:center;-webkit-tap-highlight-color:transparent;transition:transform .15s}
-.fab:active{transform:scale(.9)}
-.fab svg{width:24px;height:24px}
-.fab-debug{position:fixed;bottom:24px;left:24px;z-index:90;width:48px;height:48px;border-radius:50%;border:none;background:var(--orange);color:#fff;cursor:pointer;box-shadow:0 4px 12px color-mix(in srgb,var(--orange) 40%,transparent);display:flex;align-items:center;justify-content:center;-webkit-tap-highlight-color:transparent;font-size:20px}
-.fab-debug:active{transform:scale(.9)}
-.overlay{position:fixed;inset:0;z-index:200;background:rgba(0,0,0,.45);display:flex;align-items:center;justify-content:center;padding:24px;animation:fadeIn .2s}
-@keyframes fadeIn{from{opacity:0}}
-.dlg{background:var(--bg2);border-radius:16px;width:100%;max-width:480px;padding:24px;box-shadow:0 8px 40px rgba(0,0,0,.2);animation:popIn .25s cubic-bezier(.4,0,.2,1);display:flex;flex-direction:column;max-height:85vh}
-@keyframes popIn{from{transform:scale(.92);opacity:0}}
-.dlg h2{font-size:18px;font-weight:600;margin-bottom:12px;display:flex;align-items:center;gap:8px}
-.dlg-body{font-size:13px;color:var(--tx2);line-height:1.5;margin-bottom:16px;overflow-y:auto;flex:1}
-.dlg-act{display:flex;justify-content:flex-end;gap:8px;flex-shrink:0}
-.btn{padding:8px 20px;border-radius:8px;border:none;font-size:14px;font-weight:500;cursor:pointer}
-.btn:active{opacity:.7}
-.btn-p{background:var(--accent);color:#fff}
-.btn-s{background:transparent;color:var(--accent)}
-.btn-w{background:var(--orange);color:#fff}
-.log-box{flex:1;overflow-y:auto;white-space:pre-wrap;font-family:monospace;font-size:11px;line-height:1.6;background:var(--bg3);border-radius:8px;padding:12px;max-height:55vh;color:var(--tx)}
-.debug-section{margin-bottom:16px}
-.debug-title{font-size:13px;font-weight:600;color:var(--tx);margin-bottom:8px;display:flex;align-items:center;gap:6px}
-.debug-item{background:var(--bg3);border-radius:8px;padding:10px;margin-bottom:6px;font-family:monospace;font-size:11px}
-.debug-item .key{color:var(--accent);font-weight:500}
-.debug-item .val{color:var(--tx);margin-top:2px;word-break:break-all}
-.debug-item.warn{border-left:3px solid var(--orange)}
-.debug-item.err{border-left:3px solid var(--red)}
-.debug-item .raw{color:var(--tx2);font-size:10px;margin-top:4px;background:rgba(0,0,0,.05);padding:4px 6px;border-radius:4px}
-@media(prefers-color-scheme:dark){
-  .debug-item .raw{background:rgba(255,255,255,.05)}
-}
-.footer{text-align:center;padding:20px 16px;font-size:12px;color:var(--tx3)}
-.hide{display:none!important}
+/* 少量页面布局补充样式（组件主题色由 mdui.css 提供） */
+body{background:var(--mdui-color-surface);color:var(--mdui-color-on-surface);margin:0;padding:0;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif}
+.page{padding:16px 16px 96px;max-width:680px;margin:0 auto}
+.banner{margin-bottom:16px;display:flex;align-items:flex-start;gap:8px;padding:12px 14px;border-radius:8px;background:rgba(var(--mdui-color-tertiary-container),.5);color:rgb(var(--mdui-color-on-tertiary-container));font-size:13px;line-height:1.5}
+.card-gap{margin-bottom:16px}
+.info-row{display:flex;justify-content:space-between;align-items:center;padding:10px 16px;font-size:14px}
+.info-row .k{color:var(--mdui-color-on-surface-variant)}
+.info-row .v{font-weight:500}
+.badge{display:inline-flex;align-items:center;font-size:12px;padding:2px 10px;border-radius:100px;font-weight:500}
+.badge.on{background:rgba(var(--mdui-color-primary),.12);color:rgb(var(--mdui-color-primary))}
+.badge.off{background:var(--mdui-color-surface-variant);color:var(--mdui-color-on-surface-variant)}
+.badge.err{background:rgba(var(--mdui-color-error),.12);color:rgb(var(--mdui-color-error))}
+.badge.work{background:rgba(var(--mdui-color-tertiary),.15);color:rgb(var(--mdui-color-tertiary))}
+.log-box{width:100%;min-height:200px;max-height:55vh;overflow-y:auto;white-space:pre-wrap;word-break:break-all;font-family:monospace;font-size:12px;line-height:1.6;background:var(--mdui-color-surface-container);border-radius:8px;padding:12px;box-sizing:border-box}
+.debug-item{margin-bottom:8px;padding:10px 12px;border-radius:8px;background:var(--mdui-color-surface-container);font-family:monospace;font-size:11px}
+.debug-item .k{color:var(--mdui-color-primary);font-weight:500}
+.debug-item .v{margin-top:4px;word-break:break-all}
+.debug-item .raw{margin-top:6px;padding:6px 8px;border-radius:6px;background:rgba(128,128,128,.08);color:var(--mdui-color-on-surface-variant);font-size:10px;white-space:pre-wrap;word-break:break-all}
+.dlg-body{max-height:70vh;overflow-y:auto}
+.footer{text-align:center;padding:20px 16px;font-size:12px;color:var(--mdui-color-on-surface-variant)}
+.hidden{display:none!important}
+mdui-list-item{--mdui-list-item-container-shape:12px}
 </style>
 </head>
 <body>
-<div class="topbar">
-  <h1>ColorOS 16 优化</h1>
-  <div class="topbar-r">
-    <button class="ibtn" id="btnRefresh" onclick="refreshAll()">
-      <svg viewBox="0 0 24 24" fill="currentColor"><path d="M17.65 6.35A7.96 7.96 0 0 0 12 4c-4.42 0-7.99 3.58-7.99 8s3.57 8 7.99 8c3.73 0 6.84-2.55 7.73-6h-2.08A5.99 5.99 0 0 1 12 18c-3.31 0-6-2.69-6-6s2.69-6 6-6c1.66 0 3.14.69 4.22 1.78L13 11h7V4l-2.35 2.35z"/></svg>
-    </button>
-  </div>
-</div>
-
-<div class="main">
-  <div class="prog-w hide" id="progW">
-    <div class="prog-b"><div class="prog-f" id="progF" style="width:0%"></div></div>
-    <div class="prog-t" id="progT">检测中...</div>
-  </div>
-
-  <div class="banner warn">
-    <svg viewBox="0 0 24 24" fill="currentColor"><path d="M1 21h22L12 2 1 21zm12-3h-2v-2h2v2zm0-4h-2v-4h2v4z"/></svg>
-    <span>开关<b>绿色=已禁用/已优化</b>，<b>灰色=未禁用/系统默认</b>。修改后需<b>重启设备</b>生效。</span>
-  </div>
-
-  <div id="cardsContainer"></div>
-
-  <div class="card">
-    <div class="card-h">
-      <div class="card-ic c-accent"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M11 7h2v2h-2zm0 4h2v6h-2zm1-9C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8z"/></svg></div>
-      <div class="card-t">模块信息</div>
+<div id="app" v-cloak>
+  <!-- 顶栏 -->
+  <mdui-top-app-bar scroll-behavior="shrink">
+    <mdui-top-app-bar-title>ColorOS 16 优化</mdui-top-app-bar-title>
+    <div slot="navigation-end" style="display:flex;align-items:center;gap:4px;margin-right:8px">
+      <mdui-button-icon icon="refresh" @click="refreshAll"></mdui-button-icon>
     </div>
-    <div style="padding:4px 0 8px">
-      <div class="info-r"><span class="l">模块版本</span><span class="v">v1.2</span></div>
-      <div class="sep" style="margin:0"></div>
-      <div class="info-r"><span class="l">KernelSU</span><span class="v" id="ksuVer">检测中...</span></div>
-      <div class="sep" style="margin:0"></div>
-      <div class="info-r"><span class="l">SELinux</span><span class="v" id="selinuxSt">检测中...</span></div>
-      <div class="sep" style="margin:0"></div>
-      <div class="info-r"><span class="l">设备</span><span class="v">OnePlus Ace5</span></div>
-      <div class="sep" style="margin:0"></div>
-      <div class="info-r"><span class="l">系统</span><span class="v">ColorOS 16</span></div>
+  </mdui-top-app-bar>
+
+  <div class="page">
+    <!-- 进度条 -->
+    <mdui-linear-progress :value="progress" :hidden="!checking" style="margin-bottom:16px"></mdui-linear-progress>
+
+    <!-- 提示横幅 -->
+    <div class="banner">
+      <span>开关 <b>主色=已禁用/已优化</b>，<b>灰色=未禁用/系统默认</b>。修改后需<b>重启设备</b>生效。</span>
     </div>
+
+    <!-- 功能分组卡片 -->
+    <template v-for="group in FEATURES" :key="group.group">
+      <mdui-card class="card-gap" variant="elevated">
+        <mdui-list>
+          <div style="padding:12px 20px 4px;font-size:14px;font-weight:600;color:var(--mdui-color-primary)">{{ group.group }}</div>
+          <mdui-list-item
+            v-for="item in group.items"
+            :key="item.key + '-' + String(state[item.key].enabled)"
+            @click="toggleItem(item)"
+          >
+            <div slot="headline">{{ item.title }}</div>
+            <div slot="description">{{ item.desc }}</div>
+            <span slot="end-icon" style="display:flex;align-items:center;gap:8px">
+              <span class="badge" :class="badgeClass(item.key)">{{ badgeText(item.key) }}</span>
+              <mdui-switch :checked="state[item.key].enabled" :disabled="state[item.key].loading" @click.stop @change="onSwitchChange(item, $event)"></mdui-switch>
+            </span>
+          </mdui-list-item>
+        </mdui-list>
+      </mdui-card>
+    </template>
+
+    <!-- 模块信息 -->
+    <mdui-card class="card-gap" variant="elevated">
+      <mdui-list>
+        <div style="padding:12px 20px 4px;font-size:14px;font-weight:600;color:var(--mdui-color-primary)">模块信息</div>
+        <div class="info-row"><span class="k">模块版本</span><span class="v">{{ moduleVersion }}</span></div>
+        <mdui-divider></mdui-divider>
+        <div class="info-row"><span class="k">KernelSU</span><span class="v">{{ ksuVersion }}</span></div>
+        <mdui-divider></mdui-divider>
+        <div class="info-row"><span class="k">SELinux</span><span class="v">{{ selinuxStatus }}</span></div>
+        <mdui-divider></mdui-divider>
+        <div class="info-row"><span class="k">设备</span><span class="v">OnePlus Ace5</span></div>
+        <mdui-divider></mdui-divider>
+        <div class="info-row"><span class="k">系统</span><span class="v">ColorOS 16</span></div>
+      </mdui-list>
+    </mdui-card>
+
+    <div class="footer">Logd Disabler for ColorOS16<br>UI: Vue 3 + mdui 2（本地资源）</div>
   </div>
 
-  <div class="footer">Logd Disabler for ColorOS16<br>Designed for KernelSU</div>
-</div>
+  <!-- 悬浮按钮：日志 -->
+  <mdui-fab icon="receipt_long" label="日志" style="position:fixed;right:20px;bottom:24px;z-index:100" @click="logOpen=true"></mdui-fab>
+  <!-- 悬浮按钮：Debug -->
+  <mdui-fab icon="bug_report" label="Debug" style="position:fixed;left:20px;bottom:24px;z-index:100" @click="showDebug()"></mdui-fab>
 
-<button class="fab" onclick="showLog()">
-  <svg viewBox="0 0 24 24" fill="currentColor"><path d="M20 4H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 14H4V8h16v10zm-8-2h4v-2h-4v2zm-6-4h10v-2H6v2zm0 4h4v-2H6v2z"/></svg>
-</button>
-<button class="fab-debug" onclick="showDebug()">🐛</button>
+  <!-- 日志对话框 -->
+  <mdui-dialog :open="logOpen" @closed="logOpen=false" style="width:min(92vw,480px)">
+    <mdui-dialog-header>操作日志</mdui-dialog-header>
+    <mdui-dialog-content>
+      <div class="log-box">{{ logText || '暂无日志' }}</div>
+    </mdui-dialog-content>
+    <mdui-dialog-actions>
+      <mdui-button variant="text" @click="clearLog()">清空</mdui-button>
+      <mdui-button variant="tonal" @click="logOpen=false">关闭</mdui-button>
+    </mdui-dialog-actions>
+  </mdui-dialog>
 
-<div class="overlay hide" id="logOv" onclick="if(event.target===this)hideLog()">
-  <div class="dlg" style="max-width:480px">
-    <h2>📋 操作日志</h2>
-    <div class="log-box" id="logBox">暂无日志</div>
-    <div class="dlg-act" style="margin-top:16px">
-      <button class="btn btn-s" onclick="clearLog()">清空</button>
-      <button class="btn btn-p" onclick="hideLog()">关闭</button>
-    </div>
-  </div>
-</div>
-
-<div class="overlay hide" id="debugOv" onclick="if(event.target===this)hideDebug()">
-  <div class="dlg">
-    <h2>🐛 Debug 面板</h2>
-    <div class="dlg-body" id="debugBody"></div>
-    <div class="dlg-act">
-      <button class="btn btn-w" onclick="copyDebugInfo()">📋 一键复制</button>
-      <button class="btn btn-p" onclick="hideDebug()">关闭</button>
-    </div>
-  </div>
+  <!-- Debug 对话框 -->
+  <mdui-dialog :open="debugOpen" @closed="debugOpen=false" style="width:min(92vw,520px)">
+    <mdui-dialog-header>Debug 面板</mdui-dialog-header>
+    <mdui-dialog-content>
+      <div class="dlg-body" v-html="debugHtml"></div>
+    </mdui-dialog-content>
+    <mdui-dialog-actions>
+      <mdui-button variant="text" @click="copyDebugInfo()">一键复制</mdui-button>
+      <mdui-button variant="tonal" @click="debugOpen=false">关闭</mdui-button>
+    </mdui-dialog-actions>
+  </mdui-dialog>
 </div>
 
 <script>
+// ===================== 功能定义 =====================
+var FEATURES = [
+{ group: '守护进程', items: [
+  { key: 'disable_logd', title: '禁用系统日志 (Logd)',
+    desc: 'mount 覆盖 /system/bin/logd + 强杀进程',
+    checkCmd: 'pgrep -x logd >/dev/null 2>&1 && echo running || echo stopped',
+    verifyCmd: 'echo "进程:"; pgrep -x logd >/dev/null 2>&1 && echo running || echo stopped; echo "文件:"; if [ -f /system/bin/logd ]; then sz=$(stat -c %s /system/bin/logd 2>/dev/null); echo "size=$sz"; else echo "notfound"; fi'
+  },
+  { key: 'block_ota', title: '禁用 OTA 更新',
+    desc: '覆盖 update_engine + 卸载 OTA 相关包',
+    checkCmd: 'pgrep -x update_engine >/dev/null 2>&1 && echo running || echo stopped',
+    verifyCmd: 'echo "进程:"; pgrep -x update_engine >/dev/null 2>&1 && echo running || echo stopped; echo "包:"; for p in com.oplus.ota com.oplus.sau com.oplus.cota; do (pm list packages -d --user 0 2>/dev/null | grep -qF "package:$p" || ! pm list packages --user 0 2>/dev/null | grep -qF "package:$p") && echo "$p:已禁用" || echo "$p:运行中"; done; echo "属性:"; echo "ota_dl=$(getprop persist.ota.auto_download 2>/dev/null)"; echo "recovery=$(getprop persist.sys.recovery_update 2>/dev/null)"'
+  },
+  { key: 'lock_developer_options', title: '禁用开发者选项访问',
+    desc: '防止系统重置开发者选项状态',
+    checkCmd: 'test "$(settings get global development_settings_enabled 2>/dev/null)" = "0" && echo locked || echo unlocked',
+    verifyCmd: 'echo "dev=$(settings get global development_settings_enabled 2>/dev/null)"; echo "lock=$(getprop persist.dev.option.lock 2>/dev/null)"'
+  },
+  { key: 'kill_redundant_processes', title: '禁用冗余后台进程',
+    desc: 'smartscene / sysmonitor / hotstart / preload',
+    checkCmd: 'r="ok"; pgrep -x smartscene >/dev/null 2>&1 && r="running"; pgrep -x sysmonitor >/dev/null 2>&1 && r="running"; pgrep -x hotstart >/dev/null 2>&1 && r="running"; echo "$r"',
+    verifyCmd: 'echo "smartscene:"; pgrep -x smartscene 2>/dev/null || echo stopped; echo "preload:"; pgrep -x preload 2>/dev/null || echo stopped; echo "sysmonitor:"; pgrep -x sysmonitor 2>/dev/null || echo stopped; echo "hotstart:"; pgrep -x hotstart 2>/dev/null || echo stopped'
+  },
+  { key: 'system_prop_toggles', title: '禁用系统预加载属性',
+    desc: '禁用 preload / monitor / hotstart 属性',
+    checkCmd: 'test "$(getprop persist.sys.preload)" = "0" && echo set || echo unset',
+    verifyCmd: 'echo "preload=$(getprop persist.sys.preload 2>/dev/null)"; echo "monitor=$(getprop persist.sys.monitor 2>/dev/null)"; echo "hotstart=$(getprop persist.sys.hotstart 2>/dev/null)"'
+  }
+]},
+{ group: '隐私与广告', items: [
+  { key: 'block_ads_and_tracking', title: '禁用广告与数据收集',
+    desc: '关闭个性化广告、用户体验计划、数据统计',
+    checkCmd: 'test "$(getprop persist.sys.oplus.ad_enable 2>/dev/null)" = "0" && echo disabled || echo enabled',
+    verifyCmd: 'echo "包:"; for p in com.oplus.statistics.rom com.coloros.assistantscreen com.coloros.sceneservice; do (pm list packages -d --user 0 2>/dev/null | grep -qF "package:$p" || ! pm list packages --user 0 2>/dev/null | grep -qF "package:$p") && echo "$p:已禁用" || echo "$p:运行中"; done; echo "属性:"; echo "ad=$(getprop persist.sys.oplus.ad_enable 2>/dev/null)"; echo "pad=$(getprop persist.sys.oplus.personalized_ad 2>/dev/null)"; echo "track=$(getprop persist.ad.track 2>/dev/null)"; echo "usage=$(getprop persist.sys.usage_stat_enable 2>/dev/null)"; echo "collect=$(getprop persist.oppo.collect 2>/dev/null)"'
+  }
+]},
+{ group: '性能优化', items: [
+  { key: 'memory_io_optimization', title: '启用内存/IO 优化',
+    desc: '关闭 schedstats / binder debug / compact',
+    checkCmd: 'v=$(cat /proc/sys/kernel/sched_schedstats 2>/dev/null); test "$v" = "0" && echo ok || echo "fail($v)"',
+    verifyCmd: 'echo "schedstats=$(cat /proc/sys/kernel/sched_schedstats 2>/dev/null)"; echo "binder=$(cat /sys/module/binder/parameters/debug_mask 2>/dev/null)"; echo "compact=$(cat /proc/sys/vm/compact_unevictable_allowed 2>/dev/null)"'
+  },
+  { key: 'extra_kernel_optimization', title: '启用内核深度优化',
+    desc: 'printk 日志级别 / 禁用透明大页',
+    checkCmd: 'p=$(cat /proc/sys/kernel/printk 2>/dev/null); echo "$p"',
+    verifyCmd: 'echo "printk=$(cat /proc/sys/kernel/printk 2>/dev/null)"; echo "thp=$(cat /sys/kernel/mm/transparent_hugepage/enabled 2>/dev/null)"'
+  }
+]},
+{ group: '可选禁用服务', items: [
+  { key: 'disable_network_monitoring', title: '禁用流量监控',
+    desc: 'com.oplus.trafficmonitor / com.oplus.dmp',
+    checkCmd: 'pm list packages --user 0 2>/dev/null | grep -qF "com.oplus.trafficmonitor" && echo enabled || echo disabled',
+    verifyCmd: 'for p in com.oplus.trafficmonitor com.oplus.dmp; do (pm list packages -d --user 0 2>/dev/null | grep -qF "package:$p" || ! pm list packages --user 0 2>/dev/null | grep -qF "package:$p") && echo "$p:已禁用" || echo "$p:运行中"; done'
+  },
+  { key: 'disable_lockscreen_magazine', title: '禁用锁屏杂志',
+    desc: 'com.heytap.pictorial',
+    checkCmd: 'pm list packages --user 0 2>/dev/null | grep -qF "com.heytap.pictorial" && echo enabled || echo disabled',
+    verifyCmd: 'echo "包:"; pm list packages --user 0 2>/dev/null | grep -qF "package:com.heytap.pictorial" && echo "pictorial:存在" || echo "pictorial:已卸载"; echo "属性:"; echo "mag=$(getprop persist.sys.lockscreen_magazine 2>/dev/null)"'
+  },
+  { key: 'disable_gamespace', title: '禁用游戏空间',
+    desc: 'com.oplus.games',
+    checkCmd: 'pm list packages --user 0 2>/dev/null | grep -qF "com.oplus.games" && echo enabled || echo disabled',
+    verifyCmd: 'pm list packages --user 0 2>/dev/null | grep -qF "package:com.oplus.games" && echo "games:存在" || echo "games:已卸载"'
+  },
+  { key: 'disable_backup_services', title: '禁用备份与云服务',
+    desc: 'com.oplus.wifibackuprestore / com.heytap.cloud',
+    checkCmd: 'pm list packages --user 0 2>/dev/null | grep -qF "com.heytap.cloud" && echo enabled || echo disabled',
+    verifyCmd: 'for p in com.oplus.wifibackuprestore com.heytap.cloud; do (pm list packages -d --user 0 2>/dev/null | grep -qF "package:$p" || ! pm list packages --user 0 2>/dev/null | grep -qF "package:$p") && echo "$p:已禁用" || echo "$p:运行中"; done'
+  },
+  { key: 'disable_ai_assistants', title: '禁用 AI 智能助手',
+    desc: 'aimemory / aiunit / aiwidgets / aiwriter / metis / obrain',
+    checkCmd: 'pm list packages --user 0 2>/dev/null | grep -qF "com.oplus.aimemory" && echo enabled || echo disabled',
+    verifyCmd: 'for p in com.oplus.aimemory com.oplus.aiunit com.oplus.aiwidgets com.oplus.aiwriter com.oplus.metis com.oplus.obrain; do (pm list packages -d --user 0 2>/dev/null | grep -qF "package:$p" || ! pm list packages --user 0 2>/dev/null | grep -qF "package:$p") && echo "$p:已禁用" || echo "$p:运行中"; done'
+  },
+  { key: 'disable_voice_assistants', title: '禁用语音助手',
+    desc: 'ovoicemanager / speechassist / ttsaccessibilityengine',
+    checkCmd: 'pm list packages --user 0 2>/dev/null | grep -qF "com.oplus.ovoicemanager" && echo enabled || echo disabled',
+    verifyCmd: 'for p in com.oplus.ovoicemanager com.oplus.ovoicemanager.wakeup com.heytap.speechassist com.oplus.ttsaccessibilityengine; do (pm list packages -d --user 0 2>/dev/null | grep -qF "package:$p" || ! pm list packages --user 0 2>/dev/null | grep -qF "package:$p") && echo "$p:已禁用" || echo "$p:运行中"; done'
+  },
+  { key: 'disable_theme_services', title: '禁用主题和个性化服务',
+    desc: 'themestore / keyguard.clock 等 7 个包',
+    checkCmd: 'pm list packages --user 0 2>/dev/null | grep -qF "com.oplus.themestore" && echo enabled || echo disabled',
+    verifyCmd: 'for p in com.oplus.themestore com.heytap.themestore com.oplus.keyguard.clock.magazine com.oplus.keyguard.clock.gallery com.oplus.keyguard.clock.graffiti com.oplus.keyguard.personality.clocks com.oplus.keyguard.style.widgets; do (pm list packages -d --user 0 2>/dev/null | grep -qF "package:$p" || ! pm list packages --user 0 2>/dev/null | grep -qF "package:$p") && echo "$p:已禁用" || echo "$p:运行中"; done'
+  },
+  { key: 'disable_network_optimization', title: '禁用网络优化服务',
+    desc: 'networksense / cellularqoe / tai.wifiqoe 等',
+    checkCmd: 'pm list packages --user 0 2>/dev/null | grep -qF "com.oplus.networksense" && echo enabled || echo disabled',
+    verifyCmd: 'for p in com.oplus.networksense com.oplus.cellularqoe com.oplus.tai.wifiqoe com.oplus.tai.borderpresearch com.oplus.nearcomm; do (pm list packages -d --user 0 2>/dev/null | grep -qF "package:$p" || ! pm list packages --user 0 2>/dev/null | grep -qF "package:$p") && echo "$p:已禁用" || echo "$p:运行中"; done'
+  },
+  { key: 'disable_security_services', title: '禁用安全和权限服务',
+    desc: 'com.oplus.securitykeyboard / com.coloros.securityguard',
+    checkCmd: 'pm list packages --user 0 2>/dev/null | grep -qF "com.oplus.securitykeyboard" && echo enabled || echo disabled',
+    verifyCmd: 'for p in com.oplus.securitykeyboard com.coloros.securityguard; do (pm list packages -d --user 0 2>/dev/null | grep -qF "package:$p" || ! pm list packages --user 0 2>/dev/null | grep -qF "package:$p") && echo "$p:已禁用" || echo "$p:运行中"; done'
+  },
+  { key: 'disable_media_services', title: '禁用多媒体和娱乐服务',
+    desc: 'com.oplus.screenrecorder / com.coloros.karaoke / com.oplus.mediacontroller',
+    checkCmd: 'pm list packages --user 0 2>/dev/null | grep -qF "com.oplus.screenrecorder" && echo enabled || echo disabled',
+    verifyCmd: 'for p in com.oplus.screenrecorder com.coloros.karaoke com.oplus.mediacontroller; do (pm list packages -d --user 0 2>/dev/null | grep -qF "package:$p" || ! pm list packages --user 0 2>/dev/null | grep -qF "package:$p") && echo "$p:已禁用" || echo "$p:运行中"; done'
+  },
+  { key: 'disable_system_tools', title: '禁用系统工具和监控服务',
+    desc: 'powermonitor / logkit / crashbox 等 9 个包',
+    checkCmd: 'pm list packages --user 0 2>/dev/null | grep -qF "com.oplus.powermonitor" && echo enabled || echo disabled',
+    verifyCmd: 'for p in com.oplus.powermonitor com.oplus.audiomonitor com.oplus.logkit com.oplus.engineermode com.oplus.crashbox com.oplus.appplatform com.oplus.contentportal com.oplus.postmanservice com.oplus.subsys; do (pm list packages -d --user 0 2>/dev/null | grep -qF "package:$p" || ! pm list packages --user 0 2>/dev/null | grep -qF "package:$p") && echo "$p:已禁用" || echo "$p:运行中"; done'
+  }
+]}
+];
+
 // ===================== KernelSU 通信层 =====================
+var PROP_PREFIX = 'persist.sys.coloros16_optimize_gui.';
+
 function ksuExec(cmd) {
   return new Promise(function(resolve) {
     try {
@@ -200,492 +267,260 @@ function sh(cmd) {
   return ksuExec("sh -c '" + safe + "'");
 }
 
-// ===================== 常量 =====================
-var PROP_PREFIX = 'persist.sys.coloros16_optimize_gui.';
-
-// ===================== 功能定义（统一语义：绿色=已禁用/已优化） =====================
-// 【核心修复】所有 checkCmd 和 verifyCmd 使用 pm list packages（不是 -d）
-// 逻辑：包不在列表中 = 已被 pm uninstall = 已禁用 ✅
-var FEATURES = [
-{ group: '守护进程', groupIcon: 'shield', groupColor: 'c-red', items: [
-  { key: 'disable_logd', title: '禁用系统日志 (Logd)',
-    desc: 'mount 覆盖 /system/bin/logd + 强杀进程',
-    type: 'toggle',
-    checkCmd: 'pgrep -x logd >/dev/null 2>&1 && echo running || echo stopped',
-    verifyCmd: 'echo "进程:"; pgrep -x logd >/dev/null 2>&1 && echo running || echo stopped; echo "文件:"; if [ -f /system/bin/logd ]; then sz=$(stat -c %s /system/bin/logd 2>/dev/null); echo "size=$sz"; else echo "notfound"; fi'
-  },
-  { key: 'block_ota', title: '禁用 OTA 更新',
-    desc: '覆盖 update_engine + 卸载 OTA 相关包',
-    type: 'toggle',
-    checkCmd: 'pgrep -x update_engine >/dev/null 2>&1 && echo running || echo stopped',
-    verifyCmd: 'echo "进程:"; pgrep -x update_engine >/dev/null 2>&1 && echo running || echo stopped; echo "包:"; for p in com.oplus.ota com.oplus.sau; do (pm list packages -d --user 0 2>/dev/null | grep -qF "package:$p" || ! pm list packages --user 0 2>/dev/null | grep -qF "package:$p") && echo "$p:已禁用" || echo "$p:运行中"; done; echo "属性:"; echo "ota_dl=$(getprop persist.ota.auto_download 2>/dev/null)"; echo "recovery=$(getprop persist.sys.recovery_update 2>/dev/null)"'
-  },
-  { key: 'lock_developer_options', title: '禁用开发者选项访问',
-    desc: '防止系统重置开发者选项状态',
-    type: 'toggle',
-    checkCmd: 'test "$(settings get global development_settings_enabled 2>/dev/null)" = "0" && echo locked || echo unlocked',
-    verifyCmd: 'echo "dev=$(settings get global development_settings_enabled 2>/dev/null)"; echo "lock=$(getprop persist.dev.option.lock 2>/dev/null)"'
-  },
-  { key: 'kill_redundant_processes', title: '禁用冗余后台进程',
-    desc: 'smartscene / sysmonitor / hotstart / preload',
-    type: 'toggle',
-    checkCmd: 'r="ok"; pgrep -x smartscene >/dev/null 2>&1 && r="running"; pgrep -x sysmonitor >/dev/null 2>&1 && r="running"; pgrep -x hotstart >/dev/null 2>&1 && r="running"; echo "$r"',
-    verifyCmd: 'echo "smartscene:"; pgrep -x smartscene 2>/dev/null || echo stopped; echo "preload:"; pgrep -x preload 2>/dev/null || echo stopped; echo "sysmonitor:"; pgrep -x sysmonitor 2>/dev/null || echo stopped; echo "hotstart:"; pgrep -x hotstart 2>/dev/null || echo stopped'
-  },
-  { key: 'system_prop_toggles', title: '禁用系统预加载属性',
-    desc: '禁用 preload / monitor / hotstart 属性',
-    type: 'toggle',
-    checkCmd: 'test "$(getprop persist.sys.preload)" = "0" && echo set || echo unset',
-    verifyCmd: 'echo "preload=$(getprop persist.sys.preload 2>/dev/null)"; echo "monitor=$(getprop persist.sys.monitor 2>/dev/null)"; echo "hotstart=$(getprop persist.sys.hotstart 2>/dev/null)"'
-  }
-]},
-{ group: '隐私与广告', groupIcon: 'visibility_off', groupColor: 'c-purple', items: [
-  { key: 'block_ads_and_tracking', title: '禁用广告与数据收集',
-    desc: '关闭个性化广告、用户体验计划、数据统计',
-    type: 'toggle',
-    checkCmd: 'test "$(getprop persist.sys.oplus.ad_enable 2>/dev/null)" = "0" && echo disabled || echo enabled',
-    verifyCmd: 'echo "包:"; for p in com.oplus.statistics.rom com.coloros.assistantscreen com.coloros.sceneservice; do (pm list packages -d --user 0 2>/dev/null | grep -qF "package:$p" || ! pm list packages --user 0 2>/dev/null | grep -qF "package:$p") && echo "$p:已禁用" || echo "$p:运行中"; done; echo "属性:"; echo "ad=$(getprop persist.sys.oplus.ad_enable 2>/dev/null)"; echo "pad=$(getprop persist.sys.oplus.personalized_ad 2>/dev/null)"; echo "track=$(getprop persist.ad.track 2>/dev/null)"; echo "usage=$(getprop persist.sys.usage_stat_enable 2>/dev/null)"; echo "collect=$(getprop persist.oppo.collect 2>/dev/null)"'
-  }
-]},
-{ group: '性能优化', groupIcon: 'tune', groupColor: 'c-green', items: [
-  { key: 'memory_io_optimization', title: '启用内存/IO 优化',
-    desc: '关闭 schedstats / binder debug / compact',
-    type: 'toggle',
-    checkCmd: 'v=$(cat /proc/sys/kernel/sched_schedstats 2>/dev/null); test "$v" = "0" && echo ok || echo "fail($v)"',
-    verifyCmd: 'echo "schedstats=$(cat /proc/sys/kernel/sched_schedstats 2>/dev/null)"; echo "binder=$(cat /sys/module/binder/parameters/debug_mask 2>/dev/null)"; echo "compact=$(cat /proc/sys/vm/compact_unevictable_allowed 2>/dev/null)"'
-  },
-  { key: 'extra_kernel_optimization', title: '启用内核深度优化',
-    desc: 'printk 日志级别 / 禁用透明大页',
-    type: 'toggle',
-    checkCmd: 'p=$(cat /proc/sys/kernel/printk 2>/dev/null); echo "$p"',
-    verifyCmd: 'echo "printk=$(cat /proc/sys/kernel/printk 2>/dev/null)"; echo "thp=$(cat /sys/kernel/mm/transparent_hugepage/enabled 2>/dev/null)"'
-  }
-]},
-{ group: '可选禁用服务', groupIcon: 'toggle_off', groupColor: 'c-orange', items: [
-  { key: 'disable_network_monitoring', title: '禁用流量监控',
-    desc: 'com.oplus.trafficmonitor / com.oplus.dmp',
-    type: 'toggle',
-    checkCmd: 'pm list packages --user 0 2>/dev/null | grep -qF "com.oplus.trafficmonitor" && echo enabled || echo disabled',
-    verifyCmd: 'for p in com.oplus.trafficmonitor com.oplus.dmp; do (pm list packages -d --user 0 2>/dev/null | grep -qF "package:$p" || ! pm list packages --user 0 2>/dev/null | grep -qF "package:$p") && echo "$p:已禁用" || echo "$p:运行中"; done'
-  },
-  { key: 'disable_lockscreen_magazine', title: '禁用锁屏杂志',
-    desc: 'com.heytap.pictorial',
-    type: 'toggle',
-    checkCmd: 'pm list packages --user 0 2>/dev/null | grep -qF "com.heytap.pictorial" && echo enabled || echo disabled',
-    verifyCmd: 'echo "包:"; pm list packages --user 0 2>/dev/null | grep -qF "package:com.heytap.pictorial" && echo "pictorial:存在" || echo "pictorial:已卸载"; echo "属性:"; echo "mag=$(getprop persist.sys.lockscreen_magazine 2>/dev/null)"'
-  },
-  { key: 'disable_gamespace', title: '禁用游戏空间',
-    desc: 'com.oplus.games',
-    type: 'toggle',
-    checkCmd: 'pm list packages --user 0 2>/dev/null | grep -qF "com.oplus.games" && echo enabled || echo disabled',
-    verifyCmd: 'pm list packages --user 0 2>/dev/null | grep -qF "package:com.oplus.games" && echo "games:存在" || echo "games:已卸载"'
-  },
-  { key: 'disable_backup_services', title: '禁用备份与云服务',
-    desc: 'com.oplus.wifibackuprestore / com.heytap.cloud',
-    type: 'toggle',
-    checkCmd: 'pm list packages --user 0 2>/dev/null | grep -qF "com.heytap.cloud" && echo enabled || echo disabled',
-    verifyCmd: 'for p in com.oplus.wifibackuprestore com.heytap.cloud; do (pm list packages -d --user 0 2>/dev/null | grep -qF "package:$p" || ! pm list packages --user 0 2>/dev/null | grep -qF "package:$p") && echo "$p:已禁用" || echo "$p:运行中"; done'
-  },
-  { key: 'disable_ai_assistants', title: '禁用 AI 智能助手',
-    desc: 'aimemory / aiunit / aiwidgets / aiwriter / metis / obrain',
-    type: 'toggle',
-    checkCmd: 'pm list packages --user 0 2>/dev/null | grep -qF "com.oplus.aimemory" && echo enabled || echo disabled',
-    verifyCmd: 'for p in com.oplus.aimemory com.oplus.aiunit com.oplus.aiwidgets com.oplus.aiwriter com.oplus.metis com.oplus.obrain; do (pm list packages -d --user 0 2>/dev/null | grep -qF "package:$p" || ! pm list packages --user 0 2>/dev/null | grep -qF "package:$p") && echo "$p:已禁用" || echo "$p:运行中"; done'
-  },
-  { key: 'disable_voice_assistants', title: '禁用语音助手',
-    desc: 'ovoicemanager / speechassist / ttsaccessibilityengine',
-    type: 'toggle',
-    checkCmd: 'pm list packages --user 0 2>/dev/null | grep -qF "com.oplus.ovoicemanager" && echo enabled || echo disabled',
-    verifyCmd: 'for p in com.oplus.ovoicemanager com.oplus.ovoicemanager.wakeup com.heytap.speechassist com.oplus.ttsaccessibilityengine; do (pm list packages -d --user 0 2>/dev/null | grep -qF "package:$p" || ! pm list packages --user 0 2>/dev/null | grep -qF "package:$p") && echo "$p:已禁用" || echo "$p:运行中"; done'
-  },
-  { key: 'disable_theme_services', title: '禁用主题和个性化服务',
-    desc: 'themestore / keyguard.clock 等 7 个包',
-    type: 'toggle',
-    checkCmd: 'pm list packages --user 0 2>/dev/null | grep -qF "com.oplus.themestore" && echo enabled || echo disabled',
-    verifyCmd: 'for p in com.oplus.themestore com.heytap.themestore com.oplus.keyguard.clock.magazine com.oplus.keyguard.clock.gallery com.oplus.keyguard.clock.graffiti com.oplus.keyguard.personality.clocks com.oplus.keyguard.style.widgets; do (pm list packages -d --user 0 2>/dev/null | grep -qF "package:$p" || ! pm list packages --user 0 2>/dev/null | grep -qF "package:$p") && echo "$p:已禁用" || echo "$p:运行中"; done'
-  },
-  { key: 'disable_network_optimization', title: '禁用网络优化服务',
-    desc: 'networksense / cellularqoe / tai.wifiqoe 等',
-    type: 'toggle',
-    checkCmd: 'pm list packages --user 0 2>/dev/null | grep -qF "com.oplus.networksense" && echo enabled || echo disabled',
-    verifyCmd: 'for p in com.oplus.networksense com.oplus.cellularqoe com.oplus.tai.wifiqoe com.oplus.tai.borderpresearch com.oplus.nearcomm; do (pm list packages -d --user 0 2>/dev/null | grep -qF "package:$p" || ! pm list packages --user 0 2>/dev/null | grep -qF "package:$p") && echo "$p:已禁用" || echo "$p:运行中"; done'
-  },
-  { key: 'disable_security_services', title: '禁用安全和权限服务',
-    desc: 'com.oplus.securitykeyboard / com.coloros.securityguard',
-    type: 'toggle',
-    checkCmd: 'pm list packages --user 0 2>/dev/null | grep -qF "com.oplus.securitykeyboard" && echo enabled || echo disabled',
-    verifyCmd: 'for p in com.oplus.securitykeyboard com.coloros.securityguard; do (pm list packages -d --user 0 2>/dev/null | grep -qF "package:$p" || ! pm list packages --user 0 2>/dev/null | grep -qF "package:$p") && echo "$p:已禁用" || echo "$p:运行中"; done'
-  },
-  { key: 'disable_media_services', title: '禁用多媒体和娱乐服务',
-    desc: 'com.oplus.screenrecorder / com.coloros.karaoke / com.oplus.mediacontroller',
-    type: 'toggle',
-    checkCmd: 'pm list packages --user 0 2>/dev/null | grep -qF "com.oplus.screenrecorder" && echo enabled || echo disabled',
-    verifyCmd: 'for p in com.oplus.screenrecorder com.coloros.karaoke com.oplus.mediacontroller; do (pm list packages -d --user 0 2>/dev/null | grep -qF "package:$p" || ! pm list packages --user 0 2>/dev/null | grep -qF "package:$p") && echo "$p:已禁用" || echo "$p:运行中"; done'
-  },
-  { key: 'disable_system_tools', title: '禁用系统工具和监控服务',
-    desc: 'powermonitor / logkit / crashbox 等 9 个包',
-    type: 'toggle',
-    checkCmd: 'pm list packages --user 0 2>/dev/null | grep -qF "com.oplus.powermonitor" && echo enabled || echo disabled',
-    verifyCmd: 'for p in com.oplus.powermonitor com.oplus.audiomonitor com.oplus.logkit com.oplus.engineermode com.oplus.crashbox com.oplus.appplatform com.oplus.contentportal com.oplus.postmanservice com.oplus.subsys; do (pm list packages -d --user 0 2>/dev/null | grep -qF "package:$p" || ! pm list packages --user 0 2>/dev/null | grep -qF "package:$p") && echo "$p:已禁用" || echo "$p:运行中"; done'
-  }
-]}
-];
-
-// ===================== 状态 =====================
-var state = {};
-var debugData = {};
-
-function initState() {
-  FEATURES.forEach(function(g) {
-    g.items.forEach(function(item) {
-      state[item.key] = { enabled: false, loading: false, status: 'pending' };
-      debugData[item.key] = { prop: '', checkRaw: '', verifyRaw: '' };
-    });
-  });
-}
-initState();
-
-// ===================== 日志系统 =====================
-var logLines = [];
-var warnLogs = [];
-
-function addLog(msg, level) {
-  level = level || 'info';
-  var t = new Date();
-  var ts = ('0'+t.getHours()).slice(-2)+':'+('0'+t.getMinutes()).slice(-2)+':'+('0'+t.getSeconds()).slice(-2);
-  var line = '['+ts+'] ['+level.toUpperCase()+'] '+msg;
-  logLines.push(line);
-  if (level === 'warn' || level === 'error') {
-    warnLogs.push(line);
-  }
-  var box = document.getElementById('logBox');
-  if(box) box.textContent = logLines.join('\n');
-}
-
-function showLog() {
-  document.getElementById('logOv').classList.remove('hide');
-  var b=document.getElementById('logBox'); if(b)b.scrollTop=b.scrollHeight;
-}
-function hideLog() { document.getElementById('logOv').classList.add('hide'); }
-function clearLog() { logLines=[]; warnLogs=[]; document.getElementById('logBox').textContent='暂无日志'; }
-
-// ===================== Debug 面板 =====================
-async function showDebug() {
-  var body = document.getElementById('debugBody');
-  body.innerHTML = '<div style="text-align:center;padding:20px;color:var(--tx2)">正在收集 Debug 数据...</div>';
-  document.getElementById('debugOv').classList.remove('hide');
-
-  var html = '';
-  html += '<div class="debug-section">';
-  html += '<div class="debug-title">⚠️ Warn/Error 日志 (' + warnLogs.length + ')</div>';
-  if (warnLogs.length === 0) {
-    html += '<div class="debug-item"><div class="val" style="color:var(--green)">✅ 无警告或错误</div></div>';
-  } else {
-    warnLogs.forEach(function(log) {
-      var cls = log.includes('[ERROR]') ? 'err' : 'warn';
-      html += '<div class="debug-item '+cls+'"><div class="val">'+escapeHtml(log)+'</div></div>';
-    });
-  }
-  html += '</div>';
-
-  html += '<div class="debug-section">';
-  html += '<div class="debug-title">📊 状态检测原始数据</div>';
-
-  for (var i = 0; i < FEATURES.length; i++) {
-    var group = FEATURES[i];
-    for (var j = 0; j < group.items.length; j++) {
-      var item = group.items[j];
-      var d = debugData[item.key];
-      var s = state[item.key];
-
-      try {
-        var propR = await sh('getprop "' + PROP_PREFIX + item.key + '" 2>/dev/null');
-        d.prop = propR.stdout.trim() || '(空)';
-        var checkR = await sh(item.checkCmd);
-        d.checkRaw = checkR.stdout.trim() || '(空)';
-        var verifyR = await sh(item.verifyCmd);
-        d.verifyRaw = verifyR.stdout.trim() || '(空)';
-      } catch(e) {
-        d.prop = 'ERROR: ' + e;
-        d.checkRaw = 'ERROR: ' + e;
-        d.verifyRaw = 'ERROR: ' + e;
-      }
-
-      var statusText = s.enabled ? '✅ 已启用' : '⭕ 未启用';
-      if (s.status === 'error') statusText = '❌ 异常';
-
-      html += '<div class="debug-item">';
-      html += '<div class="key">' + item.title + ' (' + item.key + ')</div>';
-      html += '<div class="val">UI状态: ' + statusText + '</div>';
-      html += '<div class="raw">📌 属性值 ('+PROP_PREFIX+item.key+'):<br>' + escapeHtml(d.prop) + '</div>';
-      html += '<div class="raw">🔍 checkCmd 输出:<br>' + escapeHtml(d.checkRaw) + '</div>';
-      html += '<div class="raw">📋 verifyCmd 输出:<br>' + escapeHtml(d.verifyRaw) + '</div>';
-      html += '</div>';
-    }
-  }
-  html += '</div>';
-  body.innerHTML = html;
-}
-
-function hideDebug() { document.getElementById('debugOv').classList.add('hide'); }
-
 function escapeHtml(str) {
-  return str.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/\n/g,'<br>');
+  return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/\n/g,'<br>');
 }
 
-async function copyDebugInfo() {
-  var text = '=== ColorOS16 Debug Info ===\n';
-  text += 'Time: ' + new Date().toISOString() + '\n\n';
-  text += '--- Warn/Error Logs ---\n';
-  if (warnLogs.length === 0) { text += '(none)\n'; } else { text += warnLogs.join('\n') + '\n'; }
-  text += '\n--- Feature States ---\n';
-
-  for (var i = 0; i < FEATURES.length; i++) {
-    var group = FEATURES[i];
-    text += '\n[' + group.group + ']\n';
-    for (var j = 0; j < group.items.length; j++) {
-      var item = group.items[j];
-      var d = debugData[item.key];
-      var s = state[item.key];
-      text += '\n' + item.title + ' (' + item.key + ')\n';
-      text += '  UI State: ' + (s.enabled ? 'enabled' : 'disabled') + ' (status: ' + s.status + ')\n';
-      text += '  Prop (' + PROP_PREFIX + item.key + '): ' + (d.prop || 'N/A') + '\n';
-      text += '  checkCmd: ' + (d.checkRaw || 'N/A') + '\n';
-      text += '  verifyCmd: ' + (d.verifyRaw || 'N/A') + '\n';
-    }
-  }
-
-  try {
-    if (navigator.clipboard && navigator.clipboard.writeText) {
-      await navigator.clipboard.writeText(text);
-      alert('✅ Debug 信息已复制到剪贴板！');
-    } else {
-      var safeText = text.replace(/\\/g, '\\\\').replace(/"/g, '\\"').replace(/\n/g, '\\n').replace(/\$/g, '\\$').replace(/`/g, '\\`');
-      var r = await sh('echo "' + safeText + '" > /data/adb/logd_disabler/debug_info.txt');
-      alert('✅ Debug 信息已保存到:\n/data/adb/logd_disabler/debug_info.txt');
-    }
-  } catch(e) {
-    var ta = document.createElement('textarea');
-    ta.value = text;
-    ta.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;z-index:9999;padding:20px;font-size:12px;font-family:monospace;background:#000;color:#0f0';
-    document.body.appendChild(ta);
-    ta.select();
-    alert('请手动复制文本，然后点击返回');
-    document.body.removeChild(ta);
-  }
-}
-
-// ===================== 渲染 UI =====================
-function renderCards() {
-  var container = document.getElementById('cardsContainer');
-  var html = '';
-  FEATURES.forEach(function(group) {
-    var iconSvg = getGroupIcon(group.groupIcon);
-    html += '<div class="card"><div class="card-h">';
-    html += '<div class="card-ic '+group.groupColor+'">'+iconSvg+'</div>';
-    html += '<div class="card-t">'+group.group+'</div></div><div class="card-b">';
-    group.items.forEach(function(item, idx) {
-      if(idx > 0) html += '<div class="sep"></div>';
-      html += '<div class="li" id="li-'+item.key+'" onclick="onItemClick(\''+item.key+'\')">';
-      html += '<div class="li-ic">'+getItemIcon(item.key)+'</div>';
-      html += '<div class="li-body">';
-      html += '<div class="li-t">'+item.title+'</div>';
-      html += '<div class="li-d">'+item.desc+'</div>';
-      html += '<div class="li-m"><span class="badge" id="badge-'+item.key+'">⏳ 检测中</span></div>';
-      html += '</div>';
-      html += '<label class="sw" onclick="event.stopPropagation()"><input type="checkbox" id="sw-'+item.key+'" onchange="onToggle(\''+item.key+'\')"><span class="sw-t"></span></label>';
-      html += '</div>';
+// ===================== Vue 应用 =====================
+var app = Vue.createApp({
+  data: function() {
+    var st = {};
+    var dbg = {};
+    FEATURES.forEach(function(g) {
+      g.items.forEach(function(item) {
+        st[item.key] = { enabled: false, loading: false, status: 'pending' };
+        dbg[item.key] = { prop: '', checkRaw: '', verifyRaw: '' };
+      });
     });
-    html += '</div></div>';
-  });
-  container.innerHTML = html;
-}
-
-function getGroupIcon(name) {
-  var icons = {
-    shield: '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 1L3 5v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V5l-9-4zm0 10.99h7c-.53 4.12-3.28 7.79-7 8.94V12H5V6.3l7-3.11v8.8z"/></svg>',
-    visibility_off: '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 7c2.76 0 5 2.24 5 5 0 .65-.13 1.26-.36 1.83l2.92 2.92c1.51-1.26 2.7-2.89 3.43-4.75-1.73-4.39-6-7.5-11-7.5-1.4 0-2.74.25-3.98.7l2.16 2.16C10.74 7.13 11.35 7 12 7z"/></svg>',
-    tune: '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M3 17v2h6v-2H3zM3 5v2h10V5H3zm10 16v-2h8v-2h-8v-2h-2v6h2zM7 9v2H3v2h4v2h2V9H7zm14 4v-2H11v2h10zm-6-4h2V7h4V5h-4V3h-2v6z"/></svg>',
-    toggle_off: '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M17 7H7c-2.76 0-5 2.24-5 5s2.24 5 5 5h10c2.76 0 5-2.24 5-5s-2.24-5-5-5zm0 8c-1.66 0-3-1.34-3-3s1.34-3 3-3 3 1.34 3 3-1.34 3-3 3z"/></svg>'
-  };
-  return icons[name] || icons.shield;
-}
-
-function getItemIcon(key) {
-  var defaultIcon = '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M17 7H7c-2.76 0-5 2.24-5 5s2.24 5 5 5h10c2.76 0 5-2.24 5-5s-2.24-5-5-5zm0 8c-1.66 0-3-1.34-3-3s1.34-3 3-3 3 1.34 3 3-1.34 3-3 3z"/></svg>';
-  return defaultIcon;
-}
-
-// ===================== 状态渲染 =====================
-function updateBadge(key) {
-  var el = document.getElementById('badge-' + key);
-  if (!el) return;
-  var s = state[key];
-  var cls = 'badge ', txt = '';
-  if (s.loading) { cls += 'work'; txt = '⏳ 处理中'; }
-  else if (s.status === 'enabled') { cls += 'on'; txt = '✅ 已禁用'; }
-  else if (s.status === 'disabled') { cls += 'off'; txt = '⭕ 未禁用'; }
-  else if (s.status === 'error') { cls += 'err'; txt = '❌ 异常'; }
-  else { cls += 'off'; txt = '⏳ 检测中'; }
-  el.className = cls;
-  el.textContent = txt;
-}
-
-function updateSwitch(key) {
-  var el = document.getElementById('sw-' + key);
-  if (el) el.checked = state[key].enabled;
-}
-
-// ===================== 核心：读写系统属性 =====================
-async function readProp(key) {
-  var r = await sh('getprop "' + PROP_PREFIX + key + '" 2>/dev/null');
-  var val = r.stdout.trim();
-  debugData[key].prop = val || '(空)';
-  return val === 'true' || val === '1';
-}
-
-async function writeProp(key, enable) {
-  var val = enable ? 'true' : 'false';
-  var r = await sh('setprop "' + PROP_PREFIX + key + '" "' + val + '"');
-  addLog('设置属性 ' + PROP_PREFIX + key + '=' + val + ' (exit=' + r.errno + ')');
-  if (r.errno !== 0) {
-    addLog('setprop 失败: ' + r.stderr, 'error');
-    return false;
-  }
-  return true;
-}
-
-// ===================== 开关事件 =====================
-async function onToggle(key) {
-  var s = state[key];
-  if (s.loading) return;
-  var el = document.getElementById('sw-' + key);
-  var wantOn = el ? el.checked : !s.enabled;
-
-  var feature = null;
-  FEATURES.forEach(function(g) {
-    g.items.forEach(function(item) {
-      if (item.key === key) feature = item;
-    });
-  });
-  if (!feature) return;
-
-  s.loading = true;
-  s.status = 'working';
-  updateBadge(key);
-
-  var action = wantOn ? '禁用' : '恢复';
-  addLog('正在' + action + ' ' + feature.title + '...');
-
-  try {
-    var ok = await writeProp(key, wantOn);
-    if (ok) {
-      s.enabled = wantOn;
-      s.status = wantOn ? 'enabled' : 'disabled';
-      addLog(feature.title + ' ' + action + '成功，重启后完全生效');
-    } else {
-      s.status = 'error';
-      addLog(feature.title + ' ' + action + '失败: setprop 返回非零', 'error');
-      if (el) el.checked = !wantOn;
+    return {
+      FEATURES: FEATURES,
+      state: st,
+      debugData: dbg,
+      logLines: [],
+      warnLogs: [],
+      logOpen: false,
+      debugOpen: false,
+      debugHtml: '',
+      checking: false,
+      progress: 0,
+      moduleVersion: 'v1.4',
+      ksuVersion: 'KernelSU',
+      selinuxStatus: '检测中...'
+    };
+  },
+  computed: {
+    logText: function() { return this.logLines.join('\n'); }
+  },
+  methods: {
+    // ---------- 日志 ----------
+    addLog: function(msg, level) {
+      level = level || 'info';
+      var t = new Date();
+      var ts = ('0'+t.getHours()).slice(-2)+':'+('0'+t.getMinutes()).slice(-2)+':'+('0'+t.getSeconds()).slice(-2);
+      var line = '['+ts+'] ['+level.toUpperCase()+'] '+msg;
+      this.logLines.push(line);
+      if (level === 'warn' || level === 'error') this.warnLogs.push(line);
+    },
+    clearLog: function() {
+      this.logLines = [];
+      this.warnLogs = [];
+    },
+    // ---------- 徽标 ----------
+    badgeClass: function(key) {
+      var s = this.state[key];
+      if (s.loading) return 'work';
+      if (s.status === 'enabled') return 'on';
+      if (s.status === 'error') return 'err';
+      return 'off';
+    },
+    badgeText: function(key) {
+      var s = this.state[key];
+      if (s.loading) return '⏳ 处理中';
+      if (s.status === 'enabled') return '✅ 已禁用';
+      if (s.status === 'error') return '❌ 异常';
+      return '⭕ 未禁用';
+    },
+    // ---------- 读写属性 ----------
+    readProp: function(key) {
+      var self = this;
+      return sh('getprop "' + PROP_PREFIX + key + '" 2>/dev/null').then(function(r) {
+        var val = r.stdout.trim();
+        self.debugData[key].prop = val || '(空)';
+        return val === 'true' || val === '1';
+      });
+    },
+    writeProp: function(key, enable) {
+      var self = this;
+      var val = enable ? 'true' : 'false';
+      return sh('setprop "' + PROP_PREFIX + key + '" "' + val + '"').then(function(r) {
+        self.addLog('设置属性 ' + PROP_PREFIX + key + '=' + val + ' (exit=' + r.errno + ')');
+        if (r.errno !== 0) {
+          self.addLog('setprop 失败: ' + r.stderr, 'error');
+          return false;
+        }
+        return true;
+      });
+    },
+    // ---------- 开关 ----------
+    onSwitchChange: function(item, e) {
+      var self = this;
+      var wantOn = !!(e.target && e.target.checked);
+      var s = this.state[item.key];
+      if (s.loading) {
+        // 恢复 switch 到真实状态
+        e.target.checked = s.enabled;
+        return;
+      }
+      s.loading = true;
+      var action = wantOn ? '禁用' : '恢复';
+      this.addLog('正在' + action + ' ' + item.title + '...');
+      this.writeProp(item.key, wantOn).then(function(ok) {
+        if (ok) {
+          s.enabled = wantOn;
+          s.status = wantOn ? 'enabled' : 'disabled';
+          self.addLog(item.title + ' ' + action + '成功，重启后完全生效');
+        } else {
+          s.status = 'error';
+          self.addLog(item.title + ' ' + action + '失败', 'error');
+        }
+        s.loading = false;
+      });
+    },
+    toggleItem: function(item) {
+      // 点击整行也切换开关（跳过 loading 状态）
+      var s = this.state[item.key];
+      if (s.loading) return;
+      // 直接驱动 state 切换，保持单一数据流
+      this.onSwitchChange(item, { target: { checked: !s.enabled } });
+    },
+    // ---------- 状态检测 ----------
+    checkItem: function(item) {
+      var self = this;
+      var s = this.state[item.key];
+      return this.readProp(item.key).then(function(propEnabled) {
+        return sh(item.checkCmd).then(function(checkR) {
+          self.debugData[item.key].checkRaw = checkR.stdout.trim() || '(空)';
+          return sh(item.verifyCmd).then(function(verifyR) {
+            self.debugData[item.key].verifyRaw = verifyR.stdout.trim() || '(空)';
+            s.enabled = propEnabled;
+            s.status = propEnabled ? 'enabled' : 'disabled';
+          });
+        });
+      }).catch(function(e) {
+        s.status = 'error';
+        self.addLog('检测 ' + item.key + ' 失败: ' + e, 'error');
+      });
+    },
+    refreshAll: function() {
+      var self = this;
+      var allItems = [];
+      FEATURES.forEach(function(g) { allItems = allItems.concat(g.items); });
+      this.checking = true;
+      this.progress = 0;
+      this.addLog('=== 开始全面状态检测 ===');
+      var chain = Promise.resolve();
+      allItems.forEach(function(item, i) {
+        chain = chain.then(function() {
+          return self.checkItem(item).then(function() {
+            self.progress = Math.round(((i + 1) / allItems.length) * 100);
+          });
+        });
+      });
+      return chain.then(function() {
+        return sh('getenforce 2>/dev/null || echo "Unknown"').then(function(r) {
+          self.selinuxStatus = r.stdout.trim();
+        });
+      }).then(function() {
+        self.addLog('=== 状态检测完成 ===');
+        self.checking = false;
+      });
+    },
+    // ---------- Debug ----------
+    showDebug: function() {
+      var self = this;
+      this.debugOpen = true;
+      this.debugHtml = '<div style="text-align:center;padding:20px;color:var(--mdui-color-on-surface-variant)">正在收集 Debug 数据...</div>';
+      var chain = Promise.resolve();
+      var html = '';
+      FEATURES.forEach(function(g) {
+        g.items.forEach(function(item) {
+          chain = chain.then(function() {
+            return self.readProp(item.key)
+              .then(function() { return sh(item.checkCmd); })
+              .then(function(r) { self.debugData[item.key].checkRaw = r.stdout.trim(); return sh(item.verifyCmd); })
+              .then(function(r) { self.debugData[item.key].verifyRaw = r.stdout.trim(); });
+          });
+        });
+      });
+      chain.then(function() {
+        var s = self.state;
+        html += '<div style="margin-bottom:12px;font-weight:600">⚠️ Warn/Error 日志 (' + self.warnLogs.length + ')</div>';
+        if (self.warnLogs.length === 0) {
+          html += '<div class="debug-item"><div class="v" style="color:var(--mdui-color-primary)">✅ 无警告或错误</div></div>';
+        } else {
+          self.warnLogs.forEach(function(l) {
+            html += '<div class="debug-item"><div class="v">' + escapeHtml(l) + '</div></div>';
+          });
+        }
+        html += '<div style="margin:16px 0 12px;font-weight:600">📊 状态检测原始数据</div>';
+        FEATURES.forEach(function(g) {
+          g.items.forEach(function(item) {
+            var d = self.debugData[item.key];
+            var st = s[item.key];
+            var statusText = st.enabled ? '✅ 已启用' : '⭕ 未启用';
+            if (st.status === 'error') statusText = '❌ 异常';
+            html += '<div class="debug-item">';
+            html += '<div class="k">' + item.title + ' (' + item.key + ')</div>';
+            html += '<div class="v">UI状态: ' + statusText + '</div>';
+            html += '<div class="raw">📌 属性值 (' + PROP_PREFIX + item.key + '):\n' + (d.prop || '(空)') + '</div>';
+            html += '<div class="raw">🔍 checkCmd 输出:\n' + (d.checkRaw || '(空)') + '</div>';
+            html += '<div class="raw">📋 verifyCmd 输出:\n' + (d.verifyRaw || '(空)') + '</div>';
+            html += '</div>';
+          });
+        });
+        self.debugHtml = html;
+      });
+    },
+    copyDebugInfo: function() {
+      var self = this;
+      var text = '=== ColorOS16 Debug Info ===\n';
+      text += 'Time: ' + new Date().toISOString() + '\n\n';
+      text += '--- Warn/Error Logs ---\n';
+      text += (self.warnLogs.length ? self.warnLogs.join('\n') : '(none)') + '\n\n';
+      text += '--- Feature States ---\n';
+      FEATURES.forEach(function(g) {
+        text += '\n[' + g.group + ']\n';
+        g.items.forEach(function(item) {
+          var d = self.debugData[item.key];
+          var s = self.state[item.key];
+          text += item.title + ' (' + item.key + '): ' + (s.enabled ? 'enabled' : 'disabled') + '\n';
+          text += '  Prop: ' + (d.prop || 'N/A') + '\n';
+          text += '  check: ' + (d.checkRaw || 'N/A') + '\n';
+          text += '  verify: ' + (d.verifyRaw || 'N/A') + '\n';
+        });
+      });
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(text).then(function() { alert('✅ Debug 信息已复制到剪贴板！'); });
+      } else {
+        var safeText = text.replace(/\\/g, '\\\\').replace(/"/g, '\\"').replace(/\n/g, '\\n').replace(/\$/g, '\\$').replace(/`/g, '\\`');
+        sh('echo "' + safeText + '" > /data/adb/logd_disabler/debug_info.txt').then(function() {
+          alert('✅ Debug 信息已保存到:\n/data/adb/logd_disabler/debug_info.txt');
+        });
+      }
     }
-  } catch(e) {
-    s.status = 'error';
-    addLog(feature.title + ' 异常: ' + e, 'error');
-    if (el) el.checked = !wantOn;
-  }
-  s.loading = false;
-  updateBadge(key);
-}
-
-function onItemClick(key) {
-  var el = document.getElementById('sw-' + key);
-  if (el && !state[key].loading) {
-    el.checked = !el.checked;
-    onToggle(key);
-  }
-}
-
-// ===================== 状态检测 =====================
-async function checkItem(item) {
-  var s = state[item.key];
-  try {
-    var propEnabled = await readProp(item.key);
-    var checkR = await sh(item.checkCmd);
-    var checkOut = checkR.stdout.trim();
-    debugData[item.key].checkRaw = checkOut || '(空)';
-
-    var verifyR = await sh(item.verifyCmd);
-    var verifyOut = verifyR.stdout.trim();
-    debugData[item.key].verifyRaw = verifyOut || '(空)';
-
-    s.enabled = propEnabled;
-    if (propEnabled) {
-      s.status = 'enabled';
-    } else {
-      s.status = 'disabled';
-    }
-  } catch(e) {
-    s.status = 'error';
-    addLog('检测 ' + item.key + ' 失败: ' + e, 'error');
-  }
-  updateBadge(item.key);
-  updateSwitch(item.key);
-}
-
-async function refreshAll() {
-  var btn = document.getElementById('btnRefresh');
-  if (btn) btn.classList.add('spin');
-  var pw = document.getElementById('progW');
-  var pf = document.getElementById('progF');
-  var pt = document.getElementById('progT');
-  if (pw) pw.classList.remove('hide');
-
-  addLog('=== 开始全面状态检测 ===');
-
-  var allItems = [];
-  FEATURES.forEach(function(g) {
-    g.items.forEach(function(item) {
-      allItems.push(item);
+  },
+  mounted: function() {
+    var self = this;
+    this.addLog('WebUI 初始化完成');
+    // 读取模块版本（module.prop）
+    sh('cat /data/adb/modules/Logd_Disabler_ColorOS16/module.prop 2>/dev/null | grep "^version=" | head -1').then(function(r) {
+      var m = r.stdout.match(/version=(.+)/);
+      if (m) self.moduleVersion = m[1].trim();
     });
-  });
-
-  for (var i = 0; i < allItems.length; i++) {
-    await checkItem(allItems[i]);
-    var pct = Math.round(((i + 1) / allItems.length) * 100);
-    if (pf) pf.style.width = pct + '%';
-    if (pt) pt.textContent = '检测中... ' + pct + '% (' + allItems[i].title + ')';
-    await new Promise(function(r) { setTimeout(r, 50); });
+    // 读取 KernelSU 版本
+    sh('cat /data/adb/ksu/version 2>/dev/null || cat /data/adb/ksu/ksud_version 2>/dev/null || echo "KernelSU"').then(function(r) {
+      var v = r.stdout.trim();
+      self.ksuVersion = v || 'KernelSU';
+    });
+    this.refreshAll();
   }
+});
 
-  var selR = await sh('getenforce 2>/dev/null || echo "Unknown"');
-  document.getElementById('selinuxSt').textContent = selR.stdout.trim();
-
-  addLog('=== 状态检测完成 ===');
-  if (pw) setTimeout(function() { pw.classList.add('hide'); }, 800);
-  if (btn) btn.classList.remove('spin');
-}
-
-// ===================== 初始化 =====================
-async function init() {
-  addLog('WebUI 初始化完成');
-  renderCards();
-
-  try {
-    var r = await sh('cat /data/adb/modules/Logd_Disabler_ColorOS16/module.prop 2>/dev/null | grep "^version=" | head -1');
-    var m = r.stdout.match(/version=(.+)/);
-    document.getElementById('ksuVer').textContent = m ? m[1].trim() : 'v3.2.4';
-  } catch(e) {
-    document.getElementById('ksuVer').textContent = 'v3.2.4';
-  }
-
-  await refreshAll();
-}
-
-if (document.readyState === 'loading') {
-  document.addEventListener('DOMContentLoaded', init);
-} else {
-  init();
-}
+// 关键：告诉 Vue 把 mdui-* 当作自定义元素处理，避免组件解析警告
+app.config.compilerOptions.isCustomElement = function(tag) {
+  return tag.startsWith('mdui-');
+};
+app.mount('#app');
 </script>
 </body>
 </html>
