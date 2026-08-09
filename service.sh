@@ -21,28 +21,95 @@ log "========== service.sh 开始执行 =========="
 
 # ===================== 辅助函数 =====================
 
+# ============================================================
+# 【关键修复 2】pm 命令的访问路径
+# 现象：service.sh 由 ksud 以 ksu 域执行，直接调用 pm 时
+#       servicemanager 拒绝 ksu 域 find package 服务，导致
+#       "cmd: Can't find service: package" 或 pm 输出为空
+#       （被误判为"包不存在"）。
+# 验证：WebUI 通过 ksu 的 root shell 执行 pm 是成功的
+#       （系统完全启动后 PMS 就绪）。
+# 方案：本模块内所有 pm/cmd 调用统一走 pmx()，优先用 su 提升，
+#       无法提升时回退为直接调用（此时 sepolicy.rule 若已生效
+#       也能工作）。
+# ============================================================
+
+# 一次性探测：su 是否可用（root 直连 ksud）
+# 只要 su 能执行且输出包含 root uid 信息即认为可用。
+PMX_USE_SU=0
+if command -v su >/dev/null 2>&1; then
+    SU_TEST=$(su -c "id" 2>&1)
+    if echo "$SU_TEST" | grep -qE "uid=0|root"; then
+        PMX_USE_SU=1
+        log "[pmx] su 提升可用，pm 命令将通过 su 执行"
+    else
+        log "[pmx] ⚠️ su 存在但提升失败($SU_TEST)，将直接调用 pm"
+    fi
+else
+    log "[pmx] ⚠️ 未找到 su 命令，将直接调用 pm"
+fi
+
+# 静默执行（丢弃 stderr，用于状态检查）
+pmx() {
+    if [ "$PMX_USE_SU" = "1" ]; then
+        su -c "$*" 2>/dev/null
+    else
+        "$@" 2>/dev/null
+    fi
+}
+
+# 详细执行（保留 stderr，用于采集 result 排错）
+pmx_verbose() {
+    if [ "$PMX_USE_SU" = "1" ]; then
+        su -c "$*" 2>&1
+    else
+        "$@" 2>&1
+    fi
+}
+
+# ===================== 等待 PackageManager 真正就绪 =====================
+# 【关键修复 3】service.sh 在 late_start 阶段执行时，PackageManagerService
+# 可能尚未注册完成，此时 pm 命令会报 "cmd: Can't find service: package"
+# 并导致 disable_pkg 误判"包不存在"（pm list 输出为空）。
+# 之前用 service check 只验证 binder 服务注册，不代表 PMS 内部已就绪
+# （systemReady 前 pm list packages 仍返回空）。
+# 现在改为：轮询 pm list packages --user 0 直到真正能列出包，最多 120 秒。
+log "[PMS] 等待 PackageManager 内部就绪（pm 可列出包）..."
+PMS_READY=0
+for i in $(seq 1 120); do
+    if pmx pm list packages --user 0 2>/dev/null | grep -q "package:"; then
+        PMS_READY=1
+        log "[PMS] PackageManager 就绪（等待 ${i}s，pm 可列出包）"
+        break
+    fi
+    # 每 15 秒记录一次诊断信息
+    if [ $((i % 15)) -eq 0 ]; then
+        SVCCK=$(service check package 2>/dev/null | grep -oE "found|running|not found" | head -1)
+        log "[PMS] 仍在等待... (${i}s, service check: ${SVCCK:-unknown})"
+    fi
+    sleep 1
+done
+if [ "$PMS_READY" != "1" ]; then
+    log "[PMS] ⚠️ 120 秒内 pm 仍无法列出包，pm 操作可能失败"
+fi
+
 # 禁用包：优先 pm disable-user，失败则 fallback 到 pm uninstall
 disable_pkg() {
     local pkg="$1"
-    # 检查包是否存在
-    if ! pm list packages 2>/dev/null | grep -qF "$pkg"; then
-        log "  ⏭️ 跳过（包不存在）: $pkg"
+    # 检查包是否存在（对 user 0 可见；已禁用/卸载的也会被 pm list --user 0 过滤掉）
+    if ! pmx pm list packages --user 0 | grep -qF "$pkg"; then
+        log "  ⏭️ 跳过（不存在或已禁用/卸载）: $pkg"
         return 0
     fi
-    # 检查包是否已经被禁用或卸载
-    if ! pm list packages --user 0 2>/dev/null | grep -qF "$pkg"; then
-        log "  ⏭️ 已禁用/卸载（跳过）: $pkg"
-        return 0
-    fi
-    # 方法1：pm disable-user --user 0（SELinux 权限要求较低）
-    result=$(pm disable-user --user 0 "$pkg" 2>&1)
+    # 方法1：pm disable-user --user 0
+    result=$(pmx_verbose pm disable-user --user 0 "$pkg")
     if echo "$result" | grep -qiE "new state: disabled|Success"; then
         log "  ✅ disable-user 成功: $pkg"
         return 0
     fi
     log "  ⚠️ disable-user 失败: $pkg ($result)"
     # 方法2：pm uninstall -k --user 0（fallback）
-    result2=$(pm uninstall -k --user 0 "$pkg" 2>&1)
+    result2=$(pmx_verbose pm uninstall -k --user 0 "$pkg")
     if echo "$result2" | grep -q "Success"; then
         log "  ✅ uninstall fallback 成功: $pkg"
         return 0
@@ -55,22 +122,32 @@ disable_pkg() {
 enable_pkg() {
     local pkg="$1"
     # 检查包是否已经对用户可见且未被禁用
-    if pm list packages --user 0 2>/dev/null | grep -qF "$pkg"; then
+    if pmx pm list packages --user 0 | grep -qF "$pkg"; then
         # 还需检查是否在 disabled 列表中
-        if ! pm list packages -d --user 0 2>/dev/null | grep -qF "$pkg"; then
+        if ! pmx pm list packages -d --user 0 | grep -qF "$pkg"; then
             log "  ✅ 已启用（跳过）: $pkg"
             return 0
         fi
+    else
+        # 包对 user 0 不可见（可能被卸载），走 install-existing 恢复
+        log "  ⚠️ 包对 user 0 不可见，尝试 install-existing 恢复: $pkg"
+        result2=$(pmx_verbose cmd package install-existing "$pkg")
+        if echo "$result2" | grep -q "installed for user"; then
+            log "  ✅ install-existing 成功: $pkg"
+            return 0
+        fi
+        log "  ❌ install-existing 失败: $pkg ($result2)"
+        return 1
     fi
     # 方法1：pm enable --user 0
-    result=$(pm enable --user 0 "$pkg" 2>&1)
+    result=$(pmx_verbose pm enable --user 0 "$pkg")
     if echo "$result" | grep -qiE "new state: enabled|Success"; then
         log "  ✅ enable 成功: $pkg"
         return 0
     fi
     log "  ⚠️ enable 失败: $pkg ($result)"
     # 方法2：cmd package install-existing（fallback）
-    result2=$(cmd package install-existing "$pkg" 2>&1)
+    result2=$(pmx_verbose cmd package install-existing "$pkg")
     if echo "$result2" | grep -q "installed for user"; then
         log "  ✅ install-existing fallback 成功: $pkg"
         return 0

@@ -22,7 +22,9 @@
 body{background:var(--mdui-color-surface);color:var(--mdui-color-on-surface);margin:0;padding:0;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif}
 .page{padding:16px 16px 96px;max-width:680px;margin:0 auto}
 .banner{margin-bottom:16px;display:flex;align-items:flex-start;gap:8px;padding:12px 14px;border-radius:8px;background:rgba(var(--mdui-color-tertiary-container),.5);color:rgb(var(--mdui-color-on-tertiary-container));font-size:13px;line-height:1.5}
-.card-gap{margin-bottom:16px}
+.card-gap{margin-bottom:16px;display:block;width:100%;box-sizing:border-box}
+/* mdui-card 默认 inline-block，强制占满容器宽度（与功能卡片保持一致） */
+mdui-card{width:100%}
 .info-row{display:flex;justify-content:space-between;align-items:center;padding:10px 16px;font-size:14px}
 .info-row .k{color:var(--mdui-color-on-surface-variant)}
 .info-row .v{font-weight:500}
@@ -37,9 +39,25 @@ body{background:var(--mdui-color-surface);color:var(--mdui-color-on-surface);mar
 .debug-item .v{margin-top:4px;word-break:break-all}
 .debug-item .raw{margin-top:6px;padding:6px 8px;border-radius:6px;background:rgba(128,128,128,.08);color:var(--mdui-color-on-surface-variant);font-size:10px;white-space:pre-wrap;word-break:break-all}
 .dlg-body{max-height:70vh;overflow-y:auto}
+.dlg-header{display:flex;align-items:center;justify-content:space-between;padding:16px 20px 0;font-size:16px;font-weight:500}
+.dlg-actions{display:flex;justify-content:flex-end;gap:4px;padding:12px 20px}
 .footer{text-align:center;padding:20px 16px;font-size:12px;color:var(--mdui-color-on-surface-variant)}
 .hidden{display:none!important}
 mdui-list-item{--mdui-list-item-container-shape:12px}
+/* ===== 聚合功能（mdui-collapse）样式 ===== */
+.agg-collapse{width:100%;padding:4px 8px 8px;box-sizing:border-box}
+.agg-collapse mdui-collapse-item{display:block;border-radius:12px;overflow:hidden;margin-bottom:4px}
+.agg-collapse mdui-collapse-item:hover{background:rgba(var(--mdui-color-on-surface),.04)}
+.agg-header{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:12px 8px;width:100%;box-sizing:border-box;cursor:pointer}
+.agg-title{flex:1;min-width:0}
+.agg-title-main{font-size:15px;font-weight:500;color:var(--mdui-color-on-surface)}
+.agg-title-sub{font-size:12px;color:var(--mdui-color-on-surface-variant);margin-top:2px}
+.agg-control{display:flex;align-items:center;gap:8px;flex-shrink:0}
+.agg-body{padding:4px 12px 12px;border-top:1px solid var(--mdui-color-surface-variant)}
+.agg-hint{font-size:12px;color:var(--mdui-color-on-surface-variant);padding:8px 0}
+.agg-row{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:7px 4px;font-size:13px;border-radius:8px}
+.agg-row:nth-child(odd){background:rgba(var(--mdui-color-on-surface),.03)}
+.agg-pkg{font-family:monospace;font-size:12px;color:var(--mdui-color-on-surface);word-break:break-all}
 </style>
 </head>
 <body>
@@ -48,7 +66,7 @@ mdui-list-item{--mdui-list-item-container-shape:12px}
   <mdui-top-app-bar scroll-behavior="shrink">
     <mdui-top-app-bar-title>ColorOS 16 优化</mdui-top-app-bar-title>
     <div slot="navigation-end" style="display:flex;align-items:center;gap:4px;margin-right:8px">
-      <mdui-button-icon icon="refresh" @click="refreshAll"></mdui-button-icon>
+      <mdui-button-icon icon="refresh--outlined" @click="refreshAll"></mdui-button-icon>
     </div>
   </mdui-top-app-bar>
 
@@ -64,11 +82,13 @@ mdui-list-item{--mdui-list-item-container-shape:12px}
     <!-- 功能分组卡片 -->
     <template v-for="group in FEATURES" :key="group.group">
       <mdui-card class="card-gap" variant="elevated">
-        <mdui-list>
-          <div style="padding:12px 20px 4px;font-size:14px;font-weight:600;color:var(--mdui-color-primary)">{{ group.group }}</div>
+        <div style="padding:12px 20px 4px;font-size:14px;font-weight:600;color:var(--mdui-color-primary)">{{ group.group }}</div>
+
+        <!-- 单项功能列表 -->
+        <mdui-list v-if="groupSingle(group).length">
           <mdui-list-item
-            v-for="item in group.items"
-            :key="item.key + '-' + String(state[item.key].enabled)"
+            v-for="item in groupSingle(group)"
+            :key="'single-' + item.key + '-' + String(state[item.key].enabled)"
             @click="toggleItem(item)"
           >
             <div slot="headline">{{ item.title }}</div>
@@ -79,6 +99,35 @@ mdui-list-item{--mdui-list-item-container-shape:12px}
             </span>
           </mdui-list-item>
         </mdui-list>
+
+        <!-- 聚合功能（多个包）：mdui-collapse accordion 可折叠展开子包清单 -->
+        <mdui-collapse accordion v-if="groupAgg(group).length" class="agg-collapse">
+          <mdui-collapse-item
+            v-for="item in groupAgg(group)"
+            :key="'agg-' + item.key + '-' + String(state[item.key].enabled)"
+            :disabled="state[item.key].loading"
+          >
+            <!-- header：标题 + 状态徽标 + 开关（点击开关不触发展开） -->
+            <div slot="header" class="agg-header">
+              <div class="agg-title">
+                <div class="agg-title-main">{{ item.title }}</div>
+                <div class="agg-title-sub">{{ item.desc }}</div>
+              </div>
+              <span class="agg-control">
+                <span class="badge" :class="badgeClass(item.key)">{{ badgeText(item.key) }}</span>
+                <mdui-switch :checked="state[item.key].enabled" :disabled="state[item.key].loading" @click.stop @change="onSwitchChange(item, $event)"></mdui-switch>
+              </span>
+            </div>
+            <!-- body：子包清单 + 每个子包状态 -->
+            <div class="agg-body" v-if="item.pkgs">
+              <div class="agg-hint">一键禁用/恢复以下 {{ item.pkgs.length }} 个包（对应 service.sh 中同名属性分支）：</div>
+              <div class="agg-row" v-for="p in item.pkgs" :key="p">
+                <span class="agg-pkg">{{ p }}</span>
+                <span class="badge" :class="pkgBadgeClass(item.key, p)">{{ pkgBadgeText(item.key, p) }}</span>
+              </div>
+            </div>
+          </mdui-collapse-item>
+        </mdui-collapse>
       </mdui-card>
     </template>
 
@@ -98,36 +147,40 @@ mdui-list-item{--mdui-list-item-container-shape:12px}
       </mdui-list>
     </mdui-card>
 
-    <div class="footer">Logd Disabler for ColorOS16<br>UI: Vue 3 + mdui 2（本地资源）</div>
+    <div class="footer">Logd Disabler for ColorOS16<br>By ZhangChongjie</div>
   </div>
 
   <!-- 悬浮按钮：日志 -->
-  <mdui-fab icon="receipt_long" label="日志" style="position:fixed;right:20px;bottom:24px;z-index:100" @click="logOpen=true"></mdui-fab>
+  <mdui-fab icon="receipt_long--outlined" label="日志" style="position:fixed;right:20px;bottom:24px;z-index:100" @click="logOpen=true"></mdui-fab>
   <!-- 悬浮按钮：Debug -->
-  <mdui-fab icon="bug_report" label="Debug" style="position:fixed;left:20px;bottom:24px;z-index:100" @click="showDebug()"></mdui-fab>
+  <mdui-fab icon="bug_report--outlined" label="Debug" style="position:fixed;left:20px;bottom:24px;z-index:100" @click="showDebug()"></mdui-fab>
 
   <!-- 日志对话框 -->
-  <mdui-dialog :open="logOpen" @closed="logOpen=false" style="width:min(92vw,480px)">
-    <mdui-dialog-header>操作日志</mdui-dialog-header>
-    <mdui-dialog-content>
+  <mdui-dialog :open="logOpen" @closed="logOpen=false" close-on-esc close-on-overlay-click style="width:min(92vw,480px)">
+    <div slot="header" class="dlg-header">
+      <span>操作日志</span>
+      <mdui-button-icon icon="close--outlined" @click="logOpen=false"></mdui-button-icon>
+    </div>
+    <div class="dlg-body">
       <div class="log-box">{{ logText || '暂无日志' }}</div>
-    </mdui-dialog-content>
-    <mdui-dialog-actions>
+    </div>
+    <div slot="action" class="dlg-actions">
       <mdui-button variant="text" @click="clearLog()">清空</mdui-button>
       <mdui-button variant="tonal" @click="logOpen=false">关闭</mdui-button>
-    </mdui-dialog-actions>
+    </div>
   </mdui-dialog>
 
   <!-- Debug 对话框 -->
-  <mdui-dialog :open="debugOpen" @closed="debugOpen=false" style="width:min(92vw,520px)">
-    <mdui-dialog-header>Debug 面板</mdui-dialog-header>
-    <mdui-dialog-content>
-      <div class="dlg-body" v-html="debugHtml"></div>
-    </mdui-dialog-content>
-    <mdui-dialog-actions>
+  <mdui-dialog :open="debugOpen" @closed="debugOpen=false" close-on-esc close-on-overlay-click style="width:min(92vw,520px)">
+    <div slot="header" class="dlg-header">
+      <span>Debug 面板</span>
+      <mdui-button-icon icon="close--outlined" @click="debugOpen=false"></mdui-button-icon>
+    </div>
+    <div class="dlg-body" v-html="debugHtml"></div>
+    <div slot="action" class="dlg-actions">
       <mdui-button variant="text" @click="copyDebugInfo()">一键复制</mdui-button>
       <mdui-button variant="tonal" @click="debugOpen=false">关闭</mdui-button>
-    </mdui-dialog-actions>
+    </div>
   </mdui-dialog>
 </div>
 
@@ -140,10 +193,11 @@ var FEATURES = [
     checkCmd: 'pgrep -x logd >/dev/null 2>&1 && echo running || echo stopped',
     verifyCmd: 'echo "进程:"; pgrep -x logd >/dev/null 2>&1 && echo running || echo stopped; echo "文件:"; if [ -f /system/bin/logd ]; then sz=$(stat -c %s /system/bin/logd 2>/dev/null); echo "size=$sz"; else echo "notfound"; fi'
   },
-  { key: 'block_ota', title: '禁用 OTA 更新',
+  { key: 'block_ota', title: '禁用 OTA 更新（5 个包）',
     desc: '覆盖 update_engine + 卸载 OTA 相关包',
+    pkgs: ['com.oplus.ota', 'com.oplus.sau', 'com.oplus.cota', 'com.oplus.romupdate', 'com.oplus.upgradeguide'],
     checkCmd: 'pgrep -x update_engine >/dev/null 2>&1 && echo running || echo stopped',
-    verifyCmd: 'echo "进程:"; pgrep -x update_engine >/dev/null 2>&1 && echo running || echo stopped; echo "包:"; for p in com.oplus.ota com.oplus.sau com.oplus.cota; do (pm list packages -d --user 0 2>/dev/null | grep -qF "package:$p" || ! pm list packages --user 0 2>/dev/null | grep -qF "package:$p") && echo "$p:已禁用" || echo "$p:运行中"; done; echo "属性:"; echo "ota_dl=$(getprop persist.ota.auto_download 2>/dev/null)"; echo "recovery=$(getprop persist.sys.recovery_update 2>/dev/null)"'
+    verifyCmd: 'echo "进程:"; pgrep -x update_engine >/dev/null 2>&1 && echo running || echo stopped; echo "包:"; for p in com.oplus.ota com.oplus.sau com.oplus.cota com.oplus.romupdate com.oplus.upgradeguide; do (pm list packages -d --user 0 2>/dev/null | grep -qF "package:$p" || ! pm list packages --user 0 2>/dev/null | grep -qF "package:$p") && echo "$p:已禁用" || echo "$p:运行中"; done; echo "属性:"; echo "ota_dl=$(getprop persist.ota.auto_download 2>/dev/null)"; echo "recovery=$(getprop persist.sys.recovery_update 2>/dev/null)"'
   },
   { key: 'lock_developer_options', title: '禁用开发者选项访问',
     desc: '防止系统重置开发者选项状态',
@@ -162,8 +216,9 @@ var FEATURES = [
   }
 ]},
 { group: '隐私与广告', items: [
-  { key: 'block_ads_and_tracking', title: '禁用广告与数据收集',
+  { key: 'block_ads_and_tracking', title: '禁用广告与数据收集（3 个包）',
     desc: '关闭个性化广告、用户体验计划、数据统计',
+    pkgs: ['com.oplus.statistics.rom', 'com.coloros.assistantscreen', 'com.coloros.sceneservice'],
     checkCmd: 'test "$(getprop persist.sys.oplus.ad_enable 2>/dev/null)" = "0" && echo disabled || echo enabled',
     verifyCmd: 'echo "包:"; for p in com.oplus.statistics.rom com.coloros.assistantscreen com.coloros.sceneservice; do (pm list packages -d --user 0 2>/dev/null | grep -qF "package:$p" || ! pm list packages --user 0 2>/dev/null | grep -qF "package:$p") && echo "$p:已禁用" || echo "$p:运行中"; done; echo "属性:"; echo "ad=$(getprop persist.sys.oplus.ad_enable 2>/dev/null)"; echo "pad=$(getprop persist.sys.oplus.personalized_ad 2>/dev/null)"; echo "track=$(getprop persist.ad.track 2>/dev/null)"; echo "usage=$(getprop persist.sys.usage_stat_enable 2>/dev/null)"; echo "collect=$(getprop persist.oppo.collect 2>/dev/null)"'
   }
@@ -181,58 +236,81 @@ var FEATURES = [
   }
 ]},
 { group: '可选禁用服务', items: [
-  { key: 'disable_network_monitoring', title: '禁用流量监控',
+  { key: 'disable_health_services', title: '禁用健康服务（1 个包）',
+    desc: 'com.oplus.healthservice',
+    pkgs: ['com.oplus.healthservice'],
+    checkCmd: 'pm list packages --user 0 2>/dev/null | grep -qF "com.oplus.healthservice" && echo enabled || echo disabled',
+    verifyCmd: 'for p in com.oplus.healthservice; do (pm list packages -d --user 0 2>/dev/null | grep -qF "package:$p" || ! pm list packages --user 0 2>/dev/null | grep -qF "package:$p") && echo "$p:已禁用" || echo "$p:运行中"; done'
+  },
+  { key: 'disable_network_monitoring', title: '禁用流量监控（2 个包）',
     desc: 'com.oplus.trafficmonitor / com.oplus.dmp',
+    pkgs: ['com.oplus.trafficmonitor', 'com.oplus.dmp'],
     checkCmd: 'pm list packages --user 0 2>/dev/null | grep -qF "com.oplus.trafficmonitor" && echo enabled || echo disabled',
     verifyCmd: 'for p in com.oplus.trafficmonitor com.oplus.dmp; do (pm list packages -d --user 0 2>/dev/null | grep -qF "package:$p" || ! pm list packages --user 0 2>/dev/null | grep -qF "package:$p") && echo "$p:已禁用" || echo "$p:运行中"; done'
   },
-  { key: 'disable_lockscreen_magazine', title: '禁用锁屏杂志',
+  { key: 'disable_lockscreen_magazine', title: '禁用锁屏杂志（1 个包）',
     desc: 'com.heytap.pictorial',
+    pkgs: ['com.heytap.pictorial'],
     checkCmd: 'pm list packages --user 0 2>/dev/null | grep -qF "com.heytap.pictorial" && echo enabled || echo disabled',
-    verifyCmd: 'echo "包:"; pm list packages --user 0 2>/dev/null | grep -qF "package:com.heytap.pictorial" && echo "pictorial:存在" || echo "pictorial:已卸载"; echo "属性:"; echo "mag=$(getprop persist.sys.lockscreen_magazine 2>/dev/null)"'
+    verifyCmd: 'echo "包:"; pm list packages -d --user 0 2>/dev/null | grep -qF "package:com.heytap.pictorial" && echo "com.heytap.pictorial:已禁用" || (pm list packages --user 0 2>/dev/null | grep -qF "package:com.heytap.pictorial" && echo "com.heytap.pictorial:运行中" || echo "com.heytap.pictorial:已卸载"); echo "属性:"; echo "mag=$(getprop persist.sys.lockscreen_magazine 2>/dev/null)"'
   },
-  { key: 'disable_gamespace', title: '禁用游戏空间',
+  { key: 'disable_gamespace', title: '禁用游戏空间（1 个包）',
     desc: 'com.oplus.games',
+    pkgs: ['com.oplus.games'],
     checkCmd: 'pm list packages --user 0 2>/dev/null | grep -qF "com.oplus.games" && echo enabled || echo disabled',
-    verifyCmd: 'pm list packages --user 0 2>/dev/null | grep -qF "package:com.oplus.games" && echo "games:存在" || echo "games:已卸载"'
+    verifyCmd: 'pm list packages -d --user 0 2>/dev/null | grep -qF "package:com.oplus.games" && echo "com.oplus.games:已禁用" || (pm list packages --user 0 2>/dev/null | grep -qF "package:com.oplus.games" && echo "com.oplus.games:运行中" || echo "com.oplus.games:已卸载")'
   },
-  { key: 'disable_backup_services', title: '禁用备份与云服务',
+  { key: 'disable_wallet_services', title: '禁用钱包服务（2 个包）',
+    desc: 'com.oplus.pay / com.coloros.securepay',
+    pkgs: ['com.oplus.pay', 'com.coloros.securepay'],
+    checkCmd: 'pm list packages --user 0 2>/dev/null | grep -qF "com.oplus.pay" && echo enabled || echo disabled',
+    verifyCmd: 'for p in com.oplus.pay com.coloros.securepay; do (pm list packages -d --user 0 2>/dev/null | grep -qF "package:$p" || ! pm list packages --user 0 2>/dev/null | grep -qF "package:$p") && echo "$p:已禁用" || echo "$p:运行中"; done'
+  },
+  { key: 'disable_backup_services', title: '禁用备份与云服务（2 个包）',
     desc: 'com.oplus.wifibackuprestore / com.heytap.cloud',
+    pkgs: ['com.oplus.wifibackuprestore', 'com.heytap.cloud'],
     checkCmd: 'pm list packages --user 0 2>/dev/null | grep -qF "com.heytap.cloud" && echo enabled || echo disabled',
     verifyCmd: 'for p in com.oplus.wifibackuprestore com.heytap.cloud; do (pm list packages -d --user 0 2>/dev/null | grep -qF "package:$p" || ! pm list packages --user 0 2>/dev/null | grep -qF "package:$p") && echo "$p:已禁用" || echo "$p:运行中"; done'
   },
-  { key: 'disable_ai_assistants', title: '禁用 AI 智能助手',
+  { key: 'disable_ai_assistants', title: '禁用 AI 智能助手（6 个包）',
     desc: 'aimemory / aiunit / aiwidgets / aiwriter / metis / obrain',
+    pkgs: ['com.oplus.aimemory', 'com.oplus.aiunit', 'com.oplus.aiwidgets', 'com.oplus.aiwriter', 'com.oplus.metis', 'com.oplus.obrain'],
     checkCmd: 'pm list packages --user 0 2>/dev/null | grep -qF "com.oplus.aimemory" && echo enabled || echo disabled',
     verifyCmd: 'for p in com.oplus.aimemory com.oplus.aiunit com.oplus.aiwidgets com.oplus.aiwriter com.oplus.metis com.oplus.obrain; do (pm list packages -d --user 0 2>/dev/null | grep -qF "package:$p" || ! pm list packages --user 0 2>/dev/null | grep -qF "package:$p") && echo "$p:已禁用" || echo "$p:运行中"; done'
   },
-  { key: 'disable_voice_assistants', title: '禁用语音助手',
+  { key: 'disable_voice_assistants', title: '禁用语音助手（4 个包）',
     desc: 'ovoicemanager / speechassist / ttsaccessibilityengine',
+    pkgs: ['com.oplus.ovoicemanager', 'com.oplus.ovoicemanager.wakeup', 'com.heytap.speechassist', 'com.oplus.ttsaccessibilityengine'],
     checkCmd: 'pm list packages --user 0 2>/dev/null | grep -qF "com.oplus.ovoicemanager" && echo enabled || echo disabled',
     verifyCmd: 'for p in com.oplus.ovoicemanager com.oplus.ovoicemanager.wakeup com.heytap.speechassist com.oplus.ttsaccessibilityengine; do (pm list packages -d --user 0 2>/dev/null | grep -qF "package:$p" || ! pm list packages --user 0 2>/dev/null | grep -qF "package:$p") && echo "$p:已禁用" || echo "$p:运行中"; done'
   },
-  { key: 'disable_theme_services', title: '禁用主题和个性化服务',
-    desc: 'themestore / keyguard.clock 等 7 个包',
+  { key: 'disable_theme_services', title: '禁用主题和个性化服务（7 个包）',
+    desc: 'themestore / keyguard.clock 等',
+    pkgs: ['com.oplus.themestore', 'com.heytap.themestore', 'com.oplus.keyguard.clock.magazine', 'com.oplus.keyguard.clock.gallery', 'com.oplus.keyguard.clock.graffiti', 'com.oplus.keyguard.personality.clocks', 'com.oplus.keyguard.style.widgets'],
     checkCmd: 'pm list packages --user 0 2>/dev/null | grep -qF "com.oplus.themestore" && echo enabled || echo disabled',
     verifyCmd: 'for p in com.oplus.themestore com.heytap.themestore com.oplus.keyguard.clock.magazine com.oplus.keyguard.clock.gallery com.oplus.keyguard.clock.graffiti com.oplus.keyguard.personality.clocks com.oplus.keyguard.style.widgets; do (pm list packages -d --user 0 2>/dev/null | grep -qF "package:$p" || ! pm list packages --user 0 2>/dev/null | grep -qF "package:$p") && echo "$p:已禁用" || echo "$p:运行中"; done'
   },
-  { key: 'disable_network_optimization', title: '禁用网络优化服务',
+  { key: 'disable_network_optimization', title: '禁用网络优化服务（5 个包）',
     desc: 'networksense / cellularqoe / tai.wifiqoe 等',
+    pkgs: ['com.oplus.networksense', 'com.oplus.cellularqoe', 'com.oplus.tai.wifiqoe', 'com.oplus.tai.borderpresearch', 'com.oplus.nearcomm'],
     checkCmd: 'pm list packages --user 0 2>/dev/null | grep -qF "com.oplus.networksense" && echo enabled || echo disabled',
     verifyCmd: 'for p in com.oplus.networksense com.oplus.cellularqoe com.oplus.tai.wifiqoe com.oplus.tai.borderpresearch com.oplus.nearcomm; do (pm list packages -d --user 0 2>/dev/null | grep -qF "package:$p" || ! pm list packages --user 0 2>/dev/null | grep -qF "package:$p") && echo "$p:已禁用" || echo "$p:运行中"; done'
   },
-  { key: 'disable_security_services', title: '禁用安全和权限服务',
+  { key: 'disable_security_services', title: '禁用安全和权限服务（2 个包）',
     desc: 'com.oplus.securitykeyboard / com.coloros.securityguard',
+    pkgs: ['com.oplus.securitykeyboard', 'com.coloros.securityguard'],
     checkCmd: 'pm list packages --user 0 2>/dev/null | grep -qF "com.oplus.securitykeyboard" && echo enabled || echo disabled',
     verifyCmd: 'for p in com.oplus.securitykeyboard com.coloros.securityguard; do (pm list packages -d --user 0 2>/dev/null | grep -qF "package:$p" || ! pm list packages --user 0 2>/dev/null | grep -qF "package:$p") && echo "$p:已禁用" || echo "$p:运行中"; done'
   },
-  { key: 'disable_media_services', title: '禁用多媒体和娱乐服务',
+  { key: 'disable_media_services', title: '禁用多媒体和娱乐服务（3 个包）',
     desc: 'com.oplus.screenrecorder / com.coloros.karaoke / com.oplus.mediacontroller',
+    pkgs: ['com.oplus.screenrecorder', 'com.coloros.karaoke', 'com.oplus.mediacontroller'],
     checkCmd: 'pm list packages --user 0 2>/dev/null | grep -qF "com.oplus.screenrecorder" && echo enabled || echo disabled',
     verifyCmd: 'for p in com.oplus.screenrecorder com.coloros.karaoke com.oplus.mediacontroller; do (pm list packages -d --user 0 2>/dev/null | grep -qF "package:$p" || ! pm list packages --user 0 2>/dev/null | grep -qF "package:$p") && echo "$p:已禁用" || echo "$p:运行中"; done'
   },
-  { key: 'disable_system_tools', title: '禁用系统工具和监控服务',
-    desc: 'powermonitor / logkit / crashbox 等 9 个包',
+  { key: 'disable_system_tools', title: '禁用系统工具和监控服务（9 个包）',
+    desc: 'powermonitor / logkit / crashbox 等',
+    pkgs: ['com.oplus.powermonitor', 'com.oplus.audiomonitor', 'com.oplus.logkit', 'com.oplus.engineermode', 'com.oplus.crashbox', 'com.oplus.appplatform', 'com.oplus.contentportal', 'com.oplus.postmanservice', 'com.oplus.subsys'],
     checkCmd: 'pm list packages --user 0 2>/dev/null | grep -qF "com.oplus.powermonitor" && echo enabled || echo disabled',
     verifyCmd: 'for p in com.oplus.powermonitor com.oplus.audiomonitor com.oplus.logkit com.oplus.engineermode com.oplus.crashbox com.oplus.appplatform com.oplus.contentportal com.oplus.postmanservice com.oplus.subsys; do (pm list packages -d --user 0 2>/dev/null | grep -qF "package:$p" || ! pm list packages --user 0 2>/dev/null | grep -qF "package:$p") && echo "$p:已禁用" || echo "$p:运行中"; done'
   }
@@ -276,21 +354,28 @@ var app = Vue.createApp({
   data: function() {
     var st = {};
     var dbg = {};
+    var pkgSt = {};
     FEATURES.forEach(function(g) {
       g.items.forEach(function(item) {
         st[item.key] = { enabled: false, loading: false, status: 'pending' };
         dbg[item.key] = { prop: '', checkRaw: '', verifyRaw: '' };
+        if (item.pkgs) {
+          pkgSt[item.key] = {};
+          item.pkgs.forEach(function(p) { pkgSt[item.key][p] = 'unknown'; });
+        }
       });
     });
     return {
       FEATURES: FEATURES,
       state: st,
       debugData: dbg,
+      pkgStates: pkgSt,
       logLines: [],
       warnLogs: [],
       logOpen: false,
       debugOpen: false,
       debugHtml: '',
+      serviceLogTail: '',
       checking: false,
       progress: 0,
       moduleVersion: 'v1.4',
@@ -314,6 +399,50 @@ var app = Vue.createApp({
     clearLog: function() {
       this.logLines = [];
       this.warnLogs = [];
+    },
+    // ---------- 分组辅助 ----------
+    groupSingle: function(group) {
+      return (group.items || []).filter(function(i) { return !i.pkgs; });
+    },
+    groupAgg: function(group) {
+      return (group.items || []).filter(function(i) { return i.pkgs; });
+    },
+    // ---------- 子包状态徽标 ----------
+    pkgBadgeClass: function(key, pkg) {
+      var s = this.pkgStates[key] && this.pkgStates[key][pkg];
+      if (s === 'disabled') return 'on';
+      if (s === 'error') return 'err';
+      return 'off';
+    },
+    pkgBadgeText: function(key, pkg) {
+      var s = this.pkgStates[key] && this.pkgStates[key][pkg];
+      if (s === 'disabled') return '已禁用';
+      if (s === 'error') return '异常';
+      if (s === 'enabled') return '运行中';
+      return '未知';
+    },
+    // ---------- 解析 verifyCmd 输出中的每个包状态 ----------
+    parsePkgStates: function(item, output) {
+      var self = this;
+      if (!item.pkgs || !output) return;
+      // verifyCmd 输出形如 "com.oplus.xxx:已禁用" / "com.oplus.xxx:运行中"
+      var lines = String(output).split('\n');
+      item.pkgs.forEach(function(p) {
+        var matched = false;
+        lines.forEach(function(l) {
+          var idx = l.indexOf(':');
+          if (idx > 0 && l.indexOf(p) >= 0) {
+            var tail = l.slice(idx + 1);
+            if (tail.indexOf('已禁用') >= 0 || tail.indexOf('卸载') >= 0) {
+              self.pkgStates[item.key][p] = 'disabled';
+            } else if (tail.indexOf('运行中') >= 0 || tail.indexOf('存在') >= 0) {
+              self.pkgStates[item.key][p] = 'enabled';
+            }
+            matched = true;
+          }
+        });
+        if (!matched) self.pkgStates[item.key][p] = 'unknown';
+      });
     },
     // ---------- 徽标 ----------
     badgeClass: function(key) {
@@ -368,6 +497,12 @@ var app = Vue.createApp({
         if (ok) {
           s.enabled = wantOn;
           s.status = wantOn ? 'enabled' : 'disabled';
+          // 聚合项：切换后子包状态与开关一致（重启后 refreshAll 再精确核验）
+          if (item.pkgs && self.pkgStates[item.key]) {
+            item.pkgs.forEach(function(p) {
+              self.pkgStates[item.key][p] = wantOn ? 'disabled' : 'enabled';
+            });
+          }
           self.addLog(item.title + ' ' + action + '成功，重启后完全生效');
         } else {
           s.status = 'error';
@@ -392,6 +527,7 @@ var app = Vue.createApp({
           self.debugData[item.key].checkRaw = checkR.stdout.trim() || '(空)';
           return sh(item.verifyCmd).then(function(verifyR) {
             self.debugData[item.key].verifyRaw = verifyR.stdout.trim() || '(空)';
+            self.parsePkgStates(item, verifyR.stdout);
             s.enabled = propEnabled;
             s.status = propEnabled ? 'enabled' : 'disabled';
           });
@@ -443,6 +579,10 @@ var app = Vue.createApp({
         });
       });
       chain.then(function() {
+        // 读取 service.log 尾部（disable_pkg 失败原因的关键证据）
+        return sh('tail -n 80 /data/adb/logd_disabler/service.log 2>/dev/null || echo "(无 service.log)"')
+          .then(function(r) { self.serviceLogTail = r.stdout.trim(); });
+      }).then(function() {
         var s = self.state;
         html += '<div style="margin-bottom:12px;font-weight:600">⚠️ Warn/Error 日志 (' + self.warnLogs.length + ')</div>';
         if (self.warnLogs.length === 0) {
@@ -452,6 +592,8 @@ var app = Vue.createApp({
             html += '<div class="debug-item"><div class="v">' + escapeHtml(l) + '</div></div>';
           });
         }
+        html += '<div style="margin:16px 0 12px;font-weight:600">📜 service.log 尾部 (最后 80 行)</div>';
+        html += '<div class="debug-item"><div class="raw">' + escapeHtml(self.serviceLogTail || '(无)') + '</div></div>';
         html += '<div style="margin:16px 0 12px;font-weight:600">📊 状态检测原始数据</div>';
         FEATURES.forEach(function(g) {
           g.items.forEach(function(item) {
@@ -477,6 +619,8 @@ var app = Vue.createApp({
       text += 'Time: ' + new Date().toISOString() + '\n\n';
       text += '--- Warn/Error Logs ---\n';
       text += (self.warnLogs.length ? self.warnLogs.join('\n') : '(none)') + '\n\n';
+      text += '--- service.log Tail (last 80 lines) ---\n';
+      text += (self.serviceLogTail || '(无)') + '\n\n';
       text += '--- Feature States ---\n';
       FEATURES.forEach(function(g) {
         text += '\n[' + g.group + ']\n';

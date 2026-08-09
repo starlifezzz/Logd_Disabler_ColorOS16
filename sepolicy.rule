@@ -1,0 +1,32 @@
+# ================================================================
+# KernelSU SELinux 规则注入 (sepolicy.rule)
+# 由 KernelSU 在 post-fs-data 阶段自动加载 (无需手动调用 ksud sepolicy)
+# ================================================================
+# 目的：允许 su/ksu/magisk 域通过 servicemanager 查找并调用
+#       package (PackageManagerService) 等系统服务，
+#       否则 pm disable-user / pm enable 会报:
+#       "cmd: Can't find service: package"
+# ================================================================
+
+# --- binder 调用 servicemanager（服务注册表） ---
+allow su servicemanager binder { call transfer }
+allow su servicemanager service_manager { find }
+allow ksu servicemanager binder { call transfer }
+allow ksu servicemanager service_manager { find }
+allow magisk servicemanager binder { call transfer }
+allow magisk servicemanager service_manager { find }
+
+# --- binder 调用 system_server（PackageManagerService 所在进程） ---
+allow su system_server binder { call transfer }
+allow ksu system_server binder { call transfer }
+allow magisk system_server binder { call transfer }
+
+# --- 访问 package 服务相关 type ---
+allow su system_server service_manager { find }
+allow ksu system_server service_manager { find }
+allow magisk system_server service_manager { find }
+
+# --- 补充：允许读取系统属性以支持 getprop/setprop ---
+allow su system_prop property_service { find read set }
+allow ksu system_prop property_service { find read set }
+allow magisk system_prop property_service { find read set }

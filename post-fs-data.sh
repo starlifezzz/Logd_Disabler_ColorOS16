@@ -27,30 +27,21 @@ fi
 
 # ===================== SELinux 规则注入 =====================
 # 【关键修复】允许 late_start service 执行 pm disable-user / pm uninstall
-# 这些规则在 post-fs-data 阶段注入，确保 service.sh 阶段有权限
-# 注意：实际执行 pm 的进程是 su/magisk/shell 域，目标 type 是 servicemanager（binder 服务注册表）
-#      以及 system_server（PackageManagerService 所在进程）
-log "[SELinux] 注入包管理相关规则..."
+# 注意：正确做法是使用模块自带的 sepolicy.rule 文件（KernelSU 在
+#       post-fs-data 阶段自动加载，无需手动调用 ksud sepolicy）。
+#       KernelSU v3.2.4 的 ksud sepolicy 子命令没有 --live 参数！
+#       （CLI 只有 Patch/Apply/Check，Patch 即实时生效）
+#       旧版此处写 "ksud sepolicy --live ..." 会导致参数解析失败，
+#       所有规则静默注入失败 → service.sh 中 pm 全部报 "Can't find service: package"
+log "[SELinux] 规则由模块 sepolicy.rule 自动注入（KernelSU 官方机制）"
 
-# KernelSU 的 ksud sepolicy 需要 --live 参数实时生效
-# Magisk 的 magiskpolicy 使用 --live 参数
+# 验证 ksud 存在（仅记录，不再手动注入）
 if [ -f "/data/adb/ksu/bin/ksud" ]; then
-    KSU_POLICY="/data/adb/ksu/bin/ksud sepolicy --live"
-elif [ -f "/data/adb/magisk/magiskpolicy" ]; then
-    KSU_POLICY="/data/adb/magisk/magiskpolicy --live"
-fi
-
-if [ -n "$KSU_POLICY" ]; then
-    # 允许 su/magisk/shell 域通过 servicemanager 查找并调用 PMS binder
-    $KSU_POLICY "allow su servicemanager binder { call transfer }" 2>/dev/null
-    $KSU_POLICY "allow su system_server binder { call transfer }" 2>/dev/null
-    $KSU_POLICY "allow magisk servicemanager binder { call transfer }" 2>/dev/null
-    $KSU_POLICY "allow magisk system_server binder { call transfer }" 2>/dev/null
-    $KSU_POLICY "allow shell servicemanager binder { call transfer }" 2>/dev/null
-    $KSU_POLICY "allow shell system_server binder { call transfer }" 2>/dev/null
-    log "[SELinux] 规则注入完成"
+    log "[SELinux] 检测到 ksud，sepolicy.rule 将由 ksud 在 post-fs-data 自动加载"
+elif [ -f "/data/adb/ksu/ksud" ]; then
+    log "[SELinux] 检测到 ksud(备用路径)，sepolicy.rule 将由 ksud 在 post-fs-data 自动加载"
 else
-    log "[SELinux] 未找到 sepolicy 工具，跳过"
+    log "[SELinux] 未找到 ksud，请确认 KernelSU 安装正常"
 fi
 
 # ===================== Logd 禁用 =====================
