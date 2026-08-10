@@ -94,8 +94,25 @@ if [ "$PMS_READY" != "1" ]; then
 fi
 
 # 禁用包：优先 pm disable-user，失败则 fallback 到 pm uninstall
+# 第二个参数为可选白名单属性名（如 disable_ai_assistants_keep），
+# 若该包在属性值（逗号分隔）中则跳过禁用——用于支持 WebUI 单独启用子包。
 disable_pkg() {
     local pkg="$1"
+    local keep_prop="$2"
+    # 【子包白名单】用户在 WebUI 单独启用（不禁用）的包
+    if [ -n "$keep_prop" ]; then
+        local keep_val
+        keep_val=$(getprop "${PROP_PREFIX}${keep_prop}" 2>/dev/null)
+        if [ -n "$keep_val" ]; then
+            local k
+            for k in $(echo "$keep_val" | tr ',' ' '); do
+                if [ "$k" = "$pkg" ]; then
+                    log "  ⏭️ 跳过（WebUI 白名单保留）: $pkg"
+                    return 0
+                fi
+            done
+        fi
+    fi
     # 检查包是否存在（对 user 0 可见；已禁用/卸载的也会被 pm list --user 0 过滤掉）
     if ! pmx pm list packages --user 0 | grep -qF "$pkg"; then
         log "  ⏭️ 跳过（不存在或已禁用/卸载）: $pkg"
@@ -201,16 +218,17 @@ if [ "$(getprop ${PROP_PREFIX}block_ota)" = "true" ]; then
     pkill -9 -x update_engine 2>/dev/null
     setprop ctl.stop update_engine 2>/dev/null
     # 依据 services.txt：一加Ace5 真实存在的 OTA 相关包
-    disable_pkg "com.oplus.ota"
-    disable_pkg "com.oplus.sau"
-    disable_pkg "com.oplus.cota"
-    disable_pkg "com.oplus.romupdate"
-    disable_pkg "com.oplus.upgradeguide"
+    disable_pkg "com.oplus.ota" "block_ota_keep"
+    disable_pkg "com.oplus.sau" "block_ota_keep"
+    disable_pkg "com.oplus.cota" "block_ota_keep"
+    disable_pkg "com.oplus.romupdate" "block_ota_keep"
+    disable_pkg "com.oplus.upgradeguide" "block_ota_keep"
     setprop persist.ota.auto_download 0
     setprop persist.sys.recovery_update 0
     setprop persist.sys.ota.disabled 1
     log "[OTA] 完成"
 else
+    setprop ${PROP_PREFIX}block_ota_keep ""
     log "[OTA] 关闭：启用包 + 恢复属性..."
     enable_pkg "com.oplus.ota"
     enable_pkg "com.oplus.sau"
@@ -259,11 +277,12 @@ if [ "$(getprop ${PROP_PREFIX}block_ads_and_tracking)" = "true" ]; then
     setprop persist.ad.track 0
     setprop persist.sys.usage_stat_enable 0
     setprop persist.oppo.collect 0
-    disable_pkg "com.oplus.statistics.rom"
-    disable_pkg "com.coloros.assistantscreen"
-    disable_pkg "com.coloros.sceneservice"
+    disable_pkg "com.oplus.statistics.rom" "block_ads_and_tracking_keep"
+    disable_pkg "com.coloros.assistantscreen" "block_ads_and_tracking_keep"
+    disable_pkg "com.coloros.sceneservice" "block_ads_and_tracking_keep"
     log "[Ads] 完成"
 else
+    setprop ${PROP_PREFIX}block_ads_and_tracking_keep ""
     log "[Ads] 关闭：恢复广告与数据收集..."
     settings put global oppo_ad_enabled 1 2>/dev/null
     settings put secure oppo_ad_personalization 1 2>/dev/null
@@ -376,8 +395,9 @@ fi
 # 9. 健康服务
 if [ "$(getprop ${PROP_PREFIX}disable_health_services)" = "true" ]; then
     log "[Health] 禁用..."
-    disable_pkg "com.oplus.healthservice"
+    disable_pkg "com.oplus.healthservice" "disable_health_services_keep"
 else
+    setprop ${PROP_PREFIX}disable_health_services_keep ""
     log "[Health] 恢复..."
     enable_pkg "com.oplus.healthservice"
 fi
@@ -385,9 +405,10 @@ fi
 # 10. 流量监控
 if [ "$(getprop ${PROP_PREFIX}disable_network_monitoring)" = "true" ]; then
     log "[NetMon] 禁用..."
-    disable_pkg "com.oplus.trafficmonitor"
-    disable_pkg "com.oplus.dmp"
+    disable_pkg "com.oplus.trafficmonitor" "disable_network_monitoring_keep"
+    disable_pkg "com.oplus.dmp" "disable_network_monitoring_keep"
 else
+    setprop ${PROP_PREFIX}disable_network_monitoring_keep ""
     log "[NetMon] 恢复..."
     enable_pkg "com.oplus.trafficmonitor"
     enable_pkg "com.oplus.dmp"
@@ -396,9 +417,10 @@ fi
 # 11. 锁屏杂志
 if [ "$(getprop ${PROP_PREFIX}disable_lockscreen_magazine)" = "true" ]; then
     log "[LockMag] 禁用..."
-    disable_pkg "com.heytap.pictorial"
+    disable_pkg "com.heytap.pictorial" "disable_lockscreen_magazine_keep"
     setprop persist.sys.lockscreen_magazine 0
 else
+    setprop ${PROP_PREFIX}disable_lockscreen_magazine_keep ""
     log "[LockMag] 恢复..."
     enable_pkg "com.heytap.pictorial"
     setprop persist.sys.lockscreen_magazine 1
@@ -407,8 +429,9 @@ fi
 # 12. 游戏空间
 if [ "$(getprop ${PROP_PREFIX}disable_gamespace)" = "true" ]; then
     log "[GameSpace] 禁用..."
-    disable_pkg "com.oplus.games"
+    disable_pkg "com.oplus.games" "disable_gamespace_keep"
 else
+    setprop ${PROP_PREFIX}disable_gamespace_keep ""
     log "[GameSpace] 恢复..."
     enable_pkg "com.oplus.games"
 fi
@@ -416,9 +439,10 @@ fi
 # 13. 钱包
 if [ "$(getprop ${PROP_PREFIX}disable_wallet_services)" = "true" ]; then
     log "[Wallet] 禁用..."
-    disable_pkg "com.oplus.pay"
-    disable_pkg "com.coloros.securepay"
+    disable_pkg "com.oplus.pay" "disable_wallet_services_keep"
+    disable_pkg "com.coloros.securepay" "disable_wallet_services_keep"
 else
+    setprop ${PROP_PREFIX}disable_wallet_services_keep ""
     log "[Wallet] 恢复..."
     enable_pkg "com.oplus.pay"
     enable_pkg "com.coloros.securepay"
@@ -427,9 +451,10 @@ fi
 # 14. 备份
 if [ "$(getprop ${PROP_PREFIX}disable_backup_services)" = "true" ]; then
     log "[Backup] 禁用..."
-    disable_pkg "com.oplus.wifibackuprestore"
-    disable_pkg "com.heytap.cloud"
+    disable_pkg "com.oplus.wifibackuprestore" "disable_backup_services_keep"
+    disable_pkg "com.heytap.cloud" "disable_backup_services_keep"
 else
+    setprop ${PROP_PREFIX}disable_backup_services_keep ""
     log "[Backup] 恢复..."
     enable_pkg "com.oplus.wifibackuprestore"
     enable_pkg "com.heytap.cloud"
@@ -438,14 +463,16 @@ fi
 # 15. AI 助手
 if [ "$(getprop ${PROP_PREFIX}disable_ai_assistants)" = "true" ]; then
     log "[AI] 禁用..."
-    disable_pkg "com.oplus.aimemory"
-    disable_pkg "com.oplus.aiunit"
-    disable_pkg "com.oplus.aiwidgets"
-    disable_pkg "com.oplus.aiwriter"
-    disable_pkg "com.oplus.metis"
-    disable_pkg "com.oplus.obrain"
+    disable_pkg "com.oplus.aimemory" "disable_ai_assistants_keep"
+    disable_pkg "com.oplus.aiunit" "disable_ai_assistants_keep"
+    disable_pkg "com.oplus.aiwidgets" "disable_ai_assistants_keep"
+    disable_pkg "com.oplus.aiwriter" "disable_ai_assistants_keep"
+    disable_pkg "com.oplus.metis" "disable_ai_assistants_keep"
+    disable_pkg "com.oplus.obrain" "disable_ai_assistants_keep"
 else
     log "[AI] 恢复..."
+    # 恢复全部时清除子包白名单，避免下次开启时残留保留项
+    setprop ${PROP_PREFIX}disable_ai_assistants_keep ""
     enable_pkg "com.oplus.aimemory"
     enable_pkg "com.oplus.aiunit"
     enable_pkg "com.oplus.aiwidgets"
@@ -457,11 +484,12 @@ fi
 # 16. 语音助手
 if [ "$(getprop ${PROP_PREFIX}disable_voice_assistants)" = "true" ]; then
     log "[Voice] 禁用..."
-    disable_pkg "com.oplus.ovoicemanager"
-    disable_pkg "com.oplus.ovoicemanager.wakeup"
-    disable_pkg "com.heytap.speechassist"
-    disable_pkg "com.oplus.ttsaccessibilityengine"
+    disable_pkg "com.oplus.ovoicemanager" "disable_voice_assistants_keep"
+    disable_pkg "com.oplus.ovoicemanager.wakeup" "disable_voice_assistants_keep"
+    disable_pkg "com.heytap.speechassist" "disable_voice_assistants_keep"
+    disable_pkg "com.oplus.ttsaccessibilityengine" "disable_voice_assistants_keep"
 else
+    setprop ${PROP_PREFIX}disable_voice_assistants_keep ""
     log "[Voice] 恢复..."
     enable_pkg "com.oplus.ovoicemanager"
     enable_pkg "com.oplus.ovoicemanager.wakeup"
@@ -472,14 +500,15 @@ fi
 # 17. 主题
 if [ "$(getprop ${PROP_PREFIX}disable_theme_services)" = "true" ]; then
     log "[Theme] 禁用..."
-    disable_pkg "com.oplus.themestore"
-    disable_pkg "com.heytap.themestore"
-    disable_pkg "com.oplus.keyguard.clock.magazine"
-    disable_pkg "com.oplus.keyguard.clock.gallery"
-    disable_pkg "com.oplus.keyguard.clock.graffiti"
-    disable_pkg "com.oplus.keyguard.personality.clocks"
-    disable_pkg "com.oplus.keyguard.style.widgets"
+    disable_pkg "com.oplus.themestore" "disable_theme_services_keep"
+    disable_pkg "com.heytap.themestore" "disable_theme_services_keep"
+    disable_pkg "com.oplus.keyguard.clock.magazine" "disable_theme_services_keep"
+    disable_pkg "com.oplus.keyguard.clock.gallery" "disable_theme_services_keep"
+    disable_pkg "com.oplus.keyguard.clock.graffiti" "disable_theme_services_keep"
+    disable_pkg "com.oplus.keyguard.personality.clocks" "disable_theme_services_keep"
+    disable_pkg "com.oplus.keyguard.style.widgets" "disable_theme_services_keep"
 else
+    setprop ${PROP_PREFIX}disable_theme_services_keep ""
     log "[Theme] 恢复..."
     enable_pkg "com.oplus.themestore"
     enable_pkg "com.heytap.themestore"
@@ -493,12 +522,13 @@ fi
 # 18. 网络优化
 if [ "$(getprop ${PROP_PREFIX}disable_network_optimization)" = "true" ]; then
     log "[NetOpt] 禁用..."
-    disable_pkg "com.oplus.networksense"
-    disable_pkg "com.oplus.cellularqoe"
-    disable_pkg "com.oplus.tai.wifiqoe"
-    disable_pkg "com.oplus.tai.borderpresearch"
-    disable_pkg "com.oplus.nearcomm"
+    disable_pkg "com.oplus.networksense" "disable_network_optimization_keep"
+    disable_pkg "com.oplus.cellularqoe" "disable_network_optimization_keep"
+    disable_pkg "com.oplus.tai.wifiqoe" "disable_network_optimization_keep"
+    disable_pkg "com.oplus.tai.borderpresearch" "disable_network_optimization_keep"
+    disable_pkg "com.oplus.nearcomm" "disable_network_optimization_keep"
 else
+    setprop ${PROP_PREFIX}disable_network_optimization_keep ""
     log "[NetOpt] 恢复..."
     enable_pkg "com.oplus.networksense"
     enable_pkg "com.oplus.cellularqoe"
@@ -510,9 +540,10 @@ fi
 # 19. 安全
 if [ "$(getprop ${PROP_PREFIX}disable_security_services)" = "true" ]; then
     log "[Security] 禁用..."
-    disable_pkg "com.oplus.securitykeyboard"
-    disable_pkg "com.coloros.securityguard"
+    disable_pkg "com.oplus.securitykeyboard" "disable_security_services_keep"
+    disable_pkg "com.coloros.securityguard" "disable_security_services_keep"
 else
+    setprop ${PROP_PREFIX}disable_security_services_keep ""
     log "[Security] 恢复..."
     enable_pkg "com.oplus.securitykeyboard"
     enable_pkg "com.coloros.securityguard"
@@ -521,10 +552,11 @@ fi
 # 20. 多媒体
 if [ "$(getprop ${PROP_PREFIX}disable_media_services)" = "true" ]; then
     log "[Media] 禁用..."
-    disable_pkg "com.oplus.screenrecorder"
-    disable_pkg "com.coloros.karaoke"
-    disable_pkg "com.oplus.mediacontroller"
+    disable_pkg "com.oplus.screenrecorder" "disable_media_services_keep"
+    disable_pkg "com.coloros.karaoke" "disable_media_services_keep"
+    disable_pkg "com.oplus.mediacontroller" "disable_media_services_keep"
 else
+    setprop ${PROP_PREFIX}disable_media_services_keep ""
     log "[Media] 恢复..."
     enable_pkg "com.oplus.screenrecorder"
     enable_pkg "com.coloros.karaoke"
@@ -535,15 +567,16 @@ fi
 # 注意：com.oplus.appplatform（应用服务）涉及短信收发，永不禁用（v1.6 移除）
 if [ "$(getprop ${PROP_PREFIX}disable_system_tools)" = "true" ]; then
     log "[SysTools] 禁用..."
-    disable_pkg "com.oplus.powermonitor"
-    disable_pkg "com.oplus.audiomonitor"
-    disable_pkg "com.oplus.logkit"
-    disable_pkg "com.oplus.engineermode"
-    disable_pkg "com.oplus.crashbox"
-    disable_pkg "com.oplus.contentportal"
-    disable_pkg "com.oplus.postmanservice"
-    disable_pkg "com.oplus.subsys"
+    disable_pkg "com.oplus.powermonitor" "disable_system_tools_keep"
+    disable_pkg "com.oplus.audiomonitor" "disable_system_tools_keep"
+    disable_pkg "com.oplus.logkit" "disable_system_tools_keep"
+    disable_pkg "com.oplus.engineermode" "disable_system_tools_keep"
+    disable_pkg "com.oplus.crashbox" "disable_system_tools_keep"
+    disable_pkg "com.oplus.contentportal" "disable_system_tools_keep"
+    disable_pkg "com.oplus.postmanservice" "disable_system_tools_keep"
+    disable_pkg "com.oplus.subsys" "disable_system_tools_keep"
 else
+    setprop ${PROP_PREFIX}disable_system_tools_keep ""
     log "[SysTools] 恢复..."
     enable_pkg "com.oplus.powermonitor"
     enable_pkg "com.oplus.audiomonitor"
