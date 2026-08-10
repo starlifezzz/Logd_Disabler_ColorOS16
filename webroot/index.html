@@ -26,9 +26,11 @@ body{background:var(--mdui-color-surface);color:var(--mdui-color-on-surface);mar
 .app-logo mdui-icon{font-size:22px}
 .app-sub{font-size:12px;color:var(--mdui-color-on-surface-variant);font-weight:400}
 /* ===== 分组卡片头 ===== */
-.group-header{display:flex;align-items:center;gap:10px;padding:14px 20px 6px}
-.group-ico{display:inline-flex;align-items:center;justify-content:center;width:30px;height:30px;border-radius:8px;background:rgba(var(--mdui-color-secondary-container),.6);color:rgb(var(--mdui-color-on-secondary-container));flex-shrink:0}
-.group-ico mdui-icon{font-size:18px}
+/* padding-left:12px 与 mdui-list-item container(0.75rem=12px) 左对齐，父项图标与子项图标同竖线 */
+.group-header{display:flex;align-items:center;gap:10px;padding:14px 12px 6px}
+/* 父项图标与子项 item-icon 同尺寸（36px/20px），保证视觉中心在一条线上 */
+.group-ico{display:inline-flex;align-items:center;justify-content:center;width:36px;height:36px;border-radius:10px;background:rgba(var(--mdui-color-secondary-container),.6);color:rgb(var(--mdui-color-on-secondary-container));flex-shrink:0}
+.group-ico mdui-icon{font-size:20px}
 .group-name{font-size:14px;font-weight:600;color:var(--mdui-color-primary);flex:1}
 .group-count{font-size:12px;color:var(--mdui-color-on-surface-variant);background:var(--mdui-color-surface-variant);padding:2px 10px;border-radius:100px}
 /* ===== 列表项左侧图标 ===== */
@@ -41,7 +43,6 @@ body{background:var(--mdui-color-surface);color:var(--mdui-color-on-surface);mar
 .progress-row{display:flex;align-items:center;gap:12px;margin-bottom:16px}
 .progress-row mdui-linear-progress{flex:1}
 .progress-text{font-size:12px;color:var(--mdui-color-on-surface-variant);white-space:nowrap}
-.banner{margin-bottom:16px;display:flex;align-items:flex-start;gap:8px;padding:12px 14px;border-radius:8px;background:rgba(var(--mdui-color-tertiary-container),.5);color:rgb(var(--mdui-color-on-tertiary-container));font-size:13px;line-height:1.5}
 .card-gap{margin-bottom:16px;display:block;width:100%;box-sizing:border-box}
 /* mdui-card 默认 inline-block，强制占满容器宽度（与功能卡片保持一致） */
 mdui-card{width:100%}
@@ -56,9 +57,30 @@ mdui-card{width:100%}
 .debug-item .v{margin-top:4px;word-break:break-all}
 .debug-item .raw{margin-top:6px;padding:6px 8px;border-radius:6px;background:rgba(128,128,128,.08);color:var(--mdui-color-on-surface-variant);font-size:10px;white-space:pre-wrap;word-break:break-all}
 .dlg-body{max-height:70vh;overflow-y:auto}
+/* mdui-dialog 居中修复：
+   原理：host 是 position:fixed + inset:0（left/right 均为 0），我们内联设置了固定 width。
+   此时 left:0 + width 优先、right:0 被忽略 → host 贴左，panel 随之偏左。
+   外部 margin:0 auto 覆盖：在 left:0/right:0 均有值 + width 固定时，fixed 元素水平居中于视口。 */
+mdui-dialog{margin:0 auto !important}
+mdui-dialog .dlg-body{max-height:56vh}
+/* Debug 面板内容撑宽：panel 宽度随内容自适应（max-width:35rem=560px），长文本自然撑开 */
+mdui-dialog .dlg-header, mdui-dialog .dlg-body, mdui-dialog .dlg-actions{width:100%;box-sizing:border-box}
 .dlg-header{display:flex;align-items:center;justify-content:space-between;padding:16px 20px 0;font-size:16px;font-weight:500}
 .dlg-actions{display:flex;justify-content:flex-end;gap:4px;padding:12px 20px}
 .footer{text-align:center;padding:20px 16px;font-size:12px;color:var(--mdui-color-on-surface-variant)}
+/* ===== 日志页 ===== */
+.log-page-body{padding:8px 16px 16px}
+.log-actions{display:flex;justify-content:flex-end;gap:8px;padding-top:12px}
+/* ===== 关于页 ===== */
+.about-tips{padding:8px 20px 16px;display:flex;flex-direction:column;gap:10px}
+.tip-row{font-size:13px;line-height:1.6;color:var(--mdui-color-on-surface-variant);padding:10px 12px;border-radius:8px;background:rgba(var(--mdui-color-surface-container-high),.5)}
+.tip-row b{color:var(--mdui-color-on-surface)}
+/* ===== GitHub 页（预留） ===== */
+.gh-profile{display:flex;flex-direction:column;align-items:center;gap:8px;padding:32px 20px;text-align:center}
+.gh-avatar{--mdui-avatar-background:var(--mdui-color-primary);color:#fff;font-size:28px;font-weight:600}
+.gh-name{font-size:18px;font-weight:600;margin-top:6px}
+.gh-bio{font-size:13px;color:var(--mdui-color-on-surface-variant);line-height:1.6}
+.gh-links{display:flex;gap:8px;margin-top:12px}
 .hidden{display:none!important}
 mdui-list-item{--mdui-list-item-container-shape:12px}
 /* ===== 统一 list-item 与折叠项(agg-header)高度为 48px，保证右侧开关垂直对齐 =====
@@ -83,8 +105,8 @@ mdui-list-item::part(body){justify-content:center;gap:0}
    负 margin-top 让折叠项标题与未折叠项 headline 同基线；switch 不受影响(独立 flex 子项) */
 .agg-title{flex:1;min-width:0;margin-top:-8px}
 .agg-title-main{font-size:15px;font-weight:500;color:var(--mdui-color-on-surface);display:flex;align-items:center;gap:4px}
-.agg-item-icon{display:inline-flex;align-items:center;justify-content:center;width:30px;height:30px;border-radius:8px;background:rgba(var(--mdui-color-surface-container-high),.8);color:var(--mdui-color-on-surface-variant);flex-shrink:0;margin-right:4px}
-.agg-item-icon mdui-icon{font-size:17px}
+.agg-item-icon{display:inline-flex;align-items:center;justify-content:center;width:36px;height:36px;border-radius:10px;background:rgba(var(--mdui-color-surface-container-high),.8);color:var(--mdui-color-on-surface-variant);flex-shrink:0;margin-right:4px}
+.agg-item-icon mdui-icon{font-size:20px}
 .agg-chevron{display:inline-flex;align-items:center;flex-shrink:0;color:var(--mdui-color-on-surface-variant);margin-left:2px}
 .agg-chevron mdui-icon{font-size:18px;transition:transform .25s cubic-bezier(.4,0,.2,1);transform:rotate(0deg)}
 .agg-chevron.open mdui-icon{transform:rotate(90deg)}
@@ -100,8 +122,7 @@ mdui-list-item::part(body){justify-content:center;gap:0}
 .agg-pkg-name{font-size:13px;font-weight:500;color:var(--mdui-color-on-surface);display:block}
 .agg-pkg-code{font-family:monospace;font-size:11px;color:var(--mdui-color-on-surface-variant);word-break:break-all;display:block;margin-top:1px}
 .agg-pkg-ops{display:flex;align-items:center;gap:6px;flex-shrink:0}
-.agg-detail-btn{display:inline-flex;align-items:center;gap:2px;padding:3px 8px;font-size:11px;border:none;border-radius:6px;background:rgba(var(--mdui-color-secondary-container),.5);color:rgb(var(--mdui-color-on-secondary-container));cursor:pointer;transition:background .15s}
-.agg-detail-btn:active{opacity:.7}
+.pkg-info-btn{--mdui-button-icon-container-size:28px;--mdui-button-icon-icon-size:16px;color:var(--mdui-color-on-surface-variant);flex-shrink:0}
 .agg-group-actions{display:flex;align-items:center;justify-content:flex-end;gap:8px;padding:6px 4px 2px;border-top:1px dashed var(--mdui-color-surface-variant);margin-top:6px}
 .agg-group-btn{display:inline-flex;align-items:center;gap:4px;padding:5px 12px;font-size:12px;font-weight:500;border:none;border-radius:100px;cursor:pointer;transition:background .15s}
 .agg-group-btn.all{background:rgba(var(--mdui-color-primary),.1);color:rgb(var(--mdui-color-primary))}
@@ -127,16 +148,12 @@ mdui-list-item::part(body){justify-content:center;gap:0}
     </div>
   </mdui-top-app-bar>
 
-  <div class="page">
+  <!-- ========== 优化页（主页） ========== -->
+  <div class="page" v-show="currentPage==='home'">
     <!-- 进度条 -->
     <div class="progress-row" v-if="checking">
       <mdui-linear-progress :value="progress" style="flex:1"></mdui-linear-progress>
       <span class="progress-text">正在检测 {{ progress }}%</span>
-    </div>
-
-    <!-- 提示横幅（20 秒后自动隐藏） -->
-    <div class="banner" v-if="bannerVisible">
-      <span>开关 <b>主色=已禁用/已优化</b>，<b>灰色=未禁用/系统默认</b>。展开聚合项可<b>单独禁用/恢复子包</b>（即时生效），父级开关控制整组（重启后完全生效）。</span>
     </div>
 
     <!-- 功能分组卡片 -->
@@ -167,7 +184,7 @@ mdui-list-item::part(body){justify-content:center;gap:0}
           </mdui-list-item>
         </mdui-list>
 
-        <!-- 单包聚合项：无需折叠，直接渲染为独立行（标题+状态+开关+详情） -->
+        <!-- 单包聚合项：无需折叠，直接渲染为独立行（标题+状态+开关） -->
         <mdui-list v-if="groupSinglePkg(group).length">
           <mdui-list-item
             v-for="item in groupSinglePkg(group)"
@@ -178,7 +195,7 @@ mdui-list-item::part(body){justify-content:center;gap:0}
             <div slot="headline">{{ item.title }}</div>
             <div slot="description">{{ item.subNames && item.subNames[0] ? item.subNames[0] : item.desc }}</div>
             <span slot="end-icon" style="display:flex;align-items:center;gap:8px">
-              <button class="agg-detail-btn" @click.stop="showPkgDetail(item, item.pkgs[0], 0)">详情</button>
+              <mdui-button-icon class="pkg-info-btn" icon="info--outlined" @click.stop="showPkgDetail(item, item.pkgs[0], 0)"></mdui-button-icon>
               <span class="switch-wrap">
                 <mdui-switch :checked="state[item.key].enabled" :disabled="state[item.key].loading" @click.stop @change="onSwitchChange(item, $event)"></mdui-switch>
                 <span v-if="!state[item.key].enabled" class="opt-hint">未优化</span>
@@ -195,7 +212,7 @@ mdui-list-item::part(body){justify-content:center;gap:0}
             :value="item.key"
             :disabled="state[item.key].loading"
           >
-            <!-- header：标题 + 数量徽章 + 箭头标识 + 状态徽标 + 开关（箭头在右侧，标题起点与 list-item 对齐） -->
+            <!-- header：标题 + 图标 + 箭头 + 开关 -->
             <div slot="header" class="agg-header" :class="{opened: isOpen(item.key)}">
               <div class="agg-title">
                 <div class="agg-title-main"><span class="agg-item-icon"><mdui-icon :name="item.icon"></mdui-icon></span>{{ item.title }}<span class="agg-chevron" :class="{open: isOpen(item.key)}"><mdui-icon name="chevron_right--outlined"></mdui-icon></span></div>
@@ -216,7 +233,7 @@ mdui-list-item::part(body){justify-content:center;gap:0}
                     <span class="agg-pkg-code">{{ p }}</span>
                   </div>
                   <div class="agg-pkg-ops">
-                    <button class="agg-detail-btn" @click="showPkgDetail(item, p, idx)">详情</button>
+                    <mdui-button-icon class="pkg-info-btn" icon="info--outlined" @click="showPkgDetail(item, p, idx)"></mdui-button-icon>
                     <span class="switch-wrap">
                       <mdui-switch :checked="pkgStateDisabled(item.key, p)" @change="onPkgSwitch(item, p, $event)"></mdui-switch>
                       <span v-if="!pkgStateDisabled(item.key, p)" class="opt-hint">未优化</span>
@@ -235,14 +252,34 @@ mdui-list-item::part(body){justify-content:center;gap:0}
         </mdui-collapse>
       </mdui-card>
     </template>
+  </div>
 
-    <!-- 模块信息 -->
+  <!-- ========== 日志页 ========== -->
+  <div class="page" v-show="currentPage==='log'">
     <mdui-card class="card-gap" variant="elevated">
-      <mdui-list>
-        <div class="group-header">
-          <span class="group-ico"><mdui-icon name="info--outlined"></mdui-icon></span>
-          <span class="group-name">模块信息</span>
+      <div class="group-header">
+        <span class="group-ico"><mdui-icon name="receipt_long--outlined"></mdui-icon></span>
+        <span class="group-name">操作日志</span>
+        <span class="group-count">{{ warnLogs.length }}</span>
+      </div>
+      <div class="log-page-body">
+        <div class="log-box">{{ logText || '暂无日志' }}</div>
+        <div class="log-actions">
+          <mdui-button variant="tonal" icon="bug_report--outlined" @click="showDebug()">Debug 面板</mdui-button>
+          <mdui-button variant="text" @click="clearLog()">清空日志</mdui-button>
         </div>
+      </div>
+    </mdui-card>
+  </div>
+
+  <!-- ========== 关于页 ========== -->
+  <div class="page" v-show="currentPage==='about'">
+    <mdui-card class="card-gap" variant="elevated">
+      <div class="group-header">
+        <span class="group-ico"><mdui-icon name="info--outlined"></mdui-icon></span>
+        <span class="group-name">模块信息</span>
+      </div>
+      <mdui-list>
         <div class="info-row"><span class="k">模块版本</span><span class="v">{{ moduleVersion }}</span></div>
         <mdui-divider></mdui-divider>
         <div class="info-row"><span class="k">KernelSU</span><span class="v">{{ ksuVersion }}</span></div>
@@ -255,33 +292,43 @@ mdui-list-item::part(body){justify-content:center;gap:0}
       </mdui-list>
     </mdui-card>
 
-    <div class="footer">Logd Disabler for ColorOS16<br>By ZhangChongjie</div>
+    <mdui-card class="card-gap" variant="elevated">
+      <div class="group-header">
+        <span class="group-ico"><mdui-icon name="tips_and_updates--outlined"></mdui-icon></span>
+        <span class="group-name">使用说明</span>
+      </div>
+      <div class="about-tips">
+        <div class="tip-row">开关 <b>主色=已禁用/已优化</b>，<b>灰色=未禁用/系统默认</b>。</div>
+        <div class="tip-row">展开聚合项可<b>单独禁用/恢复子包</b>（即时生效），父级开关控制整组（重启后完全生效）。</div>
+        <div class="tip-row">所有操作由 <b>service.sh</b> 在重启时持久化执行，属性值保存在系统属性中。</div>
+      </div>
+    </mdui-card>
   </div>
 
-  <!-- 底部导航栏（Material 3 Navigation Bar，替代悬浮按钮） -->
-  <mdui-navigation-bar class="bottom-nav" value="home">
-    <mdui-navigation-bar-item value="home" icon="speed--outlined" active-icon="speed--outlined" label="优化" @click="scrollTop"></mdui-navigation-bar-item>
-    <mdui-navigation-bar-item value="log" icon="receipt_long--outlined" active-icon="receipt_long--outlined" label="日志" @click="logOpen=true"></mdui-navigation-bar-item>
-    <mdui-navigation-bar-item value="debug" icon="bug_report--outlined" active-icon="bug_report--outlined" label="Debug" @click="showDebug()"></mdui-navigation-bar-item>
+  <!-- ========== GitHub 页 ========== -->
+  <div class="page" v-show="currentPage==='github'">
+    <mdui-card class="card-gap" variant="elevated">
+      <div class="gh-profile">
+        <mdui-avatar class="gh-avatar" size="64">Z</mdui-avatar>
+        <div class="gh-name">starlifezzz</div>
+        <div class="gh-bio">ColorOS16 优化 WebUI 模块 · KernelSU</div>
+        <div class="gh-links">
+          <mdui-button variant="tonal" icon="open_in_new--outlined" @click="openGithub()">GitHub 主页</mdui-button>
+        </div>
+      </div>
+    </mdui-card>
+  </div>
+
+  <!-- 底部导航栏（Material 3 Navigation Bar：优化 / 日志 / 关于 / GitHub） -->
+  <mdui-navigation-bar class="bottom-nav" :value="currentPage" @change="setPage($event.target.value)">
+    <mdui-navigation-bar-item value="home" icon="speed--outlined" active-icon="speed--outlined" label="优化"></mdui-navigation-bar-item>
+    <mdui-navigation-bar-item value="log" icon="receipt_long--outlined" active-icon="receipt_long--outlined" label="日志"></mdui-navigation-bar-item>
+    <mdui-navigation-bar-item value="about" icon="info--outlined" active-icon="info--outlined" label="关于"></mdui-navigation-bar-item>
+    <mdui-navigation-bar-item value="github" icon="person--outlined" active-icon="person--outlined" label="GitHub"></mdui-navigation-bar-item>
   </mdui-navigation-bar>
 
-  <!-- 日志对话框 -->
-  <mdui-dialog :open="logOpen" @closed="logOpen=false" close-on-esc close-on-overlay-click style="width:min(92vw,480px)">
-    <div slot="header" class="dlg-header">
-      <span>操作日志</span>
-      <mdui-button-icon icon="close--outlined" @click="logOpen=false"></mdui-button-icon>
-    </div>
-    <div class="dlg-body">
-      <div class="log-box">{{ logText || '暂无日志' }}</div>
-    </div>
-    <div slot="action" class="dlg-actions">
-      <mdui-button variant="text" @click="clearLog()">清空</mdui-button>
-      <mdui-button variant="tonal" @click="logOpen=false">关闭</mdui-button>
-    </div>
-  </mdui-dialog>
-
   <!-- Debug 对话框 -->
-  <mdui-dialog :open="debugOpen" @closed="debugOpen=false" close-on-esc close-on-overlay-click style="width:min(92vw,520px)">
+  <mdui-dialog :open="debugOpen" @closed="debugOpen=false" close-on-esc close-on-overlay-click style="width:min(92vw,560px)">
     <div slot="header" class="dlg-header">
       <span>Debug 面板</span>
       <mdui-button-icon icon="close--outlined" @click="debugOpen=false"></mdui-button-icon>
@@ -294,7 +341,7 @@ mdui-list-item::part(body){justify-content:center;gap:0}
   </mdui-dialog>
 
   <!-- 包详情对话框 -->
-  <mdui-dialog :open="pkgDetailOpen" @closed="pkgDetailOpen=false" close-on-esc close-on-overlay-click style="width:min(92vw,440px)">
+  <mdui-dialog :open="pkgDetailOpen" @closed="pkgDetailOpen=false" close-on-esc close-on-overlay-click style="width:min(92vw,480px)">
     <div slot="header" class="dlg-header">
       <span>包详情</span>
       <mdui-button-icon icon="close--outlined" @click="pkgDetailOpen=false"></mdui-button-icon>
@@ -521,7 +568,6 @@ var app = Vue.createApp({
       pkgStates: pkgSt,
       logLines: [],
       warnLogs: [],
-      logOpen: false,
       debugOpen: false,
       debugHtml: '',
       serviceLogTail: '',
@@ -531,13 +577,13 @@ var app = Vue.createApp({
       pkgDetailPkg: '',
       pkgDetailGroup: '',
       pkgDetailState: '',
-      bannerVisible: true,
       openItem: '',
       checking: false,
       progress: 0,
       moduleVersion: 'v1.4',
       ksuVersion: 'KernelSU',
-      selinuxStatus: '检测中...'
+      selinuxStatus: '检测中...',
+      currentPage: 'home'
     };
   },
   computed: {
@@ -563,6 +609,15 @@ var app = Vue.createApp({
     // ---------- 日志 ----------
     scrollTop: function() {
       window.scrollTo({ top: 0, behavior: 'smooth' });
+    },
+    // 页面切换（纯展示：底部导航切页，不影响任何操作逻辑）
+    setPage: function(p) {
+      this.currentPage = p;
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    },
+    // 打开 GitHub 主页（项目仓库）
+    openGithub: function() {
+      window.open('https://github.com/starlifezzz/Logd_Disabler_ColorOS16', '_blank');
     },
     addLog: function(msg, level) {
       level = level || 'info';
@@ -983,8 +1038,6 @@ var app = Vue.createApp({
       var v = r.stdout.trim();
       self.ksuVersion = v || 'KernelSU';
     });
-    // 提示横幅 20 秒后自动隐藏
-    setTimeout(function() { self.bannerVisible = false; }, 20000);
     this.refreshAll();
   }
 });
