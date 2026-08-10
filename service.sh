@@ -414,26 +414,16 @@ else
     enable_pkg "com.oplus.dmp"
 fi
 
-# 11. 锁屏杂志
-if [ "$(getprop ${PROP_PREFIX}disable_lockscreen_magazine)" = "true" ]; then
-    log "[LockMag] 禁用..."
-    disable_pkg "com.heytap.pictorial" "disable_lockscreen_magazine_keep"
-    setprop persist.sys.lockscreen_magazine 0
-else
-    setprop ${PROP_PREFIX}disable_lockscreen_magazine_keep ""
-    log "[LockMag] 恢复..."
-    enable_pkg "com.heytap.pictorial"
-    setprop persist.sys.lockscreen_magazine 1
-fi
-
 # 12. 游戏空间
 if [ "$(getprop ${PROP_PREFIX}disable_gamespace)" = "true" ]; then
     log "[GameSpace] 禁用..."
     disable_pkg "com.oplus.games" "disable_gamespace_keep"
+    disable_pkg "com.oplus.cosa" "disable_gamespace_keep"
 else
     setprop ${PROP_PREFIX}disable_gamespace_keep ""
     log "[GameSpace] 恢复..."
     enable_pkg "com.oplus.games"
+    enable_pkg "com.oplus.cosa"
 fi
 
 # 13. 钱包
@@ -460,7 +450,7 @@ else
     enable_pkg "com.heytap.cloud"
 fi
 
-# 15. AI 助手
+# 15. AI 助手（含小布识屏）
 if [ "$(getprop ${PROP_PREFIX}disable_ai_assistants)" = "true" ]; then
     log "[AI] 禁用..."
     disable_pkg "com.oplus.aimemory" "disable_ai_assistants_keep"
@@ -469,6 +459,9 @@ if [ "$(getprop ${PROP_PREFIX}disable_ai_assistants)" = "true" ]; then
     disable_pkg "com.oplus.aiwriter" "disable_ai_assistants_keep"
     disable_pkg "com.oplus.metis" "disable_ai_assistants_keep"
     disable_pkg "com.oplus.obrain" "disable_ai_assistants_keep"
+    disable_pkg "com.oplus.deepthinker" "disable_ai_assistants_keep"
+    # 小布识屏（colordirectservice）并入 AI 助手
+    disable_pkg "com.coloros.colordirectservice" "disable_ai_assistants_keep"
 else
     log "[AI] 恢复..."
     # 恢复全部时清除子包白名单，避免下次开启时残留保留项
@@ -479,6 +472,8 @@ else
     enable_pkg "com.oplus.aiwriter"
     enable_pkg "com.oplus.metis"
     enable_pkg "com.oplus.obrain"
+    enable_pkg "com.oplus.deepthinker"
+    enable_pkg "com.coloros.colordirectservice"
 fi
 
 # 16. 语音助手
@@ -497,7 +492,7 @@ else
     enable_pkg "com.oplus.ttsaccessibilityengine"
 fi
 
-# 17. 主题
+# 17. 主题（含锁屏杂志）
 if [ "$(getprop ${PROP_PREFIX}disable_theme_services)" = "true" ]; then
     log "[Theme] 禁用..."
     disable_pkg "com.oplus.themestore" "disable_theme_services_keep"
@@ -507,6 +502,9 @@ if [ "$(getprop ${PROP_PREFIX}disable_theme_services)" = "true" ]; then
     disable_pkg "com.oplus.keyguard.clock.graffiti" "disable_theme_services_keep"
     disable_pkg "com.oplus.keyguard.personality.clocks" "disable_theme_services_keep"
     disable_pkg "com.oplus.keyguard.style.widgets" "disable_theme_services_keep"
+    # 锁屏杂志（乐划锁屏）并入主题服务
+    disable_pkg "com.heytap.pictorial" "disable_theme_services_keep"
+    setprop persist.sys.lockscreen_magazine 0
 else
     setprop ${PROP_PREFIX}disable_theme_services_keep ""
     log "[Theme] 恢复..."
@@ -517,6 +515,8 @@ else
     enable_pkg "com.oplus.keyguard.clock.graffiti"
     enable_pkg "com.oplus.keyguard.personality.clocks"
     enable_pkg "com.oplus.keyguard.style.widgets"
+    enable_pkg "com.heytap.pictorial"
+    setprop persist.sys.lockscreen_magazine 1
 fi
 
 # 18. 网络优化
@@ -555,12 +555,14 @@ if [ "$(getprop ${PROP_PREFIX}disable_media_services)" = "true" ]; then
     disable_pkg "com.oplus.screenrecorder" "disable_media_services_keep"
     disable_pkg "com.coloros.karaoke" "disable_media_services_keep"
     disable_pkg "com.oplus.mediacontroller" "disable_media_services_keep"
+    disable_pkg "com.oplus.mediaturbo" "disable_media_services_keep"
 else
     setprop ${PROP_PREFIX}disable_media_services_keep ""
     log "[Media] 恢复..."
     enable_pkg "com.oplus.screenrecorder"
     enable_pkg "com.coloros.karaoke"
     enable_pkg "com.oplus.mediacontroller"
+    enable_pkg "com.oplus.mediaturbo"
 fi
 
 # 21. 系统工具
@@ -575,6 +577,7 @@ if [ "$(getprop ${PROP_PREFIX}disable_system_tools)" = "true" ]; then
     disable_pkg "com.oplus.contentportal" "disable_system_tools_keep"
     disable_pkg "com.oplus.postmanservice" "disable_system_tools_keep"
     disable_pkg "com.oplus.subsys" "disable_system_tools_keep"
+    disable_pkg "com.oplus.engineernetwork" "disable_system_tools_keep"
 else
     setprop ${PROP_PREFIX}disable_system_tools_keep ""
     log "[SysTools] 恢复..."
@@ -586,6 +589,125 @@ else
     enable_pkg "com.oplus.contentportal"
     enable_pkg "com.oplus.postmanservice"
     enable_pkg "com.oplus.subsys"
+    enable_pkg "com.oplus.engineernetwork"
+fi
+
+# ===================== 22-30. 第一梯队新增服务 =====================
+# 依据：onservices.txt 运行进程排查，均为当前自启占用后台的组件
+# 由用户审核后加入，注意保持与 WebUI FEATURES 一一对应
+# 注：小布识屏(com.coloros.colordirectservice)已并入 15.AI助手
+
+# 23. 速览/负一屏支持组件
+if [ "$(getprop ${PROP_PREFIX}disable_speedview)" = "true" ]; then
+    log "[SpeedView] 禁用..."
+    disable_pkg "com.coloros.ocs.opencapabilityservice" "disable_speedview_keep"
+else
+    setprop ${PROP_PREFIX}disable_speedview_keep ""
+    log "[SpeedView] 恢复..."
+    enable_pkg "com.coloros.ocs.opencapabilityservice"
+fi
+
+# 24. 应用恢复服务
+if [ "$(getprop ${PROP_PREFIX}disable_app_recover)" = "true" ]; then
+    log "[AppRecover] 禁用..."
+    disable_pkg "com.oplus.apprecover" "disable_app_recover_keep"
+else
+    setprop ${PROP_PREFIX}disable_app_recover_keep ""
+    log "[AppRecover] 恢复..."
+    enable_pkg "com.oplus.apprecover"
+fi
+
+# 25. 双击亮屏支持组件
+if [ "$(getprop ${PROP_PREFIX}disable_double_tap)" = "true" ]; then
+    log "[DoubleTap] 禁用..."
+    disable_pkg "com.oplus.exsystemservice" "disable_double_tap_keep"
+else
+    setprop ${PROP_PREFIX}disable_double_tap_keep ""
+    log "[DoubleTap] 恢复..."
+    enable_pkg "com.oplus.exsystemservice"
+fi
+
+# 26. 通知管理服务
+if [ "$(getprop ${PROP_PREFIX}disable_notification_mgr)" = "true" ]; then
+    log "[NotifMgr] 禁用..."
+    disable_pkg "com.oplus.notificationmanager" "disable_notification_mgr_keep"
+else
+    setprop ${PROP_PREFIX}disable_notification_mgr_keep ""
+    log "[NotifMgr] 恢复..."
+    enable_pkg "com.oplus.notificationmanager"
+fi
+
+# 27. 设备快连服务
+if [ "$(getprop ${PROP_PREFIX}disable_device_link)" = "true" ]; then
+    log "[DevLink] 禁用..."
+    disable_pkg "com.heytap.accessory" "disable_device_link_keep"
+else
+    setprop ${PROP_PREFIX}disable_device_link_keep ""
+    log "[DevLink] 恢复..."
+    enable_pkg "com.heytap.accessory"
+fi
+
+# 28. 设备互联服务
+if [ "$(getprop ${PROP_PREFIX}disable_device_connect)" = "true" ]; then
+    log "[DevConnect] 禁用..."
+    disable_pkg "com.oplus.linker" "disable_device_connect_keep"
+else
+    setprop ${PROP_PREFIX}disable_device_connect_keep ""
+    log "[DevConnect] 恢复..."
+    enable_pkg "com.oplus.linker"
+fi
+
+# 29. 远程控制服务
+if [ "$(getprop ${PROP_PREFIX}disable_remote_control)" = "true" ]; then
+    log "[RemoteCtrl] 禁用..."
+    disable_pkg "com.oplus.remotecontrol" "disable_remote_control_keep"
+else
+    setprop ${PROP_PREFIX}disable_remote_control_keep ""
+    log "[RemoteCtrl] 恢复..."
+    enable_pkg "com.oplus.remotecontrol"
+fi
+
+# 30. 出行引擎
+if [ "$(getprop ${PROP_PREFIX}disable_travel_engine)" = "true" ]; then
+    log "[TravelEngine] 禁用..."
+    disable_pkg "com.oplus.travelengine" "disable_travel_engine_keep"
+else
+    setprop ${PROP_PREFIX}disable_travel_engine_keep ""
+    log "[TravelEngine] 恢复..."
+    enable_pkg "com.oplus.travelengine"
+fi
+
+# ===================== 31-32. 二级分组总开关 =====================
+# 设置相关（二级折叠组总开关：一键禁用组内 6 个子项）
+if [ "$(getprop ${PROP_PREFIX}disable_settings_related)" = "true" ]; then
+    log "[SettingsRelated] 禁用..."
+    disable_pkg "com.oplus.apprecover" "disable_settings_related_keep"
+    disable_pkg "com.oplus.notificationmanager" "disable_settings_related_keep"
+    disable_pkg "com.oplus.remotecontrol" "disable_settings_related_keep"
+    disable_pkg "com.oplus.travelengine" "disable_settings_related_keep"
+    disable_pkg "com.heytap.accessory" "disable_settings_related_keep"
+    disable_pkg "com.oplus.linker" "disable_settings_related_keep"
+else
+    setprop ${PROP_PREFIX}disable_settings_related_keep ""
+    log "[SettingsRelated] 恢复..."
+    enable_pkg "com.oplus.apprecover"
+    enable_pkg "com.oplus.notificationmanager"
+    enable_pkg "com.oplus.remotecontrol"
+    enable_pkg "com.oplus.travelengine"
+    enable_pkg "com.heytap.accessory"
+    enable_pkg "com.oplus.linker"
+fi
+
+# 屏幕服务（二级折叠组总开关：一键禁用组内 2 个子项）
+if [ "$(getprop ${PROP_PREFIX}disable_screen_services)" = "true" ]; then
+    log "[ScreenServices] 禁用..."
+    disable_pkg "com.oplus.exsystemservice" "disable_screen_services_keep"
+    disable_pkg "com.coloros.ocs.opencapabilityservice" "disable_screen_services_keep"
+else
+    setprop ${PROP_PREFIX}disable_screen_services_keep ""
+    log "[ScreenServices] 恢复..."
+    enable_pkg "com.oplus.exsystemservice"
+    enable_pkg "com.coloros.ocs.opencapabilityservice"
 fi
 
 # ===================== 写入状态 =====================
