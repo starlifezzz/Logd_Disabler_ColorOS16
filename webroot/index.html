@@ -892,6 +892,11 @@ var app = Vue.createApp({
     parsePkgStates: function(item, output) {
       var self = this;
       if (!item.pkgs || !output) return;
+      // 防御：确保 pkgStates[item.key] 已初始化（总开关合成 item 首次调用前可能未预置）
+      if (!this.pkgStates[item.key]) {
+        this.pkgStates[item.key] = {};
+        item.pkgs.forEach(function(p) { self.pkgStates[item.key][p] = 'unknown'; });
+      }
       // verifyCmd 输出形如 "com.oplus.xxx:已禁用" / "com.oplus.xxx:运行中"
       var lines = String(output).split('\n');
       item.pkgs.forEach(function(p) {
@@ -1095,12 +1100,18 @@ var app = Vue.createApp({
         // 二级分组总开关：构造合成 item 一并检测
         self.groupSubGroups(g).forEach(function(sub) {
           if (sub.subKey) {
+            var subPkgs = sub.items.reduce(function(a, it) { return a.concat(it.pkgs || []); }, []);
+            // 预置 pkgStates，供 parsePkgStates/checkItem 使用，避免 undefined 报错
+            if (!self.pkgStates[sub.subKey]) {
+              self.pkgStates[sub.subKey] = {};
+              subPkgs.forEach(function(p) { self.pkgStates[sub.subKey][p] = 'unknown'; });
+            }
             allItems.push({
               key: sub.subKey,
               title: sub.name + '（总开关）',
-              pkgs: sub.items.reduce(function(a, it) { return a.concat(it.pkgs || []); }, []),
-              checkCmd: 'r="ok"; for p in ' + sub.items.reduce(function(a, it) { return a.concat(it.pkgs || []); }, []).join(' ') + '; do pm list packages -d --user 0 2>/dev/null | grep -qF "package:$p" || r="running"; done; echo "$r"',
-              verifyCmd: 'for p in ' + sub.items.reduce(function(a, it) { return a.concat(it.pkgs || []); }, []).join(' ') + '; do (pm list packages -d --user 0 2>/dev/null | grep -qF "package:$p" || ! pm list packages --user 0 2>/dev/null | grep -qF "package:$p") && echo "$p:已禁用" || echo "$p:运行中"; done'
+              pkgs: subPkgs,
+              checkCmd: 'r="ok"; for p in ' + subPkgs.join(' ') + '; do pm list packages -d --user 0 2>/dev/null | grep -qF "package:$p" || r="running"; done; echo "$r"',
+              verifyCmd: 'for p in ' + subPkgs.join(' ') + '; do (pm list packages -d --user 0 2>/dev/null | grep -qF "package:$p" || ! pm list packages --user 0 2>/dev/null | grep -qF "package:$p") && echo "$p:已禁用" || echo "$p:运行中"; done'
             });
           }
         });

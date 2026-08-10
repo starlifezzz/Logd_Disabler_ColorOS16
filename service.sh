@@ -681,33 +681,38 @@ fi
 # 设置相关（二级折叠组总开关：一键禁用组内 6 个子项）
 if [ "$(getprop ${PROP_PREFIX}disable_settings_related)" = "true" ]; then
     log "[SettingsRelated] 禁用..."
-    disable_pkg "com.oplus.apprecover" "disable_settings_related_keep"
-    disable_pkg "com.oplus.notificationmanager" "disable_settings_related_keep"
-    disable_pkg "com.oplus.remotecontrol" "disable_settings_related_keep"
-    disable_pkg "com.oplus.travelengine" "disable_settings_related_keep"
-    disable_pkg "com.heytap.accessory" "disable_settings_related_keep"
-    disable_pkg "com.oplus.linker" "disable_settings_related_keep"
+    # 子项开关优先：仅当子项开关为 true 时才禁用该包，
+    # 避免总开关开启后用户单独关闭子项时被总开关重新禁用（子项已在前方块恢复）。
+    [ "$(getprop ${PROP_PREFIX}disable_app_recover)" = "true" ] && disable_pkg "com.oplus.apprecover" "disable_settings_related_keep"
+    [ "$(getprop ${PROP_PREFIX}disable_notification_mgr)" = "true" ] && disable_pkg "com.oplus.notificationmanager" "disable_settings_related_keep"
+    [ "$(getprop ${PROP_PREFIX}disable_remote_control)" = "true" ] && disable_pkg "com.oplus.remotecontrol" "disable_settings_related_keep"
+    [ "$(getprop ${PROP_PREFIX}disable_travel_engine)" = "true" ] && disable_pkg "com.oplus.travelengine" "disable_settings_related_keep"
+    [ "$(getprop ${PROP_PREFIX}disable_device_link)" = "true" ] && disable_pkg "com.heytap.accessory" "disable_settings_related_keep"
+    [ "$(getprop ${PROP_PREFIX}disable_device_connect)" = "true" ] && disable_pkg "com.oplus.linker" "disable_settings_related_keep"
 else
     setprop ${PROP_PREFIX}disable_settings_related_keep ""
     log "[SettingsRelated] 恢复..."
-    enable_pkg "com.oplus.apprecover"
-    enable_pkg "com.oplus.notificationmanager"
-    enable_pkg "com.oplus.remotecontrol"
-    enable_pkg "com.oplus.travelengine"
-    enable_pkg "com.heytap.accessory"
-    enable_pkg "com.oplus.linker"
+    # 恢复分支尊重子项独立开关：
+    # 子项开关为 true（用户单独启用禁用）时不得恢复该包，否则覆盖子项已执行的禁用。
+    [ "$(getprop ${PROP_PREFIX}disable_app_recover)" != "true" ] && enable_pkg "com.oplus.apprecover"
+    [ "$(getprop ${PROP_PREFIX}disable_notification_mgr)" != "true" ] && enable_pkg "com.oplus.notificationmanager"
+    [ "$(getprop ${PROP_PREFIX}disable_remote_control)" != "true" ] && enable_pkg "com.oplus.remotecontrol"
+    [ "$(getprop ${PROP_PREFIX}disable_travel_engine)" != "true" ] && enable_pkg "com.oplus.travelengine"
+    [ "$(getprop ${PROP_PREFIX}disable_device_link)" != "true" ] && enable_pkg "com.heytap.accessory"
+    [ "$(getprop ${PROP_PREFIX}disable_device_connect)" != "true" ] && enable_pkg "com.oplus.linker"
 fi
 
 # 屏幕服务（二级折叠组总开关：一键禁用组内 2 个子项）
 if [ "$(getprop ${PROP_PREFIX}disable_screen_services)" = "true" ]; then
     log "[ScreenServices] 禁用..."
-    disable_pkg "com.oplus.exsystemservice" "disable_screen_services_keep"
-    disable_pkg "com.coloros.ocs.opencapabilityservice" "disable_screen_services_keep"
+    [ "$(getprop ${PROP_PREFIX}disable_double_tap)" = "true" ] && disable_pkg "com.oplus.exsystemservice" "disable_screen_services_keep"
+    [ "$(getprop ${PROP_PREFIX}disable_speedview)" = "true" ] && disable_pkg "com.coloros.ocs.opencapabilityservice" "disable_screen_services_keep"
 else
     setprop ${PROP_PREFIX}disable_screen_services_keep ""
     log "[ScreenServices] 恢复..."
-    enable_pkg "com.oplus.exsystemservice"
-    enable_pkg "com.coloros.ocs.opencapabilityservice"
+    # 尊重子项独立开关（同上）
+    [ "$(getprop ${PROP_PREFIX}disable_double_tap)" != "true" ] && enable_pkg "com.oplus.exsystemservice"
+    [ "$(getprop ${PROP_PREFIX}disable_speedview)" != "true" ] && enable_pkg "com.coloros.ocs.opencapabilityservice"
 fi
 
 # ===================== 写入状态 =====================
