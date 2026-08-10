@@ -12,10 +12,26 @@ echo "当前时间: $(date)"
 echo "模块目录: $MODDIR"
 echo ""
 
-# 函数：获取KernelSU UI设置的系统属性值
+# 函数：获取KernelSU UI设置的开关值
+# 【v2.0】优先读取 config.json（/data/adb/Logd_Disabler_ColorOS16/config.json）
+# 若文件不存在，回退读取旧 persist 属性（迁移兼容）
 get_ksu_setting() {
     local key="$1"
     local default="$2"
+    local CONFIG_FILE="/data/adb/Logd_Disabler_ColorOS16/config.json"
+    if [ -f "$CONFIG_FILE" ]; then
+        # 从 config.json 精确提取："key": true / false
+        local line
+        line=$(grep -oE "\"${key}\"[[:space:]]*:[[:space:]]*(true|false)" "$CONFIG_FILE" 2>/dev/null | head -1)
+        if echo "$line" | grep -qE ":true$"; then
+            echo "true"
+            return
+        elif echo "$line" | grep -qE ":false$"; then
+            echo "false"
+            return
+        fi
+    fi
+    # 回退：旧 persist 属性
     local value=$(getprop "persist.sys.coloros16_optimize_gui.$key")
     if [ -z "$value" ]; then
         echo "$default"
@@ -331,8 +347,11 @@ check_package_with_config "com.oplus.dmp" "disable_network_monitoring"
 echo ""
 
 # 9. 锁屏杂志与壁纸服务状态
+# 【v2.0】锁屏杂志已并入"主题服务"（disable_theme_services），
+# 其包 com.heytap.pictorial 与属性 persist.sys.lockscreen_magazine
+# 均在该开关下统一管理。
 echo "9. 锁屏杂志与壁纸服务:"
-lockscreen_mag_enabled=$(get_ksu_setting "disable_lockscreen_magazine" "false")
+lockscreen_mag_enabled=$(get_ksu_setting "disable_theme_services" "false")
 if [ "$lockscreen_mag_enabled" = "true" ]; then
     echo "   用户设置: 🟢 已启用（禁用杂志）"
 else

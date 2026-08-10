@@ -621,7 +621,13 @@ var FEATURES = [
 ];
 
 // ===================== KernelSU 通信层 =====================
-var PROP_PREFIX = 'persist.sys.coloros16_optimize_gui.';
+// 【v2.0】配置存储迁移：由 persist 属性改为 config.json 文件
+// - WebUI 是唯一写入者（原子写：base64 + tmp + mv）
+// - service.sh 只读执行，重启后根据 config.json 决定各开关
+// - 路径：/data/adb/Logd_Disabler_ColorOS16/config.json（模块外数据目录，
+//   避开 KernelSU 只读的 webroot，且模块升级不覆盖配置）
+var CONFIG_PATH = '/data/adb/Logd_Disabler_ColorOS16/config.json';
+var PROP_PREFIX = 'persist.sys.coloros16_optimize_gui.';   // 仅兼容旧属性读取
 
 function ksuExec(cmd) {
   return new Promise(function(resolve) {
@@ -818,26 +824,26 @@ var app = Vue.createApp({
     pkgStateDisabled: function(key, pkg) {
       return !!(this.pkgStates[key] && this.pkgStates[key][pkg] === 'disabled');
     },
-    // 【子包白名单】用户单独启用（不禁用）的包写入 <key>_keep 属性，
-    // 重启后 service.sh 禁用该功能时跳过白名单中的包。
-    // 属性值：逗号分隔包名，如 "com.oplus.aimemory,com.oplus.aiwriter"
+    // 【子包白名单】用户单独启用（不禁用）的包写入 config.json 的
+    // <key>_keep 字段（逗号分隔），重启后 service.sh 禁用该功能时
+    // 跳过白名单中的包。
     updatePkgKeep: function(item, pkg, wantDisabled) {
       var self = this;
-      var prop = PROP_PREFIX + item.key + '_keep';
-      sh('getprop "' + prop + '" 2>/dev/null').then(function(r) {
-        var list = (r.stdout || '').trim().split(',').filter(function(x){ return x && x.trim(); });
-        var idx = list.indexOf(pkg);
-        if (wantDisabled) {
-          // 禁用该包 → 从白名单移除
-          if (idx >= 0) { list.splice(idx, 1); }
-        } else {
-          // 恢复该包（不禁用）→ 加入白名单
-          if (idx < 0) { list.push(pkg); }
-        }
-        var val = list.join(',');
-        return sh('setprop "' + prop + '" "' + val + '"').then(function(w) {
-          self.addLog('子包白名单 ' + item.key + '_keep=' + (val || '(空)') + (w.errno === 0 ? '' : ' 设置失败'));
-        });
+      if (!this.config) this.config = {};
+      var kkey = item.key + '_keep';
+      var raw = this.config[kkey] || '';
+      var list = String(raw).split(',').filter(function(x){ return x && x.trim(); });
+      var idx = list.indexOf(pkg);
+      if (wantDisabled) {
+        // 禁用该包 → 从白名单移除
+        if (idx >= 0) { list.splice(idx, 1); }
+      } else {
+        // 恢复该包（不禁用）→ 加入白名单
+        if (idx < 0) { list.push(pkg); }
+      }
+      this.config[kkey] = list.join(',');
+      return this.writeConfig().then(function(ok) {
+        self.addLog('子包白名单 ' + kkey + '=' + (self.config[kkey] || '(空)') + (ok ? '' : ' 写入失败'));
       });
     },
     onPkgSwitch: function(item, pkg, e) {
@@ -916,25 +922,89 @@ var app = Vue.createApp({
         if (!matched) self.pkgStates[item.key][p] = 'unknown';
       });
     },
-    // ---------- 读写属性 ----------
-    readProp: function(key) {
+    // ---------- config.json 读写（v2.0，替代 readProp/writeProp） ----------
+    // 读取整个 config.json 到内存 this.config。
+    // 若文件不存在（如升级后首次打开），回退读取旧 persist 属性生成
+    // 初始状态，保证 UI 显示与已生效的开关一致。
+    readConfig: function() {
       var self = this;
-      return sh('getprop "' + PROP_PREFIX + key + '" 2>/dev/null').then(function(r) {
-        var val = r.stdout.trim();
-        self.debugData[key].prop = val || '(空)';
-        return val === 'true' || val === '1';
+      return sh('cat "' + CONFIG_PATH + '" 2>/dev/null').then(function(r) {
+        var cfg = null;
+        try { cfg = JSON.parse(r.stdout || ''); } catch(e) { cfg = null; }
+        if (cfg && cfg.version) {
+          self.config = cfg;
+          return cfg;
+        }
+        // 回退：从旧 persist 属性读取（迁移场景）
+        self.addLog('config.json 不存在，从旧属性读取初始状态...', 'info');
+        cfg = { version: 2 };
+        return self.migrateFromProps(cfg);
       });
     },
-    writeProp: function(key, enable) {
+    // 从旧 persist.sys.coloros16_optimize_gui.* 属性读取状态（一次性迁移）
+    migrateFromProps: function(cfg) {
       var self = this;
-      var val = enable ? 'true' : 'false';
-      return sh('setprop "' + PROP_PREFIX + key + '" "' + val + '"').then(function(r) {
-        self.addLog('设置属性 ' + PROP_PREFIX + key + '=' + val + ' (exit=' + r.errno + ')');
+      var chain = Promise.resolve();
+      // 收集所有需要迁移的 key：普通 item + 二级分组总开关（subGroupKey）
+      var migrateKeys = [];
+      FEATURES.forEach(function(g) {
+        g.items.forEach(function(item) {
+          migrateKeys.push(item.key);
+          if (item.subGroupKey) migrateKeys.push(item.subGroupKey);
+        });
+      });
+      // 去重
+      migrateKeys = migrateKeys.filter(function(k, i, a) { return a.indexOf(k) === i; });
+      migrateKeys.forEach(function(key) {
+        chain = chain.then(function() {
+          return sh('getprop "' + PROP_PREFIX + key + '" 2>/dev/null').then(function(r) {
+            var v = r.stdout.trim();
+            cfg[key] = (v === 'true' || v === '1');
+            // 迁移 keep 白名单（仅普通 item 有）
+            return sh('getprop "' + PROP_PREFIX + key + '_keep" 2>/dev/null').then(function(k) {
+              if (k.stdout.trim()) cfg[key + '_keep'] = k.stdout.trim();
+            });
+          });
+        });
+      });
+      return chain.then(function() {
+        self.config = cfg;
+        self.addLog('旧属性已读取，将在首次修改时写入 config.json', 'info');
+        return cfg;
+      });
+    },
+    // 原子写 config.json：base64 编码避免引号转义，先写临时文件再 mv
+    writeConfig: function() {
+      var self = this;
+      var json = JSON.stringify(this.config || {}, null, 2);
+      var b64 = btoa(unescape(encodeURIComponent(json)));
+      var cmd = 'echo "' + b64 + '" | base64 -d > "' + CONFIG_PATH + '.tmp" && mv "' + CONFIG_PATH + '.tmp" "' + CONFIG_PATH + '"';
+      return sh(cmd).then(function(r) {
         if (r.errno !== 0) {
-          self.addLog('setprop 失败: ' + r.stderr, 'error');
+          self.addLog('config.json 写入失败: ' + (r.stderr || ''), 'error');
           return false;
         }
         return true;
+      });
+    },
+    // 读单个开关状态（从内存 config，不再 exec）
+    readProp: function(key) {
+      var self = this;
+      return Promise.resolve().then(function() {
+        var v = self.config ? self.config[key] : false;
+        self.debugData[key].prop = String(v);
+        return v === true || v === '1';
+      });
+    },
+    // 写单个开关状态（更新内存 + 原子写文件）
+    writeProp: function(key, enable) {
+      var self = this;
+      if (!this.config) this.config = {};
+      this.config[key] = !!enable;
+      this.debugData[key].prop = String(!!enable);
+      return this.writeConfig().then(function(ok) {
+        self.addLog('配置 ' + key + '=' + (enable ? 'true' : 'false') + (ok ? '' : ' 写入失败'));
+        return ok;
       });
     },
     // ---------- 开关 ----------
@@ -1029,67 +1099,68 @@ var app = Vue.createApp({
           self.state[it.key].status = wantOn ? 'enabled' : 'disabled';
         }
       });
+      // 【v2.0】同步写入 config.json，保证重启后子项与总开关一致
+      if (!this.config) this.config = {};
+      sub.items.forEach(function(it) {
+        self.config[it.key] = wantOn;
+      });
+      this.config[item.key] = wantOn;
+      this.writeConfig().then(function(ok) {
+        if (!ok) self.addLog('⚠️ 总开关状态写入 config.json 失败', 'warn');
+      });
       this.onSwitchChange(item, e);
     },
     // ---------- 状态检测 ----------
-    checkItem: function(item) {
+    // 【v2.0 快速检测】两级策略：
+    // 第一级（立即）：从 config.json 读开关状态，无任何 exec，首屏秒开。
+    // 第二级（异步）：仅对 config 中为 true 的包类功能执行 verifyCmd，
+    //   校验真实 pm 状态，保留"属性=开 但实际=未禁用"的检测能力。
+    checkItem: function(item, quick) {
       var self = this;
       var s = this.state[item.key];
-      return this.readProp(item.key).then(function(propEnabled) {
-        return sh(item.checkCmd).then(function(checkR) {
-          self.debugData[item.key].checkRaw = checkR.stdout.trim() || '(空)';
-          return sh(item.verifyCmd).then(function(verifyR) {
-            self.debugData[item.key].verifyRaw = verifyR.stdout.trim() || '(空)';
-            self.parsePkgStates(item, verifyR.stdout);
-            // 【状态判定规则】
-            // - 包类功能（有 pkgs）：以实际 pm 状态为准，属性值仅作辅助。
-            //   避免"属性=true 但 pm 未生效"时误显示已禁用。
-            // - 非包类功能（无 pkgs，如开发者选项/内核优化/系统属性）：
-            //   它们不是禁用包，而是设置系统属性/参数，checkCmd 输出为
-            //   locked/ok/set/数字 等自定义关键字，无法用 disabled/stopped
-            //   判断 → 以属性值（用户意图）为准，不误报。
-            var actualDisabled = false;
-            var hasPkgs = item.pkgs && item.pkgs.length && self.pkgStates[item.key];
-            if (hasPkgs) {
-              // 包类功能：读取子包白名单（用户单独启用/保留的包）
-              // 白名单中的包运行中属于正常选择，不计入"未生效"。
-              var keepProp = PROP_PREFIX + item.key + '_keep';
-              sh('getprop "' + keepProp + '" 2>/dev/null').then(function(keepR) {
-                var keepList = (keepR.stdout || '').split(',').filter(function(x){ return x && x.trim(); });
-                // 统计非白名单包是否全部已禁用
-                var nonKeptAll = item.pkgs.every(function(p) {
-                  if (keepList.indexOf(p) >= 0) return true; // 白名单包：跳过
-                  return self.pkgStates[item.key][p] === 'disabled';
-                });
-                // 统计实际运行中的包数量（含白名单）
-                var runningCount = 0;
-                item.pkgs.forEach(function(p) {
-                  if (self.pkgStates[item.key][p] !== 'disabled') runningCount++;
-                });
-                actualDisabled = nonKeptAll;
-                s.enabled = actualDisabled;
-                s.status = actualDisabled ? 'enabled' : (propEnabled ? 'pending' : 'disabled');
-                if (propEnabled && !actualDisabled) {
-                  // 属性开了但部分包未禁用：区分"白名单保留"与"真的未生效"
-                  if (runningCount > 0 && keepList.length > 0) {
-                    // 有白名单保留 → 属正常（部分保留）
-                    s.status = 'enabled';
-                    self.addLog('ℹ️ ' + item.title + '：白名单保留 ' + keepList.length + ' 个包（' + keepList.join(',') + '）', 'info');
-                  } else {
-                    self.addLog('⚠️ ' + item.title + ' 属性=开 但实际=未禁用，请检查 service.sh 是否执行成功', 'warn');
-                  }
-                }
-              });
-            } else {
-              // 非包类功能：以属性值为准（属性即用户意图，service.sh 会按属性执行）
-              s.enabled = propEnabled;
-              s.status = propEnabled ? 'enabled' : 'disabled';
-            }
-          });
+      // ---------- 第一级：config.json 状态（零 exec） ----------
+      var cfgEnabled = !!(this.config && this.config[item.key] === true);
+      s.enabled = cfgEnabled;
+      s.status = cfgEnabled ? 'enabled' : 'disabled';
+      this.debugData[item.key].prop = String(cfgEnabled);
+      if (quick) return Promise.resolve();
+      // 读取 keep 白名单（从内存 config）
+      var keepList = [];
+      if (this.config) {
+        var raw = this.config[item.key + '_keep'];
+        keepList = String(raw || '').split(',').filter(function(x){ return x && x.trim(); });
+      }
+      // ---------- 第二级：仅对启用中的包类功能做真实状态校验 ----------
+      if (!cfgEnabled || !item.pkgs || !item.pkgs.length) {
+        return Promise.resolve();
+      }
+      return sh(item.verifyCmd).then(function(verifyR) {
+        self.debugData[item.key].verifyRaw = verifyR.stdout.trim() || '(空)';
+        self.parsePkgStates(item, verifyR.stdout);
+        // 统计非白名单包是否全部已禁用（白名单包运行中属正常选择）
+        var nonKeptAll = item.pkgs.every(function(p) {
+          if (keepList.indexOf(p) >= 0) return true;
+          return self.pkgStates[item.key] && self.pkgStates[item.key][p] === 'disabled';
         });
+        var runningCount = 0;
+        item.pkgs.forEach(function(p) {
+          if (!(self.pkgStates[item.key] && self.pkgStates[item.key][p] === 'disabled')) runningCount++;
+        });
+        var actualDisabled = nonKeptAll;
+        s.enabled = actualDisabled;
+        s.status = actualDisabled ? 'enabled' : 'pending';
+        if (cfgEnabled && !actualDisabled) {
+          if (runningCount > 0 && keepList.length > 0) {
+            // 有白名单保留 → 属正常（部分保留）
+            s.status = 'enabled';
+            self.addLog('ℹ️ ' + item.title + '：白名单保留 ' + keepList.length + ' 个包（' + keepList.join(',') + '）', 'info');
+          } else {
+            self.addLog('⚠️ ' + item.title + ' 配置=开 但实际=未禁用，请检查 service.sh 是否执行成功', 'warn');
+          }
+        }
       }).catch(function(e) {
         s.status = 'error';
-        self.addLog('检测 ' + item.key + ' 失败: ' + e, 'error');
+        self.addLog('校验 ' + item.key + ' 失败: ' + e, 'error');
       });
     },
     refreshAll: function() {
@@ -1118,12 +1189,18 @@ var app = Vue.createApp({
       });
       this.checking = true;
       this.progress = 0;
-      this.addLog('=== 开始全面状态检测 ===');
+      this.addLog('=== 开始全面状态检测（config.json 快速模式） ===');
+      // 第一级：全部 item 立即按 config 渲染（同步，秒开）
+      allItems.forEach(function(item) {
+        self.checkItem(item, true);
+      });
+      self.progress = 40;
+      // 第二级：异步校验启用中的包类功能
       var chain = Promise.resolve();
       allItems.forEach(function(item, i) {
         chain = chain.then(function() {
-          return self.checkItem(item).then(function() {
-            self.progress = Math.round(((i + 1) / allItems.length) * 100);
+          return self.checkItem(item, false).then(function() {
+            self.progress = 40 + Math.round(((i + 1) / allItems.length) * 60);
           });
         });
       });
@@ -1231,7 +1308,9 @@ var app = Vue.createApp({
       var v = r.stdout.trim();
       self.ksuVersion = v || 'KernelSU';
     });
-    this.refreshAll();
+    this.readConfig().then(function() {
+      self.refreshAll();
+    });
   }
 });
 

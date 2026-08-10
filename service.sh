@@ -2,12 +2,16 @@
 # ================================================================
 # ColorOS16 优化模块 - service.sh (late_start service)
 # 执行时机：系统服务启动后
-# 读取 WebUI 设置的 persist.sys.coloros16_optimize_gui.* 属性
+# 配置来源：/data/adb/Logd_Disabler_ColorOS16/config.json
+#           （由 WebUI 写入，service.sh 只读执行）
 # 支持双向操作：开启时优化，关闭时恢复原状
+# v2.0 架构：30 个手写 if 块重构为"数据表 + 通用循环"，
+#           新增禁用项只需在 PKG_TABLE 加一行，无需新增逻辑块
 # ================================================================
 
 MODDIR=${0%/*}
-PROP_PREFIX="persist.sys.coloros16_optimize_gui."
+PROP_PREFIX="persist.sys.coloros16_optimize_gui."   # 仅用于旧属性迁移（v1.x 兼容）
+CONFIG="/data/adb/Logd_Disabler_ColorOS16/config.json"
 WORK_DIR="/data/adb/logd_disabler"
 LOG_FILE="$WORK_DIR/service.log"
 
@@ -18,6 +22,74 @@ log() {
 }
 
 log "========== service.sh 开始执行 =========="
+
+# ===================== 配置读取 =====================
+# 【v2.0】所有开关状态统一从 config.json 读取（WebUI 唯一写入者）
+is_on() {
+    # 匹配形如 "  "key": true," 或 "  "key": true } 的行
+    grep -qE "[\"']${1}[\"'][[:space:]]*:[[:space:]]*true" "$CONFIG" 2>/dev/null
+}
+
+# 读取 keep 白名单（逗号分隔字符串），无则返回空
+get_keep() {
+    grep -E "[\"']${1}_keep[\"'][[:space:]]*:[[:space:]]*" "$CONFIG" 2>/dev/null \
+        | sed -E 's/.*: *"([^"]*)".*/\1/' | head -1
+}
+
+# ===================== 旧属性迁移（v1.x → v2.0） =====================
+# 首次运行：若 config.json 不存在，则从旧 persist.sys.coloros16_optimize_gui.*
+# 属性一次性迁移生成，保证升级不丢用户配置。
+MIGRATED=0
+if [ ! -f "$CONFIG" ]; then
+    log "[迁移] 未找到 config.json，尝试从旧 persist 属性迁移..."
+    CONFIG_DIR="$(dirname "$CONFIG")"
+    mkdir -p "$CONFIG_DIR"
+    # 全部 30 个开关 key（含 2 个总开关），与 WebUI FEATURES 一一对应
+    ALL_KEYS="disable_logd block_ota lock_developer_options block_ads_and_tracking kill_redundant_processes system_prop_toggles memory_io_optimization extra_kernel_optimization disable_health_services disable_network_monitoring disable_gamespace disable_wallet_services disable_backup_services disable_ai_assistants disable_voice_assistants disable_theme_services disable_network_optimization disable_security_services disable_media_services disable_system_tools disable_speedview disable_app_recover disable_double_tap disable_notification_mgr disable_device_link disable_device_connect disable_remote_control disable_travel_engine disable_settings_related disable_screen_services"
+    # keep 白名单 key（有子包的功能）
+    KEEP_KEYS="block_ota_keep block_ads_and_tracking_keep disable_health_services_keep disable_network_monitoring_keep disable_gamespace_keep disable_wallet_services_keep disable_backup_services_keep disable_ai_assistants_keep disable_voice_assistants_keep disable_theme_services_keep disable_network_optimization_keep disable_security_services_keep disable_media_services_keep disable_system_tools_keep disable_speedview_keep disable_app_recover_keep disable_double_tap_keep disable_notification_mgr_keep disable_device_link_keep disable_device_connect_keep disable_remote_control_keep disable_travel_engine_keep"
+    {
+        echo "{"
+        echo "  \"version\": 2,"
+        first=1
+        for key in $ALL_KEYS; do
+            val=$(getprop "${PROP_PREFIX}${key}" 2>/dev/null)
+            [ "$val" = "true" ] && v=true || v=false
+            [ $first -eq 0 ] && echo ","
+            printf '  "%s": %s' "$key" "$v"
+            first=0
+        done
+        for kkey in $KEEP_KEYS; do
+            kval=$(getprop "${PROP_PREFIX}${kkey}" 2>/dev/null)
+            echo ","
+            printf '  "%s": "%s"' "$kkey" "$kval"
+        done
+        echo ""
+        echo "}"
+    } > "$CONFIG.tmp" && mv "$CONFIG.tmp" "$CONFIG"
+    MIGRATED=1
+    log "[迁移] 完成：已生成 config.json"
+fi
+
+# 配置缺失或损坏时兜底：生成全 false 默认配置
+if ! grep -q '"version"' "$CONFIG" 2>/dev/null; then
+    log "[迁移] config.json 无效，生成默认配置（全部关闭）..."
+    CONFIG_DIR="$(dirname "$CONFIG")"
+    mkdir -p "$CONFIG_DIR"
+    {
+        echo "{"
+        echo "  \"version\": 2,"
+        ALL_KEYS="disable_logd block_ota lock_developer_options block_ads_and_tracking kill_redundant_processes system_prop_toggles memory_io_optimization extra_kernel_optimization disable_health_services disable_network_monitoring disable_gamespace disable_wallet_services disable_backup_services disable_ai_assistants disable_voice_assistants disable_theme_services disable_network_optimization disable_security_services disable_media_services disable_system_tools disable_speedview disable_app_recover disable_double_tap disable_notification_mgr disable_device_link disable_device_connect disable_remote_control disable_travel_engine disable_settings_related disable_screen_services"
+        first=1
+        for key in $ALL_KEYS; do
+            [ $first -eq 0 ] && echo ","
+            printf '  "%s": false' "$key"
+            first=0
+        done
+        echo ""
+        echo "}"
+    } > "$CONFIG.tmp" && mv "$CONFIG.tmp" "$CONFIG"
+fi
 
 # ===================== 辅助函数 =====================
 
@@ -50,21 +122,30 @@ else
 fi
 
 # 静默执行（丢弃 stderr，用于状态检查）
+# 【修复 v2.0.1】函数内强制 IFS 为默认值再拼接 "$*"：
+# 防止调用方残留的 IFS（如通用循环曾用 IFS=','）导致
+# su -c 收到 "cmd,package,..." 形式的损坏命令。
 pmx() {
+    local OLDIFS=$IFS
+    IFS=$(printf ' \t\n')
     if [ "$PMX_USE_SU" = "1" ]; then
         su -c "$*" 2>/dev/null
     else
         "$@" 2>/dev/null
     fi
+    IFS=$OLDIFS
 }
 
 # 详细执行（保留 stderr，用于采集 result 排错）
 pmx_verbose() {
+    local OLDIFS=$IFS
+    IFS=$(printf ' \t\n')
     if [ "$PMX_USE_SU" = "1" ]; then
         su -c "$*" 2>&1
     else
         "$@" 2>&1
     fi
+    IFS=$OLDIFS
 }
 
 # ===================== 等待 PackageManager 真正就绪 =====================
@@ -94,15 +175,16 @@ if [ "$PMS_READY" != "1" ]; then
 fi
 
 # 禁用包：优先 pm disable-user，失败则 fallback 到 pm uninstall
-# 第二个参数为可选白名单属性名（如 disable_ai_assistants_keep），
-# 若该包在属性值（逗号分隔）中则跳过禁用——用于支持 WebUI 单独启用子包。
+# 第二个参数为可选 keep 键名（如 disable_ai_assistants），
+# 若该包在 config.json 的 <key>_keep（逗号分隔）中则跳过禁用——
+# 用于支持 WebUI 单独启用子包。
 disable_pkg() {
     local pkg="$1"
-    local keep_prop="$2"
+    local keep_key="$2"
     # 【子包白名单】用户在 WebUI 单独启用（不禁用）的包
-    if [ -n "$keep_prop" ]; then
+    if [ -n "$keep_key" ]; then
         local keep_val
-        keep_val=$(getprop "${PROP_PREFIX}${keep_prop}" 2>/dev/null)
+        keep_val=$(get_keep "$keep_key")
         if [ -n "$keep_val" ]; then
             local k
             for k in $(echo "$keep_val" | tr ',' ' '); do
@@ -173,8 +255,65 @@ enable_pkg() {
     return 1
 }
 
+# ================================================================
+# 【v2.0 核心】标准包禁用项数据表
+# 格式：key|pkg1,pkg2,...
+# 通用循环遍历：is_on(key) 为 true → 禁用全部包（keep 白名单跳过）；
+#               否则 → 恢复全部包。
+# 【新增禁用项】只需在此表加一行，并在 WebUI FEATURES 加对应条目，
+#               无需新增任何逻辑块！
+# ================================================================
+PKG_TABLE='
+disable_health_services|com.oplus.healthservice
+disable_network_monitoring|com.oplus.trafficmonitor,com.oplus.dmp
+disable_gamespace|com.oplus.games,com.oplus.cosa
+disable_wallet_services|com.oplus.pay,com.coloros.securepay
+disable_backup_services|com.oplus.wifibackuprestore,com.heytap.cloud
+disable_ai_assistants|com.oplus.aimemory,com.oplus.aiunit,com.oplus.aiwidgets,com.oplus.aiwriter,com.oplus.metis,com.oplus.obrain,com.oplus.deepthinker,com.coloros.colordirectservice
+disable_voice_assistants|com.oplus.ovoicemanager,com.oplus.ovoicemanager.wakeup,com.heytap.speechassist,com.oplus.ttsaccessibilityengine
+disable_theme_services|com.oplus.themestore,com.heytap.themestore,com.oplus.keyguard.clock.magazine,com.oplus.keyguard.clock.gallery,com.oplus.keyguard.clock.graffiti,com.oplus.keyguard.personality.clocks,com.oplus.keyguard.style.widgets,com.heytap.pictorial
+disable_network_optimization|com.oplus.networksense,com.oplus.cellularqoe,com.oplus.tai.wifiqoe,com.oplus.tai.borderpresearch,com.oplus.nearcomm
+disable_security_services|com.oplus.securitykeyboard,com.coloros.securityguard
+disable_media_services|com.oplus.screenrecorder,com.coloros.karaoke,com.oplus.mediacontroller,com.oplus.mediaturbo
+disable_system_tools|com.oplus.powermonitor,com.oplus.audiomonitor,com.oplus.logkit,com.oplus.engineermode,com.oplus.crashbox,com.oplus.contentportal,com.oplus.postmanservice,com.oplus.subsys,com.oplus.engineernetwork
+disable_speedview|com.coloros.ocs.opencapabilityservice
+disable_app_recover|com.oplus.apprecover
+disable_double_tap|com.oplus.exsystemservice
+disable_notification_mgr|com.oplus.notificationmanager
+disable_device_link|com.heytap.accessory
+disable_device_connect|com.oplus.linker
+disable_remote_control|com.oplus.remotecontrol
+disable_travel_engine|com.oplus.travelengine
+'
+
+# 通用循环：处理标准包禁用项
+# 【修复 v2.0.1】不能用 IFS=',' 后再调用 disable_pkg/enable_pkg！
+# 原因：pmx/pmx_verbose 内部用 su -c "$*" 传参，"$*" 会以当前 IFS 的
+# 第一个字符连接参数。IFS=',' 时 su 收到的命令变成
+# "cmd,package,install-existing,pkg" → 全部执行失败，包被误判"跳过"。
+# 改用 tr 展开，保持 IFS 为默认值，函数内 "$*" 正常空格连接。
+echo "$PKG_TABLE" | while IFS='|' read -r key pkgs; do
+    [ -z "$key" ] && continue
+    if is_on "$key"; then
+        log "[$key] 禁用..."
+        for p in $(echo "$pkgs" | tr ',' ' '); do
+            disable_pkg "$p" "$key"
+        done
+    else
+        log "[$key] 恢复..."
+        for p in $(echo "$pkgs" | tr ',' ' '); do
+            enable_pkg "$p"
+        done
+    fi
+done
+
+# ================================================================
+# 特殊块 1-8（mount / 进程 / 系统属性，无法数据化，保留手写逻辑）
+# 条件统一从 config.json 读取
+# ================================================================
+
 # ===================== 1. Logd =====================
-if [ "$(getprop ${PROP_PREFIX}disable_logd)" = "true" ]; then
+if is_on "disable_logd"; then
     log "[Logd] 启用：覆盖文件 + 杀进程..."
     DUMMY="$WORK_DIR/dummy"
     for bin in logd logcat logpersist.start logpersist.stop logtagd; do
@@ -212,23 +351,22 @@ else
 fi
 
 # ===================== 2. OTA 阻断 =====================
-if [ "$(getprop ${PROP_PREFIX}block_ota)" = "true" ]; then
+if is_on "block_ota"; then
     log "[OTA] 启用：杀进程 + 禁用包..."
     stop update_engine 2>/dev/null
     pkill -9 -x update_engine 2>/dev/null
     setprop ctl.stop update_engine 2>/dev/null
     # 依据 services.txt：一加Ace5 真实存在的 OTA 相关包
-    disable_pkg "com.oplus.ota" "block_ota_keep"
-    disable_pkg "com.oplus.sau" "block_ota_keep"
-    disable_pkg "com.oplus.cota" "block_ota_keep"
-    disable_pkg "com.oplus.romupdate" "block_ota_keep"
-    disable_pkg "com.oplus.upgradeguide" "block_ota_keep"
+    disable_pkg "com.oplus.ota" "block_ota"
+    disable_pkg "com.oplus.sau" "block_ota"
+    disable_pkg "com.oplus.cota" "block_ota"
+    disable_pkg "com.oplus.romupdate" "block_ota"
+    disable_pkg "com.oplus.upgradeguide" "block_ota"
     setprop persist.ota.auto_download 0
     setprop persist.sys.recovery_update 0
     setprop persist.sys.ota.disabled 1
     log "[OTA] 完成"
 else
-    setprop ${PROP_PREFIX}block_ota_keep ""
     log "[OTA] 关闭：启用包 + 恢复属性..."
     enable_pkg "com.oplus.ota"
     enable_pkg "com.oplus.sau"
@@ -252,7 +390,7 @@ else
 fi
 
 # ===================== 3. 开发者选项锁定 =====================
-if [ "$(getprop ${PROP_PREFIX}lock_developer_options)" = "true" ]; then
+if is_on "lock_developer_options"; then
     log "[DevLock] 启用：锁定开发者选项..."
     settings put global development_settings_enabled 0 2>/dev/null
     setprop persist.dev.option.lock 1
@@ -265,7 +403,7 @@ else
 fi
 
 # ===================== 4. 广告与数据收集屏蔽 =====================
-if [ "$(getprop ${PROP_PREFIX}block_ads_and_tracking)" = "true" ]; then
+if is_on "block_ads_and_tracking"; then
     log "[Ads] 启用：关闭广告与数据收集..."
     settings put global oppo_ad_enabled 0 2>/dev/null
     settings put secure oppo_ad_personalization 0 2>/dev/null
@@ -277,12 +415,11 @@ if [ "$(getprop ${PROP_PREFIX}block_ads_and_tracking)" = "true" ]; then
     setprop persist.ad.track 0
     setprop persist.sys.usage_stat_enable 0
     setprop persist.oppo.collect 0
-    disable_pkg "com.oplus.statistics.rom" "block_ads_and_tracking_keep"
-    disable_pkg "com.coloros.assistantscreen" "block_ads_and_tracking_keep"
-    disable_pkg "com.coloros.sceneservice" "block_ads_and_tracking_keep"
+    disable_pkg "com.oplus.statistics.rom" "block_ads_and_tracking"
+    disable_pkg "com.coloros.assistantscreen" "block_ads_and_tracking"
+    disable_pkg "com.coloros.sceneservice" "block_ads_and_tracking"
     log "[Ads] 完成"
 else
-    setprop ${PROP_PREFIX}block_ads_and_tracking_keep ""
     log "[Ads] 关闭：恢复广告与数据收集..."
     settings put global oppo_ad_enabled 1 2>/dev/null
     settings put secure oppo_ad_personalization 1 2>/dev/null
@@ -301,7 +438,7 @@ else
 fi
 
 # ===================== 5. 进程查杀 =====================
-if [ "$(getprop ${PROP_PREFIX}kill_redundant_processes)" = "true" ]; then
+if is_on "kill_redundant_processes"; then
     log "[Procs] 启用：查杀冗余进程..."
     KILL_LIST="smartscene preload sysmonitor hotstart daemondaemon oplusmemchecker"
     for proc in $KILL_LIST; do
@@ -320,7 +457,7 @@ else
 fi
 
 # ===================== 6. 系统属性开关 =====================
-if [ "$(getprop ${PROP_PREFIX}system_prop_toggles)" = "true" ]; then
+if is_on "system_prop_toggles"; then
     log "[SysProps] 启用：设置系统属性..."
     setprop persist.sys.preload 0
     setprop persist.sys.monitor 0
@@ -349,7 +486,7 @@ else
 fi
 
 # ===================== 7. 内存/IO 优化 =====================
-if [ "$(getprop ${PROP_PREFIX}memory_io_optimization)" = "true" ]; then
+if is_on "memory_io_optimization"; then
     log "[MemIO] 启用：写入优化参数..."
     echo 0 > /proc/sys/kernel/sched_schedstats 2>/dev/null
     echo 0 > /sys/module/binder/parameters/debug_mask 2>/dev/null
@@ -372,7 +509,7 @@ else
 fi
 
 # ===================== 8. 额外内核优化 =====================
-if [ "$(getprop ${PROP_PREFIX}extra_kernel_optimization)" = "true" ]; then
+if is_on "extra_kernel_optimization"; then
     log "[Kernel] 启用：写入内核参数..."
     echo "3 3 3 3" > /proc/sys/kernel/printk 2>/dev/null
     echo 3 > /proc/sys/kernel/printk_console_loglevel 2>/dev/null
@@ -390,329 +527,48 @@ else
     log "[Kernel] 恢复完成"
 fi
 
-# ===================== 9-21. 可选禁用服务 =====================
-
-# 9. 健康服务
-if [ "$(getprop ${PROP_PREFIX}disable_health_services)" = "true" ]; then
-    log "[Health] 禁用..."
-    disable_pkg "com.oplus.healthservice" "disable_health_services_keep"
-else
-    setprop ${PROP_PREFIX}disable_health_services_keep ""
-    log "[Health] 恢复..."
-    enable_pkg "com.oplus.healthservice"
-fi
-
-# 10. 流量监控
-if [ "$(getprop ${PROP_PREFIX}disable_network_monitoring)" = "true" ]; then
-    log "[NetMon] 禁用..."
-    disable_pkg "com.oplus.trafficmonitor" "disable_network_monitoring_keep"
-    disable_pkg "com.oplus.dmp" "disable_network_monitoring_keep"
-else
-    setprop ${PROP_PREFIX}disable_network_monitoring_keep ""
-    log "[NetMon] 恢复..."
-    enable_pkg "com.oplus.trafficmonitor"
-    enable_pkg "com.oplus.dmp"
-fi
-
-# 12. 游戏空间
-if [ "$(getprop ${PROP_PREFIX}disable_gamespace)" = "true" ]; then
-    log "[GameSpace] 禁用..."
-    disable_pkg "com.oplus.games" "disable_gamespace_keep"
-    disable_pkg "com.oplus.cosa" "disable_gamespace_keep"
-else
-    setprop ${PROP_PREFIX}disable_gamespace_keep ""
-    log "[GameSpace] 恢复..."
-    enable_pkg "com.oplus.games"
-    enable_pkg "com.oplus.cosa"
-fi
-
-# 13. 钱包
-if [ "$(getprop ${PROP_PREFIX}disable_wallet_services)" = "true" ]; then
-    log "[Wallet] 禁用..."
-    disable_pkg "com.oplus.pay" "disable_wallet_services_keep"
-    disable_pkg "com.coloros.securepay" "disable_wallet_services_keep"
-else
-    setprop ${PROP_PREFIX}disable_wallet_services_keep ""
-    log "[Wallet] 恢复..."
-    enable_pkg "com.oplus.pay"
-    enable_pkg "com.coloros.securepay"
-fi
-
-# 14. 备份
-if [ "$(getprop ${PROP_PREFIX}disable_backup_services)" = "true" ]; then
-    log "[Backup] 禁用..."
-    disable_pkg "com.oplus.wifibackuprestore" "disable_backup_services_keep"
-    disable_pkg "com.heytap.cloud" "disable_backup_services_keep"
-else
-    setprop ${PROP_PREFIX}disable_backup_services_keep ""
-    log "[Backup] 恢复..."
-    enable_pkg "com.oplus.wifibackuprestore"
-    enable_pkg "com.heytap.cloud"
-fi
-
-# 15. AI 助手（含小布识屏）
-if [ "$(getprop ${PROP_PREFIX}disable_ai_assistants)" = "true" ]; then
-    log "[AI] 禁用..."
-    disable_pkg "com.oplus.aimemory" "disable_ai_assistants_keep"
-    disable_pkg "com.oplus.aiunit" "disable_ai_assistants_keep"
-    disable_pkg "com.oplus.aiwidgets" "disable_ai_assistants_keep"
-    disable_pkg "com.oplus.aiwriter" "disable_ai_assistants_keep"
-    disable_pkg "com.oplus.metis" "disable_ai_assistants_keep"
-    disable_pkg "com.oplus.obrain" "disable_ai_assistants_keep"
-    disable_pkg "com.oplus.deepthinker" "disable_ai_assistants_keep"
-    # 小布识屏（colordirectservice）并入 AI 助手
-    disable_pkg "com.coloros.colordirectservice" "disable_ai_assistants_keep"
-else
-    log "[AI] 恢复..."
-    # 恢复全部时清除子包白名单，避免下次开启时残留保留项
-    setprop ${PROP_PREFIX}disable_ai_assistants_keep ""
-    enable_pkg "com.oplus.aimemory"
-    enable_pkg "com.oplus.aiunit"
-    enable_pkg "com.oplus.aiwidgets"
-    enable_pkg "com.oplus.aiwriter"
-    enable_pkg "com.oplus.metis"
-    enable_pkg "com.oplus.obrain"
-    enable_pkg "com.oplus.deepthinker"
-    enable_pkg "com.coloros.colordirectservice"
-fi
-
-# 16. 语音助手
-if [ "$(getprop ${PROP_PREFIX}disable_voice_assistants)" = "true" ]; then
-    log "[Voice] 禁用..."
-    disable_pkg "com.oplus.ovoicemanager" "disable_voice_assistants_keep"
-    disable_pkg "com.oplus.ovoicemanager.wakeup" "disable_voice_assistants_keep"
-    disable_pkg "com.heytap.speechassist" "disable_voice_assistants_keep"
-    disable_pkg "com.oplus.ttsaccessibilityengine" "disable_voice_assistants_keep"
-else
-    setprop ${PROP_PREFIX}disable_voice_assistants_keep ""
-    log "[Voice] 恢复..."
-    enable_pkg "com.oplus.ovoicemanager"
-    enable_pkg "com.oplus.ovoicemanager.wakeup"
-    enable_pkg "com.heytap.speechassist"
-    enable_pkg "com.oplus.ttsaccessibilityengine"
-fi
-
-# 17. 主题（含锁屏杂志）
-if [ "$(getprop ${PROP_PREFIX}disable_theme_services)" = "true" ]; then
-    log "[Theme] 禁用..."
-    disable_pkg "com.oplus.themestore" "disable_theme_services_keep"
-    disable_pkg "com.heytap.themestore" "disable_theme_services_keep"
-    disable_pkg "com.oplus.keyguard.clock.magazine" "disable_theme_services_keep"
-    disable_pkg "com.oplus.keyguard.clock.gallery" "disable_theme_services_keep"
-    disable_pkg "com.oplus.keyguard.clock.graffiti" "disable_theme_services_keep"
-    disable_pkg "com.oplus.keyguard.personality.clocks" "disable_theme_services_keep"
-    disable_pkg "com.oplus.keyguard.style.widgets" "disable_theme_services_keep"
-    # 锁屏杂志（乐划锁屏）并入主题服务
-    disable_pkg "com.heytap.pictorial" "disable_theme_services_keep"
+# ===================== 17. 主题（附加属性） =====================
+# 主题服务的包已在 PKG_TABLE 处理，这里仅处理关联系统属性
+if is_on "disable_theme_services"; then
     setprop persist.sys.lockscreen_magazine 0
 else
-    setprop ${PROP_PREFIX}disable_theme_services_keep ""
-    log "[Theme] 恢复..."
-    enable_pkg "com.oplus.themestore"
-    enable_pkg "com.heytap.themestore"
-    enable_pkg "com.oplus.keyguard.clock.magazine"
-    enable_pkg "com.oplus.keyguard.clock.gallery"
-    enable_pkg "com.oplus.keyguard.clock.graffiti"
-    enable_pkg "com.oplus.keyguard.personality.clocks"
-    enable_pkg "com.oplus.keyguard.style.widgets"
-    enable_pkg "com.heytap.pictorial"
     setprop persist.sys.lockscreen_magazine 1
 fi
 
-# 18. 网络优化
-if [ "$(getprop ${PROP_PREFIX}disable_network_optimization)" = "true" ]; then
-    log "[NetOpt] 禁用..."
-    disable_pkg "com.oplus.networksense" "disable_network_optimization_keep"
-    disable_pkg "com.oplus.cellularqoe" "disable_network_optimization_keep"
-    disable_pkg "com.oplus.tai.wifiqoe" "disable_network_optimization_keep"
-    disable_pkg "com.oplus.tai.borderpresearch" "disable_network_optimization_keep"
-    disable_pkg "com.oplus.nearcomm" "disable_network_optimization_keep"
-else
-    setprop ${PROP_PREFIX}disable_network_optimization_keep ""
-    log "[NetOpt] 恢复..."
-    enable_pkg "com.oplus.networksense"
-    enable_pkg "com.oplus.cellularqoe"
-    enable_pkg "com.oplus.tai.wifiqoe"
-    enable_pkg "com.oplus.tai.borderpresearch"
-    enable_pkg "com.oplus.nearcomm"
-fi
+# ================================================================
+# 二级分组总开关（31-32）
+# 子项开关优先：总开关 on 时仅禁子项也为 on 的包；
+#               总开关 off 时仅恢复子项也为 off 的包。
+# ================================================================
 
-# 19. 安全
-if [ "$(getprop ${PROP_PREFIX}disable_security_services)" = "true" ]; then
-    log "[Security] 禁用..."
-    disable_pkg "com.oplus.securitykeyboard" "disable_security_services_keep"
-    disable_pkg "com.coloros.securityguard" "disable_security_services_keep"
-else
-    setprop ${PROP_PREFIX}disable_security_services_keep ""
-    log "[Security] 恢复..."
-    enable_pkg "com.oplus.securitykeyboard"
-    enable_pkg "com.coloros.securityguard"
-fi
-
-# 20. 多媒体
-if [ "$(getprop ${PROP_PREFIX}disable_media_services)" = "true" ]; then
-    log "[Media] 禁用..."
-    disable_pkg "com.oplus.screenrecorder" "disable_media_services_keep"
-    disable_pkg "com.coloros.karaoke" "disable_media_services_keep"
-    disable_pkg "com.oplus.mediacontroller" "disable_media_services_keep"
-    disable_pkg "com.oplus.mediaturbo" "disable_media_services_keep"
-else
-    setprop ${PROP_PREFIX}disable_media_services_keep ""
-    log "[Media] 恢复..."
-    enable_pkg "com.oplus.screenrecorder"
-    enable_pkg "com.coloros.karaoke"
-    enable_pkg "com.oplus.mediacontroller"
-    enable_pkg "com.oplus.mediaturbo"
-fi
-
-# 21. 系统工具
-# 注意：com.oplus.appplatform（应用服务）涉及短信收发，永不禁用（v1.6 移除）
-if [ "$(getprop ${PROP_PREFIX}disable_system_tools)" = "true" ]; then
-    log "[SysTools] 禁用..."
-    disable_pkg "com.oplus.powermonitor" "disable_system_tools_keep"
-    disable_pkg "com.oplus.audiomonitor" "disable_system_tools_keep"
-    disable_pkg "com.oplus.logkit" "disable_system_tools_keep"
-    disable_pkg "com.oplus.engineermode" "disable_system_tools_keep"
-    disable_pkg "com.oplus.crashbox" "disable_system_tools_keep"
-    disable_pkg "com.oplus.contentportal" "disable_system_tools_keep"
-    disable_pkg "com.oplus.postmanservice" "disable_system_tools_keep"
-    disable_pkg "com.oplus.subsys" "disable_system_tools_keep"
-    disable_pkg "com.oplus.engineernetwork" "disable_system_tools_keep"
-else
-    setprop ${PROP_PREFIX}disable_system_tools_keep ""
-    log "[SysTools] 恢复..."
-    enable_pkg "com.oplus.powermonitor"
-    enable_pkg "com.oplus.audiomonitor"
-    enable_pkg "com.oplus.logkit"
-    enable_pkg "com.oplus.engineermode"
-    enable_pkg "com.oplus.crashbox"
-    enable_pkg "com.oplus.contentportal"
-    enable_pkg "com.oplus.postmanservice"
-    enable_pkg "com.oplus.subsys"
-    enable_pkg "com.oplus.engineernetwork"
-fi
-
-# ===================== 22-30. 第一梯队新增服务 =====================
-# 依据：onservices.txt 运行进程排查，均为当前自启占用后台的组件
-# 由用户审核后加入，注意保持与 WebUI FEATURES 一一对应
-# 注：小布识屏(com.coloros.colordirectservice)已并入 15.AI助手
-
-# 23. 速览/负一屏支持组件
-if [ "$(getprop ${PROP_PREFIX}disable_speedview)" = "true" ]; then
-    log "[SpeedView] 禁用..."
-    disable_pkg "com.coloros.ocs.opencapabilityservice" "disable_speedview_keep"
-else
-    setprop ${PROP_PREFIX}disable_speedview_keep ""
-    log "[SpeedView] 恢复..."
-    enable_pkg "com.coloros.ocs.opencapabilityservice"
-fi
-
-# 24. 应用恢复服务
-if [ "$(getprop ${PROP_PREFIX}disable_app_recover)" = "true" ]; then
-    log "[AppRecover] 禁用..."
-    disable_pkg "com.oplus.apprecover" "disable_app_recover_keep"
-else
-    setprop ${PROP_PREFIX}disable_app_recover_keep ""
-    log "[AppRecover] 恢复..."
-    enable_pkg "com.oplus.apprecover"
-fi
-
-# 25. 双击亮屏支持组件
-if [ "$(getprop ${PROP_PREFIX}disable_double_tap)" = "true" ]; then
-    log "[DoubleTap] 禁用..."
-    disable_pkg "com.oplus.exsystemservice" "disable_double_tap_keep"
-else
-    setprop ${PROP_PREFIX}disable_double_tap_keep ""
-    log "[DoubleTap] 恢复..."
-    enable_pkg "com.oplus.exsystemservice"
-fi
-
-# 26. 通知管理服务
-if [ "$(getprop ${PROP_PREFIX}disable_notification_mgr)" = "true" ]; then
-    log "[NotifMgr] 禁用..."
-    disable_pkg "com.oplus.notificationmanager" "disable_notification_mgr_keep"
-else
-    setprop ${PROP_PREFIX}disable_notification_mgr_keep ""
-    log "[NotifMgr] 恢复..."
-    enable_pkg "com.oplus.notificationmanager"
-fi
-
-# 27. 设备快连服务
-if [ "$(getprop ${PROP_PREFIX}disable_device_link)" = "true" ]; then
-    log "[DevLink] 禁用..."
-    disable_pkg "com.heytap.accessory" "disable_device_link_keep"
-else
-    setprop ${PROP_PREFIX}disable_device_link_keep ""
-    log "[DevLink] 恢复..."
-    enable_pkg "com.heytap.accessory"
-fi
-
-# 28. 设备互联服务
-if [ "$(getprop ${PROP_PREFIX}disable_device_connect)" = "true" ]; then
-    log "[DevConnect] 禁用..."
-    disable_pkg "com.oplus.linker" "disable_device_connect_keep"
-else
-    setprop ${PROP_PREFIX}disable_device_connect_keep ""
-    log "[DevConnect] 恢复..."
-    enable_pkg "com.oplus.linker"
-fi
-
-# 29. 远程控制服务
-if [ "$(getprop ${PROP_PREFIX}disable_remote_control)" = "true" ]; then
-    log "[RemoteCtrl] 禁用..."
-    disable_pkg "com.oplus.remotecontrol" "disable_remote_control_keep"
-else
-    setprop ${PROP_PREFIX}disable_remote_control_keep ""
-    log "[RemoteCtrl] 恢复..."
-    enable_pkg "com.oplus.remotecontrol"
-fi
-
-# 30. 出行引擎
-if [ "$(getprop ${PROP_PREFIX}disable_travel_engine)" = "true" ]; then
-    log "[TravelEngine] 禁用..."
-    disable_pkg "com.oplus.travelengine" "disable_travel_engine_keep"
-else
-    setprop ${PROP_PREFIX}disable_travel_engine_keep ""
-    log "[TravelEngine] 恢复..."
-    enable_pkg "com.oplus.travelengine"
-fi
-
-# ===================== 31-32. 二级分组总开关 =====================
-# 设置相关（二级折叠组总开关：一键禁用组内 6 个子项）
-if [ "$(getprop ${PROP_PREFIX}disable_settings_related)" = "true" ]; then
+# 设置相关（组内 6 个子项）
+if is_on "disable_settings_related"; then
     log "[SettingsRelated] 禁用..."
-    # 子项开关优先：仅当子项开关为 true 时才禁用该包，
-    # 避免总开关开启后用户单独关闭子项时被总开关重新禁用（子项已在前方块恢复）。
-    [ "$(getprop ${PROP_PREFIX}disable_app_recover)" = "true" ] && disable_pkg "com.oplus.apprecover" "disable_settings_related_keep"
-    [ "$(getprop ${PROP_PREFIX}disable_notification_mgr)" = "true" ] && disable_pkg "com.oplus.notificationmanager" "disable_settings_related_keep"
-    [ "$(getprop ${PROP_PREFIX}disable_remote_control)" = "true" ] && disable_pkg "com.oplus.remotecontrol" "disable_settings_related_keep"
-    [ "$(getprop ${PROP_PREFIX}disable_travel_engine)" = "true" ] && disable_pkg "com.oplus.travelengine" "disable_settings_related_keep"
-    [ "$(getprop ${PROP_PREFIX}disable_device_link)" = "true" ] && disable_pkg "com.heytap.accessory" "disable_settings_related_keep"
-    [ "$(getprop ${PROP_PREFIX}disable_device_connect)" = "true" ] && disable_pkg "com.oplus.linker" "disable_settings_related_keep"
+    is_on "disable_app_recover" && disable_pkg "com.oplus.apprecover" "disable_settings_related"
+    is_on "disable_notification_mgr" && disable_pkg "com.oplus.notificationmanager" "disable_settings_related"
+    is_on "disable_remote_control" && disable_pkg "com.oplus.remotecontrol" "disable_settings_related"
+    is_on "disable_travel_engine" && disable_pkg "com.oplus.travelengine" "disable_settings_related"
+    is_on "disable_device_link" && disable_pkg "com.heytap.accessory" "disable_settings_related"
+    is_on "disable_device_connect" && disable_pkg "com.oplus.linker" "disable_settings_related"
 else
-    setprop ${PROP_PREFIX}disable_settings_related_keep ""
     log "[SettingsRelated] 恢复..."
-    # 恢复分支尊重子项独立开关：
-    # 子项开关为 true（用户单独启用禁用）时不得恢复该包，否则覆盖子项已执行的禁用。
-    [ "$(getprop ${PROP_PREFIX}disable_app_recover)" != "true" ] && enable_pkg "com.oplus.apprecover"
-    [ "$(getprop ${PROP_PREFIX}disable_notification_mgr)" != "true" ] && enable_pkg "com.oplus.notificationmanager"
-    [ "$(getprop ${PROP_PREFIX}disable_remote_control)" != "true" ] && enable_pkg "com.oplus.remotecontrol"
-    [ "$(getprop ${PROP_PREFIX}disable_travel_engine)" != "true" ] && enable_pkg "com.oplus.travelengine"
-    [ "$(getprop ${PROP_PREFIX}disable_device_link)" != "true" ] && enable_pkg "com.heytap.accessory"
-    [ "$(getprop ${PROP_PREFIX}disable_device_connect)" != "true" ] && enable_pkg "com.oplus.linker"
+    ! is_on "disable_app_recover" && enable_pkg "com.oplus.apprecover"
+    ! is_on "disable_notification_mgr" && enable_pkg "com.oplus.notificationmanager"
+    ! is_on "disable_remote_control" && enable_pkg "com.oplus.remotecontrol"
+    ! is_on "disable_travel_engine" && enable_pkg "com.oplus.travelengine"
+    ! is_on "disable_device_link" && enable_pkg "com.heytap.accessory"
+    ! is_on "disable_device_connect" && enable_pkg "com.oplus.linker"
 fi
 
-# 屏幕服务（二级折叠组总开关：一键禁用组内 2 个子项）
-if [ "$(getprop ${PROP_PREFIX}disable_screen_services)" = "true" ]; then
+# 屏幕服务（组内 2 个子项）
+if is_on "disable_screen_services"; then
     log "[ScreenServices] 禁用..."
-    [ "$(getprop ${PROP_PREFIX}disable_double_tap)" = "true" ] && disable_pkg "com.oplus.exsystemservice" "disable_screen_services_keep"
-    [ "$(getprop ${PROP_PREFIX}disable_speedview)" = "true" ] && disable_pkg "com.coloros.ocs.opencapabilityservice" "disable_screen_services_keep"
+    is_on "disable_double_tap" && disable_pkg "com.oplus.exsystemservice" "disable_screen_services"
+    is_on "disable_speedview" && disable_pkg "com.coloros.ocs.opencapabilityservice" "disable_screen_services"
 else
-    setprop ${PROP_PREFIX}disable_screen_services_keep ""
     log "[ScreenServices] 恢复..."
-    # 尊重子项独立开关（同上）
-    [ "$(getprop ${PROP_PREFIX}disable_double_tap)" != "true" ] && enable_pkg "com.oplus.exsystemservice"
-    [ "$(getprop ${PROP_PREFIX}disable_speedview)" != "true" ] && enable_pkg "com.coloros.ocs.opencapabilityservice"
+    ! is_on "disable_double_tap" && enable_pkg "com.oplus.exsystemservice"
+    ! is_on "disable_speedview" && enable_pkg "com.coloros.ocs.opencapabilityservice"
 fi
 
 # ===================== 写入状态 =====================

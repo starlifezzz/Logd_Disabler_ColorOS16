@@ -45,7 +45,19 @@ else
 fi
 
 # ===================== Logd 禁用 =====================
-if [ "$(getprop ${PROP_PREFIX}disable_logd)" = "true" ]; then
+# 【v2.0】配置读取：优先 config.json，旧属性作为升级迁移 fallback
+is_on() {
+    local key="$1"
+    local CONFIG_FILE="/data/adb/Logd_Disabler_ColorOS16/config.json"
+    if [ -f "$CONFIG_FILE" ]; then
+        grep -qE "\"${key}\"[[:space:]]*:[[:space:]]*true" "$CONFIG_FILE" 2>/dev/null && return 0
+        return 1
+    fi
+    [ "$(getprop ${PROP_PREFIX}${key})" = "true" ] && return 0
+    return 1
+}
+
+if is_on "disable_logd"; then
     log "[Logd] 开始 mount 覆盖..."
     for bin in logd logcat logpersist.start logpersist.stop logtagd; do
         TARGET="/system/bin/$bin"
@@ -75,7 +87,7 @@ else
 fi
 
 # ===================== OTA 阻断 =====================
-if [ "$(getprop ${PROP_PREFIX}block_ota)" = "true" ]; then
+if is_on "block_ota"; then
     log "[OTA] 开始 mount 覆盖..."
     for bin in update_engine update_engine_client; do
         TARGET="/system/bin/$bin"

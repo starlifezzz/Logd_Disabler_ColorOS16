@@ -11,12 +11,14 @@
 - **内置图形化设置界面**：在KernelSU管理器中直接开关各项功能
 - **无需编辑配置文件**：通过直观的UI界面控制所有优化选项
 - **本地框架渲染**：WebUI 基于 Vue 3 + mdui 2（全部资源随模块本地打包，不依赖 CDN/在线组件库）
-- **配置实时持久化**：UI 设置写入 `persist.sys.coloros16_optimize_gui.*` 系统属性，重启后由脚本读取生效
+- **配置实时持久化**：UI 设置写入 `config.json`（`/data/adb/Logd_Disabler_ColorOS16/config.json`），重启后由脚本读取生效
 
-### 🔧 **配置机制说明**
-- **唯一配置源**：系统属性 `persist.sys.coloros16_optimize_gui.*`
+### 🔧 **配置机制说明（v2.0）**
+- **唯一配置源**：`/data/adb/Logd_Disabler_ColorOS16/config.json`（模块外数据目录，升级模块不覆盖配置）
+- **WebUI 唯一写入者**：开关状态通过原子写（base64 + 临时文件 + mv）持久化，服务脚本只读执行
 - **UI 修改即时生效**：开关状态即写即存，重启设备后由 service.sh 执行实际优化
 - **双向操作**：每个功能都支持"开启优化 / 关闭恢复"
+- **v1.x 自动迁移**：首次运行 service.sh 会从旧 `persist.sys.coloros16_optimize_gui.*` 属性一次性迁移，升级不丢配置
 
 ### 🔒 **安全可靠**
 - **Systemless 设计**：所有优化基于 mount bind / pm 命令，卸载模块后大部分修改自动复原
@@ -71,25 +73,27 @@
 
 ## 📂 配置管理
 
-### 配置存储机制
-- **配置源**：系统属性 `persist.sys.coloros16_optimize_gui.*`（如 `disable_logd`、`block_ota` 等）
-- **属性前缀**：`persist.` 保证重启后仍保留
-- **读取时机**：post-fs-data 和 service 阶段读取属性决定是否执行优化
-- **修改方式**：仅通过 WebUI 开关修改（推荐），或 adb 手动 `setprop`
+### 配置存储机制（v2.0）
+- **配置源**：`/data/adb/Logd_Disabler_ColorOS16/config.json`（如 `disable_logd`、`block_ota` 等键）
+- **写入方式**：WebUI 开关修改后原子写入（base64 + 临时文件 + mv），模块外目录不受升级影响
+- **读取时机**：post-fs-data（挂载覆盖）和 service（包管理 + 参数）阶段读取 config.json 决定是否执行优化
+- **兼容性**：v1.x 的 `persist.sys.coloros16_optimize_gui.*` 属性在首次开机时自动迁移，无需手动处理
 
-### 手动设置属性（高级用户）
+### 手动修改配置（高级用户）
 ```bash
-# 通过 adb 修改配置（示例：禁用日志）
+# 通过 adb 查看当前配置
 adb shell
 su
-setprop persist.sys.coloros16_optimize_gui.disable_logd true
-# 重启生效
+cat /data/adb/Logd_Disabler_ColorOS16/config.json
+
+# 手动修改（示例：启用日志禁用），修改后需重启生效
+sed -i 's/"disable_logd": false/"disable_logd": true/' /data/adb/Logd_Disabler_ColorOS16/config.json
 reboot
 ```
 
 ### 验证状态
 ```bash
-# 执行验证脚本
+# 执行验证脚本（v2.0 自动读取 config.json）
 su
 sh /data/adb/modules/Logd_Disabler_ColorOS16/verify_status.sh
 ```
@@ -103,15 +107,15 @@ sh /data/adb/modules/Logd_Disabler_ColorOS16/verify_status.sh
 4. 通过UI界面调整设置
 5. 再次重启设备
 
-### 方法2: 手动设置属性
+### 方法2: 手动修改配置
 ```bash
 # 查看当前所有配置
 adb shell
 su
-getprop | grep coloros16_optimize_gui
+cat /data/adb/Logd_Disabler_ColorOS16/config.json
 
-# 示例：启用 OTA 阻断
-setprop persist.sys.coloros16_optimize_gui.block_ota true
+# 示例：启用 OTA 阻断（修改后重启生效）
+sed -i 's/"block_ota": false/"block_ota": true/' /data/adb/Logd_Disabler_ColorOS16/config.json
 ```
 
 ### 验证状态
