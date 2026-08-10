@@ -28,11 +28,8 @@ mdui-card{width:100%}
 .info-row{display:flex;justify-content:space-between;align-items:center;padding:10px 16px;font-size:14px}
 .info-row .k{color:var(--mdui-color-on-surface-variant)}
 .info-row .v{font-weight:500}
-.badge{display:inline-flex;align-items:center;font-size:12px;padding:2px 10px;border-radius:100px;font-weight:500}
-.badge.on{background:rgba(var(--mdui-color-primary),.12);color:rgb(var(--mdui-color-primary))}
-.badge.off{background:var(--mdui-color-surface-variant);color:var(--mdui-color-on-surface-variant)}
-.badge.err{background:rgba(var(--mdui-color-error),.12);color:rgb(var(--mdui-color-error))}
-.badge.work{background:rgba(var(--mdui-color-tertiary),.15);color:rgb(var(--mdui-color-tertiary))}
+.switch-wrap{position:relative;display:inline-flex;align-items:center}
+.switch-wrap .opt-hint{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:10px;line-height:1;color:var(--mdui-color-on-surface-variant);white-space:nowrap;pointer-events:none;z-index:1}
 .log-box{width:100%;min-height:200px;max-height:55vh;overflow-y:auto;white-space:pre-wrap;word-break:break-all;font-family:monospace;font-size:12px;line-height:1.6;background:var(--mdui-color-surface-container);border-radius:8px;padding:12px;box-sizing:border-box}
 .debug-item{margin-bottom:8px;padding:10px 12px;border-radius:8px;background:var(--mdui-color-surface-container);font-family:monospace;font-size:11px}
 .debug-item .k{color:var(--mdui-color-primary);font-weight:500}
@@ -124,8 +121,10 @@ mdui-list-item::part(body){justify-content:center;gap:0}
             <div slot="headline">{{ item.title }}</div>
             <div slot="description">{{ item.desc }}</div>
             <span slot="end-icon" style="display:flex;align-items:center;gap:8px">
-              <span class="badge" :class="badgeClass(item.key)">{{ badgeText(item.key) }}</span>
-              <mdui-switch :checked="state[item.key].enabled" :disabled="state[item.key].loading" @click.stop @change="onSwitchChange(item, $event)"></mdui-switch>
+              <span class="switch-wrap">
+                <mdui-switch :checked="state[item.key].enabled" :disabled="state[item.key].loading" @click.stop @change="onSwitchChange(item, $event)"></mdui-switch>
+                <span v-if="!state[item.key].enabled" class="opt-hint">未优化</span>
+              </span>
             </span>
           </mdui-list-item>
         </mdui-list>
@@ -141,8 +140,10 @@ mdui-list-item::part(body){justify-content:center;gap:0}
             <div slot="description">{{ item.subNames && item.subNames[0] ? item.subNames[0] : item.desc }}</div>
             <span slot="end-icon" style="display:flex;align-items:center;gap:8px">
               <button class="agg-detail-btn" @click.stop="showPkgDetail(item, item.pkgs[0], 0)">详情</button>
-              <span class="badge" :class="badgeClass(item.key)">{{ badgeText(item.key) }}</span>
-              <mdui-switch :checked="state[item.key].enabled" :disabled="state[item.key].loading" @click.stop @change="onSwitchChange(item, $event)"></mdui-switch>
+              <span class="switch-wrap">
+                <mdui-switch :checked="state[item.key].enabled" :disabled="state[item.key].loading" @click.stop @change="onSwitchChange(item, $event)"></mdui-switch>
+                <span v-if="!state[item.key].enabled" class="opt-hint">未优化</span>
+              </span>
             </span>
           </mdui-list-item>
         </mdui-list>
@@ -161,8 +162,10 @@ mdui-list-item::part(body){justify-content:center;gap:0}
                 <div class="agg-title-main">{{ item.title }}<span class="agg-chevron" :class="{open: isOpen(item.key)}"><mdui-icon name="chevron_right--outlined"></mdui-icon></span></div>
               </div>
               <span class="agg-control">
-                <span class="badge" :class="badgeClass(item.key)">{{ badgeText(item.key) }}</span>
-                <mdui-switch :checked="state[item.key].enabled" :disabled="state[item.key].loading" @click.stop @change="onSwitchChange(item, $event)"></mdui-switch>
+                <span class="switch-wrap">
+                  <mdui-switch :checked="state[item.key].enabled" :disabled="state[item.key].loading" @click.stop @change="onSwitchChange(item, $event)"></mdui-switch>
+                  <span v-if="!state[item.key].enabled" class="opt-hint">未优化</span>
+                </span>
               </span>
             </div>
             <!-- body：细分模式（有 subNames）→ 每个子包独立开关；否则仅展示包清单 -->
@@ -175,8 +178,10 @@ mdui-list-item::part(body){justify-content:center;gap:0}
                   </div>
                   <div class="agg-pkg-ops">
                     <button class="agg-detail-btn" @click="showPkgDetail(item, p, idx)">详情</button>
-                    <span class="badge" :class="pkgBadgeClass(item.key, p)">{{ pkgBadgeText(item.key, p) }}</span>
-                    <mdui-switch :checked="pkgStateDisabled(item.key, p)" @change="onPkgSwitch(item, p, $event)"></mdui-switch>
+                    <span class="switch-wrap">
+                      <mdui-switch :checked="pkgStateDisabled(item.key, p)" @change="onPkgSwitch(item, p, $event)"></mdui-switch>
+                      <span v-if="!pkgStateDisabled(item.key, p)" class="opt-hint">未优化</span>
+                    </span>
                   </div>
                 </div>
               </template>
@@ -184,7 +189,6 @@ mdui-list-item::part(body){justify-content:center;gap:0}
                 <div class="agg-hint">一键禁用/恢复以下 {{ item.pkgs.length }} 个包（对应 service.sh 中同名属性分支）：</div>
                 <div class="agg-row" v-for="p in item.pkgs" :key="p">
                   <span class="agg-pkg">{{ p }}</span>
-                  <span class="badge" :class="pkgBadgeClass(item.key, p)">{{ pkgBadgeText(item.key, p) }}</span>
                 </div>
               </template>
             </div>
@@ -529,14 +533,8 @@ var app = Vue.createApp({
     isOpen: function(key) {
       return this.openItem === key;
     },
-    // ---------- 子包状态徽标 ----------
-    pkgBadgeClass: function(key, pkg) {
-      var s = this.pkgStates[key] && this.pkgStates[key][pkg];
-      if (s === 'disabled') return 'on';
-      if (s === 'error') return 'err';
-      return 'off';
-    },
-    pkgBadgeText: function(key, pkg) {
+    // ---------- 子包状态文本（详情对话框使用） ----------
+    pkgStateText: function(key, pkg) {
       var s = this.pkgStates[key] && this.pkgStates[key][pkg];
       if (s === 'disabled') return '已禁用';
       if (s === 'error') return '异常';
@@ -599,7 +597,7 @@ var app = Vue.createApp({
       this.pkgDetailPkg = pkg;
       this.pkgDetailName = (item.subNames && item.subNames[idx]) || pkg;
       this.pkgDetailGroup = item.title;
-      this.pkgDetailState = this.pkgBadgeText(item.key, pkg);
+      this.pkgDetailState = this.pkgStateText(item.key, pkg);
       this.pkgDetailOpen = true;
     },
     togglePkgDetail: function() {
@@ -639,22 +637,6 @@ var app = Vue.createApp({
         });
         if (!matched) self.pkgStates[item.key][p] = 'unknown';
       });
-    },
-    // ---------- 徽标 ----------
-    badgeClass: function(key) {
-      var s = this.state[key];
-      if (s.loading || s.status === 'pending') return 'work';
-      if (s.status === 'enabled') return 'on';
-      if (s.status === 'error') return 'err';
-      return 'off';
-    },
-    badgeText: function(key) {
-      var s = this.state[key];
-      if (s.loading) return '⏳ 处理中';
-      if (s.status === 'enabled') return '✅ 已禁用';
-      if (s.status === 'error') return '❌ 异常';
-      if (s.status === 'pending') return '⚠️ 未生效';
-      return '⭕ 未禁用';
     },
     // ---------- 读写属性 ----------
     readProp: function(key) {
