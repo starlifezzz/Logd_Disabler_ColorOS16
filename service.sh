@@ -334,7 +334,7 @@ disable_wallet_services|com.oplus.pay,com.coloros.securepay
 disable_backup_services|com.oplus.wifibackuprestore,com.heytap.cloud
 disable_ai_assistants|com.oplus.aimemory,com.oplus.aiunit,com.oplus.aiwidgets,com.oplus.aiwriter,com.oplus.metis,com.oplus.obrain,com.oplus.deepthinker,com.coloros.colordirectservice
 disable_voice_assistants|com.oplus.ovoicemanager,com.oplus.ovoicemanager.wakeup,com.heytap.speechassist,com.oplus.ttsaccessibilityengine
-disable_theme_services|com.oplus.themestore,com.heytap.themestore,com.oplus.keyguard.clock.magazine,com.oplus.keyguard.clock.gallery,com.oplus.keyguard.clock.graffiti,com.oplus.keyguard.personality.clocks,com.oplus.keyguard.style.widgets,com.heytap.pictorial,com.oplus.wallpapers,com.android.wallpaper.livepicker,com.coloros.lockassistant
+disable_theme_services|com.oplus.themestore,com.heytap.themestore,com.oplus.keyguard.clock.magazine,com.oplus.keyguard.clock.gallery,com.oplus.keyguard.clock.graffiti,com.oplus.keyguard.personality.clocks,com.oplus.keyguard.style.widgets,com.heytap.pictorial,com.oplus.wallpapers,com.android.wallpaper.livepicker
 disable_network_optimization|com.oplus.networksense,com.oplus.cellularqoe,com.oplus.tai.wifiqoe,com.oplus.tai.borderpresearch,com.oplus.nearcomm
 disable_security_services|com.oplus.securitykeyboard,com.coloros.securityguard
 disable_media_services|com.oplus.screenrecorder,com.coloros.karaoke,com.oplus.mediacontroller,com.oplus.mediaturbo
@@ -603,14 +603,17 @@ fi
 # ================================================================
 
 # 设置相关（组内 6 个子项）
+# 【v2.1.1】keep_key 传子项自身 key（如 disable_app_recover）而非总开关 key：
+# WebUI 子包"恢复"操作写入的是子项 key 的 _keep 字段（如 disable_app_recover_keep），
+# 若传 disable_settings_related 会导致服务端重启后读不到白名单，误禁用户保留的包。
 if is_on "disable_settings_related"; then
     log "[SettingsRelated] 禁用..."
-    is_on "disable_app_recover" && disable_pkg "com.oplus.apprecover" "disable_settings_related"
-    is_on "disable_notification_mgr" && disable_pkg "com.oplus.notificationmanager" "disable_settings_related"
-    is_on "disable_remote_control" && disable_pkg "com.oplus.remotecontrol" "disable_settings_related"
-    is_on "disable_travel_engine" && disable_pkg "com.oplus.travelengine" "disable_settings_related"
-    is_on "disable_device_link" && disable_pkg "com.heytap.accessory" "disable_settings_related"
-    is_on "disable_device_connect" && disable_pkg "com.oplus.linker" "disable_settings_related"
+    is_on "disable_app_recover" && disable_pkg "com.oplus.apprecover" "disable_app_recover"
+    is_on "disable_notification_mgr" && disable_pkg "com.oplus.notificationmanager" "disable_notification_mgr"
+    is_on "disable_remote_control" && disable_pkg "com.oplus.remotecontrol" "disable_remote_control"
+    is_on "disable_travel_engine" && disable_pkg "com.oplus.travelengine" "disable_travel_engine"
+    is_on "disable_device_link" && disable_pkg "com.heytap.accessory" "disable_device_link"
+    is_on "disable_device_connect" && disable_pkg "com.oplus.linker" "disable_device_connect"
 else
     log "[SettingsRelated] 恢复..."
     ! is_on "disable_app_recover" && enable_pkg "com.oplus.apprecover"
@@ -624,8 +627,8 @@ fi
 # 屏幕服务（组内 2 个子项）
 if is_on "disable_screen_services"; then
     log "[ScreenServices] 禁用..."
-    is_on "disable_double_tap" && disable_pkg "com.oplus.exsystemservice" "disable_screen_services"
-    is_on "disable_speedview" && disable_pkg "com.coloros.ocs.opencapabilityservice" "disable_screen_services"
+    is_on "disable_double_tap" && disable_pkg "com.oplus.exsystemservice" "disable_double_tap"
+    is_on "disable_speedview" && disable_pkg "com.coloros.ocs.opencapabilityservice" "disable_speedview"
 else
     log "[ScreenServices] 恢复..."
     ! is_on "disable_double_tap" && enable_pkg "com.oplus.exsystemservice"

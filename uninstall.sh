@@ -65,7 +65,6 @@ com.oplus.keyguard.style.widgets
 com.heytap.pictorial
 com.oplus.wallpapers
 com.android.wallpaper.livepicker
-com.coloros.lockassistant
 com.oplus.networksense
 com.oplus.cellularqoe
 com.oplus.tai.wifiqoe

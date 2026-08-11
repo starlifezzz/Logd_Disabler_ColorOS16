@@ -577,11 +577,11 @@ var FEATURES = [
   },
   { key: 'disable_theme_services', icon: 'palette--outlined', title: '主题和个性化服务',
     desc: '关闭主题商店/锁屏时钟组件/乐划锁屏/壁纸服务',
-    deps: '⚠️ 连带影响：锁屏时钟/个性化时钟组件与"锁屏样式小组件"相互依赖，只保留其中部分可能导致锁屏界面异常（时钟不显示等）；壁纸服务被禁用后静态壁纸仍可用，但动态壁纸与锁屏画报失效。',
-    pkgs: ['com.oplus.themestore', 'com.heytap.themestore', 'com.oplus.keyguard.clock.magazine', 'com.oplus.keyguard.clock.gallery', 'com.oplus.keyguard.clock.graffiti', 'com.oplus.keyguard.personality.clocks', 'com.oplus.keyguard.style.widgets', 'com.heytap.pictorial', 'com.oplus.wallpapers', 'com.android.wallpaper.livepicker', 'com.coloros.lockassistant'],
-    subNames: ['主题商店', '主题商店(欢太)', '锁屏杂志时钟', '锁屏图库时钟', '锁屏涂鸦时钟', '个性化时钟', '锁屏样式小组件', '乐划锁屏', '壁纸服务', '动态壁纸选择器', '锁屏助手'],
+    deps: '⚠️ 连带影响：锁屏时钟/个性化时钟组件与"锁屏样式小组件"相互依赖，只保留其中部分可能导致锁屏界面异常（时钟不显示等）；壁纸服务被禁用后静态壁纸仍可用，但动态壁纸与锁屏画报失效。注：锁屏助手(com.coloros.lockassistant)为 persistent 系统保护应用，pm 无法禁用，已从本组移除。',
+    pkgs: ['com.oplus.themestore', 'com.heytap.themestore', 'com.oplus.keyguard.clock.magazine', 'com.oplus.keyguard.clock.gallery', 'com.oplus.keyguard.clock.graffiti', 'com.oplus.keyguard.personality.clocks', 'com.oplus.keyguard.style.widgets', 'com.heytap.pictorial', 'com.oplus.wallpapers', 'com.android.wallpaper.livepicker'],
+    subNames: ['主题商店', '主题商店(欢太)', '锁屏杂志时钟', '锁屏图库时钟', '锁屏涂鸦时钟', '个性化时钟', '锁屏样式小组件', '乐划锁屏', '壁纸服务', '动态壁纸选择器'],
     checkCmd: 'pm list packages --user 0 2>/dev/null | grep -qF "com.oplus.themestore" && echo enabled || echo disabled',
-    verifyCmd: 'for p in com.oplus.themestore com.heytap.themestore com.oplus.keyguard.clock.magazine com.oplus.keyguard.clock.gallery com.oplus.keyguard.clock.graffiti com.oplus.keyguard.personality.clocks com.oplus.keyguard.style.widgets com.heytap.pictorial com.oplus.wallpapers com.android.wallpaper.livepicker com.coloros.lockassistant; do if pm list packages -d --user 0 2>/dev/null | grep -qF "package:$p"; then echo "$p:disabled"; elif ! pm list packages --user 0 2>/dev/null | grep -qF "package:$p"; then echo "$p:missing"; else echo "$p:enabled"; fi; done; echo "属性:"; echo "mag=$(getprop persist.sys.lockscreen_magazine 2>/dev/null)"'
+    verifyCmd: 'for p in com.oplus.themestore com.heytap.themestore com.oplus.keyguard.clock.magazine com.oplus.keyguard.clock.gallery com.oplus.keyguard.clock.graffiti com.oplus.keyguard.personality.clocks com.oplus.keyguard.style.widgets com.heytap.pictorial com.oplus.wallpapers com.android.wallpaper.livepicker; do if pm list packages -d --user 0 2>/dev/null | grep -qF "package:$p"; then echo "$p:disabled"; elif ! pm list packages --user 0 2>/dev/null | grep -qF "package:$p"; then echo "$p:missing"; else echo "$p:enabled"; fi; done; echo "属性:"; echo "mag=$(getprop persist.sys.lockscreen_magazine 2>/dev/null)"'
   },
   { key: 'disable_network_optimization', icon: 'wifi_tethering--outlined', title: '网络优化服务',
     desc: '关闭网络质量优化服务',
@@ -916,6 +916,20 @@ var app = Vue.createApp({
       var keepRaw = (this.config && this.config[key + '_keep']) || '';
       return String(keepRaw).split(',').indexOf(pkg) >= 0;
     },
+    // 【v2.1.1】判断某包是否受白名单保护（用于总开关即时禁用路径）：
+    //  - 普通功能：查本项 keep（isKept）
+    //  - 合成子组(总开关)：若本项 keep 未命中，再查该包所属子项的 keep
+    //    （子包"恢复"操作写入的是子项 key 的 _keep 字段）
+    pkgKeptBySub: function(item, pkg) {
+      if (this.isKept(item.key, pkg)) return true;
+      if (item.synthetic && item.subItems) {
+        for (var i = 0; i < item.subItems.length; i++) {
+          var si = item.subItems[i];
+          if (si.pkgs && si.pkgs.indexOf(pkg) >= 0 && this.isKept(si.key, pkg)) return true;
+        }
+      }
+      return false;
+    },
     // ---------- 子包独立开关 ----------
     pkgStateDisabled: function(key, pkg) {
       return !!(this.pkgStates[key] && this.pkgStates[key][pkg] === 'disabled');
@@ -1156,7 +1170,11 @@ var app = Vue.createApp({
           item.pkgs.forEach(function(p) {
             // 【修复】即时禁用时尊重白名单：白名单包=用户保留启用，禁止禁用。
             // 否则总开关切换会把这些包 pm disable，导致与子包开关状态不一致。
-            if (wantOn && self.isKept(item.key, p)) return;
+            // 【v2.1.1】合成子组(总开关)额外检查子项自身 keep：
+            // 用户在子包的"恢复"操作写入的是子项 key 的 _keep 字段
+            // （如 disable_app_recover_keep），若只查总开关 keep 会漏掉，
+            // 导致总开关切换把子项白名单包误禁。
+            if (wantOn && !self.pkgKeptBySub(item, p)) return;
             var c = wantOn
               ? 'pm disable-user --user 0 ' + p + ' 2>/dev/null || pm disable ' + p
               : 'pm enable ' + p;
@@ -1251,10 +1269,15 @@ var app = Vue.createApp({
       this.debugData[item.key].prop = String(cfgEnabled);
       if (quick) return Promise.resolve();
       // 读取 keep 白名单（从内存 config）
+      // 【v2.1.1】防御脏数据：只保留属于本功能 pkgs 列表内的包。
+      // 历史版本曾有跨组误写 keep 的记录（如广告组混入速览组的包），
+      // 过滤后既避免误报"白名单保留"，也避免影响期望状态推导。
       var keepList = [];
       if (this.config) {
         var raw = this.config[item.key + '_keep'];
-        keepList = String(raw || '').split(',').filter(function(x){ return x && x.trim(); });
+        keepList = String(raw || '').split(',').filter(function(x){
+          return x && x.trim() && item.pkgs && item.pkgs.indexOf(x.trim()) >= 0;
+        }).map(function(x){ return x.trim(); });
       }
       // ---------- 第二级：包类功能全部做真实状态校验 ----------
       if (!item.pkgs || !item.pkgs.length) {
@@ -1264,11 +1287,35 @@ var app = Vue.createApp({
         self.debugData[item.key].verifyRaw = verifyR.stdout.trim() || '(空)';
         self.parsePkgStates(item, verifyR.stdout);
         // 【方案 B】逐包双向校验：期望状态 vs 真实状态
+        // 【v2.1.1】期望状态推导：
+        //  - 普通功能：本项 config 开关 + 本项 keep 白名单
+        //  - 合成子组(synthetic)：按"子项自身 config 开关 + 子项自身 keep"逐包推导，
+        //    避免总开关未单独配置时(恒 false)把子项已禁用的包误判为"期望启用却被禁用"。
         var problems = [];
         var keptNames = {};
         keepList.forEach(function(p) { keptNames[p] = true; });
         item.pkgs.forEach(function(p) {
-          var expectDisabled = cfgEnabled && !keptNames[p];
+          var expectDisabled;
+          if (item.synthetic && item.subItems) {
+            // 找到该包所属的子项，用该子项的配置推导期望
+            var owner = null;
+            item.subItems.forEach(function(si) {
+              if (!owner && si.pkgs && si.pkgs.indexOf(p) >= 0) owner = si;
+            });
+            if (owner) {
+              var ownerOn = !!(self.config && self.config[owner.key] === true);
+              var ownerKeep = [];
+              if (self.config) {
+                var oraw = self.config[owner.key + '_keep'];
+                ownerKeep = String(oraw || '').split(',').filter(function(x){ return x && x.trim(); });
+              }
+              expectDisabled = ownerOn && ownerKeep.indexOf(p) < 0;
+            } else {
+              expectDisabled = false; // 未归属任何子项，跳过期望不符提示
+            }
+          } else {
+            expectDisabled = cfgEnabled && !keptNames[p];
+          }
           var actual = self.pkgStates[item.key] && self.pkgStates[item.key][p];
           if (actual === 'unknown' || !actual) return; // 无法判定，跳过
           if (expectDisabled) {
@@ -1327,6 +1374,12 @@ var app = Vue.createApp({
             allItems.push({
               key: sub.subKey,
               title: sub.name + '（总开关）',
+              // 【v2.1.1】标记为合成子组并引用子项列表：
+              // checkItem 对合成子组按"各子项自身配置"逐包推导期望状态，
+              // 而不是读取 config[subKey]（用户从未单独开过总开关时该值恒 false，
+              // 会导致"期望全部启用"与子项实际禁用冲突的误报 Warn）。
+              synthetic: true,
+              subItems: sub.items,
               pkgs: subPkgs,
               checkCmd: 'r="ok"; for p in ' + subPkgs.join(' ') + '; do pm list packages -d --user 0 2>/dev/null | grep -qF "package:$p" || r="running"; done; echo "$r"',
               verifyCmd: 'for p in ' + subPkgs.join(' ') + '; do if pm list packages -d --user 0 2>/dev/null | grep -qF "package:$p"; then echo "$p:disabled"; elif ! pm list packages --user 0 2>/dev/null | grep -qF "package:$p"; then echo "$p:missing"; else echo "$p:enabled"; fi; done'
