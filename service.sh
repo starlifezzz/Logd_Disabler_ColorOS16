@@ -174,10 +174,41 @@ if [ "$PMS_READY" != "1" ]; then
     log "[PMS] ⚠️ 120 秒内 pm 仍无法列出包，pm 操作可能失败"
 fi
 
+# 【v2.0.2】杀进程：禁用成功后立即清理该包残留进程
+# 原因：pm disable-user 只阻止包再次启动，不会杀掉已运行进程
+# （实测 exsystemservice/subsys 禁用后进程仍存活，直到重启）。
+# 此处补一刀 pkill，让禁用立即生效、立刻释放内存。
+# 警告：pkill 会终止该包全部进程（含 :service 子进程），
+#       仅作用于刚被禁用的包——keep 白名单保留的包不会走到这里。
+# 循环 2 次（间隔 2 秒）：部分常驻系统组件被杀后可能被系统短暂拉起。
+kill_pkg_procs() {
+    local pkg="$1"
+    local i
+    # 【v2.0.3】先 am force-stop（对 persistent 进程有效，会连同其所有服务/广播一起终止）
+    am force-stop "$pkg" 2>/dev/null
+    for i in 1 2 3; do
+        if pkill -f "$pkg" 2>/dev/null; then
+            log "  🔪 已终止残留进程: $pkg (第${i}次)"
+            sleep 2
+        else
+            [ "$i" = "1" ] && log "  📭 无残留进程: $pkg"
+            return 0
+        fi
+    done
+    # 3 轮后仍存活（persistent 被系统拉起），尝试按 UID 清理
+    local uid
+    uid=$(pmx pm list packages --user 0 2>/dev/null | grep -qF "$pkg" && dumpsys package "$pkg" 2>/dev/null | grep -E "^ *userId=" | head -1 | grep -oE "[0-9]+")
+    if [ -n "$uid" ]; then
+        am force-stop --user 0 "$pkg" 2>/dev/null
+        log "  ⚠️ $pkg 持续存活（persistent），已按 UID=$uid 尝试强杀"
+    fi
+}
+
 # 禁用包：优先 pm disable-user，失败则 fallback 到 pm uninstall
 # 第二个参数为可选 keep 键名（如 disable_ai_assistants），
 # 若该包在 config.json 的 <key>_keep（逗号分隔）中则跳过禁用——
 # 用于支持 WebUI 单独启用子包。
+# 【v2.0.2】成功后自动调用 kill_pkg_procs 清理残留进程。
 disable_pkg() {
     local pkg="$1"
     local keep_key="$2"
@@ -189,7 +220,17 @@ disable_pkg() {
             local k
             for k in $(echo "$keep_val" | tr ',' ' '); do
                 if [ "$k" = "$pkg" ]; then
-                    log "  ⏭️ 跳过（WebUI 白名单保留）: $pkg"
+                    # 【修复】白名单包=用户在 WebUI 保留启用：
+                    # 不仅“跳过禁用”，还必须确保其处于启用态——
+                    # 若此前被 UI 总开关即时路径禁掉（pm disabled），
+                    # 此处重新 pm enable 拉回，保证重启后与配置一一对应。
+                    if pmx pm list packages -d --user 0 | grep -qF "package:$pkg"; then
+                        log "  🔄 白名单包被禁用，恢复启用: $pkg"
+                        result=$(pmx_verbose pm enable "$pkg")
+                        log "  $result"
+                    else
+                        log "  ⏭️ 跳过（WebUI 白名单保留）: $pkg"
+                    fi
                     return 0
                 fi
             done
@@ -204,6 +245,7 @@ disable_pkg() {
     result=$(pmx_verbose pm disable-user --user 0 "$pkg")
     if echo "$result" | grep -qiE "new state: disabled|Success"; then
         log "  ✅ disable-user 成功: $pkg"
+        kill_pkg_procs "$pkg"
         return 0
     fi
     log "  ⚠️ disable-user 失败: $pkg ($result)"
@@ -211,9 +253,23 @@ disable_pkg() {
     result2=$(pmx_verbose pm uninstall -k --user 0 "$pkg")
     if echo "$result2" | grep -q "Success"; then
         log "  ✅ uninstall fallback 成功: $pkg"
+        kill_pkg_procs "$pkg"
         return 0
     fi
-    log "  ❌ 两种方法均失败: $pkg"
+    log "  ⚠️ uninstall fallback 失败: $pkg ($result2)"
+    # 方法3：pm disable --user 0（全局禁用，persistent 应用专用兜底）
+    # 【v2.0.3】com.coloros.lockassistant 等 persistent 应用无法被 disable-user
+    # 禁用（系统立即重新拉起），改用全局 disable + 强杀进程组合。
+    result3=$(pmx_verbose pm disable --user 0 "$pkg" 2>&1)
+    if echo "$result3" | grep -qiE "new state: disabled|Success"; then
+        log "  ✅ pm disable 成功（persistent 兜底）: $pkg"
+        # persistent 应用禁用后系统会尝试重启，需多轮强杀
+        kill_pkg_procs "$pkg"
+        sleep 2
+        kill_pkg_procs "$pkg"
+        return 0
+    fi
+    log "  ❌ 三种方法均失败: $pkg ($result3)"
     return 1
 }
 
@@ -251,7 +307,14 @@ enable_pkg() {
         log "  ✅ install-existing fallback 成功: $pkg"
         return 0
     fi
-    log "  ❌ 两种恢复方法均失败: $pkg"
+    log "  ⚠️ install-existing fallback 失败: $pkg ($result2)"
+    # 方法3：pm enable（全局恢复，对应 disable_pkg 方法3 的 persistent 兜底）
+    result3=$(pmx_verbose pm enable "$pkg" 2>&1)
+    if echo "$result3" | grep -qiE "new state: enabled|Success"; then
+        log "  ✅ pm enable 成功（persistent 恢复）: $pkg"
+        return 0
+    fi
+    log "  ❌ 三种恢复方法均失败: $pkg ($result3)"
     return 1
 }
 
@@ -271,12 +334,12 @@ disable_wallet_services|com.oplus.pay,com.coloros.securepay
 disable_backup_services|com.oplus.wifibackuprestore,com.heytap.cloud
 disable_ai_assistants|com.oplus.aimemory,com.oplus.aiunit,com.oplus.aiwidgets,com.oplus.aiwriter,com.oplus.metis,com.oplus.obrain,com.oplus.deepthinker,com.coloros.colordirectservice
 disable_voice_assistants|com.oplus.ovoicemanager,com.oplus.ovoicemanager.wakeup,com.heytap.speechassist,com.oplus.ttsaccessibilityengine
-disable_theme_services|com.oplus.themestore,com.heytap.themestore,com.oplus.keyguard.clock.magazine,com.oplus.keyguard.clock.gallery,com.oplus.keyguard.clock.graffiti,com.oplus.keyguard.personality.clocks,com.oplus.keyguard.style.widgets,com.heytap.pictorial
+disable_theme_services|com.oplus.themestore,com.heytap.themestore,com.oplus.keyguard.clock.magazine,com.oplus.keyguard.clock.gallery,com.oplus.keyguard.clock.graffiti,com.oplus.keyguard.personality.clocks,com.oplus.keyguard.style.widgets,com.heytap.pictorial,com.oplus.wallpapers,com.android.wallpaper.livepicker,com.coloros.lockassistant
 disable_network_optimization|com.oplus.networksense,com.oplus.cellularqoe,com.oplus.tai.wifiqoe,com.oplus.tai.borderpresearch,com.oplus.nearcomm
 disable_security_services|com.oplus.securitykeyboard,com.coloros.securityguard
 disable_media_services|com.oplus.screenrecorder,com.coloros.karaoke,com.oplus.mediacontroller,com.oplus.mediaturbo
 disable_system_tools|com.oplus.powermonitor,com.oplus.audiomonitor,com.oplus.logkit,com.oplus.engineermode,com.oplus.crashbox,com.oplus.contentportal,com.oplus.postmanservice,com.oplus.subsys,com.oplus.engineernetwork
-disable_speedview|com.coloros.ocs.opencapabilityservice
+disable_speedview|com.coloros.ocs.opencapabilityservice,com.coloros.assistantscreen
 disable_app_recover|com.oplus.apprecover
 disable_double_tap|com.oplus.exsystemservice
 disable_notification_mgr|com.oplus.notificationmanager
@@ -416,7 +479,6 @@ if is_on "block_ads_and_tracking"; then
     setprop persist.sys.usage_stat_enable 0
     setprop persist.oppo.collect 0
     disable_pkg "com.oplus.statistics.rom" "block_ads_and_tracking"
-    disable_pkg "com.coloros.assistantscreen" "block_ads_and_tracking"
     disable_pkg "com.coloros.sceneservice" "block_ads_and_tracking"
     log "[Ads] 完成"
 else
@@ -432,7 +494,6 @@ else
     setprop persist.sys.usage_stat_enable 1
     setprop persist.oppo.collect 1
     enable_pkg "com.oplus.statistics.rom"
-    enable_pkg "com.coloros.assistantscreen"
     enable_pkg "com.coloros.sceneservice"
     log "[Ads] 恢复完成"
 fi
