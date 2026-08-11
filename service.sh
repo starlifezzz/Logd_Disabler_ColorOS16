@@ -22,6 +22,11 @@ log() {
 }
 
 log "========== service.sh 开始执行 =========="
+# 【v2.1.2】开始即写入"运行中"标记（status=running），结束后覆写为 status=ok。
+# WebUI 检测逻辑：读到 running/无文件 → 判定为开机优化未完成，跳过 Warn，
+# 避免时序竞态误报（WebUI 早于 service.sh 完成 verifyCmd）。
+echo "last_run=$(date '+%Y-%m-%d %H:%M:%S')" > "$WORK_DIR/service_status.log"
+echo "status=running" >> "$WORK_DIR/service_status.log"
 
 # ===================== 配置读取 =====================
 # 【v2.0】所有开关状态统一从 config.json 读取（WebUI 唯一写入者）
@@ -636,6 +641,8 @@ else
 fi
 
 # ===================== 写入状态 =====================
+# 【v2.1.2】写入完成标记：WebUI 检测前先读此文件判断 service.sh 是否已跑完。
+# 避免"开机后 WebUI 立即 verifyCmd、service.sh 还在逐一禁用"导致的时序误报。
 echo "last_run=$(date '+%Y-%m-%d %H:%M:%S')" > "$WORK_DIR/service_status.log"
 echo "status=ok" >> "$WORK_DIR/service_status.log"
 log "========== service.sh 执行完毕 =========="

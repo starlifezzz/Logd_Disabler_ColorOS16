@@ -765,6 +765,7 @@ var app = Vue.createApp({
       moduleVersion: 'v1.4',
       ksuVersion: 'KernelSU',
       selinuxStatus: '检测中...',
+      serviceReady: false,
       currentPage: 'home'
     };
   },
@@ -1251,6 +1252,33 @@ var app = Vue.createApp({
       this.onSwitchChange(item, e);
     },
     // ---------- 状态检测 ----------
+    // 【v2.1.2】waitServiceReady：读取 service.sh 状态文件，判断开机优化是否已完成。
+    // service.sh 启动即写 status=running，全部执行完毕覆写 status=ok。
+    // WebUI 需等 status=ok 才做严格双向校验，否则仅记录不过滤 Warn，
+    // 彻底消除"开机后检测早于 service.sh 完成"的时序竞态误报。
+    waitServiceReady: function(timeoutMs) {
+      var self = this;
+      var start = Date.now();
+      function poll() {
+        return sh('cat /data/adb/logd_disabler/service_status.log 2>/dev/null').then(function(r) {
+          var out = String(r.stdout || '');
+          if (/status=ok/.test(out)) return true;
+          if (/status=running/.test(out)) {
+            // 仍在执行：未超时则继续等
+            if (Date.now() - start < timeoutMs) {
+              return new Promise(function(res) { setTimeout(function() { res(poll()); }, 1500); });
+            }
+            return false; // 超时（异常情况）
+          }
+          // 文件不存在/空：可能是清除数据后首次开机，给 3 秒后重试一次再放弃
+          if (Date.now() - start < timeoutMs) {
+            return new Promise(function(res) { setTimeout(function() { res(poll()); }, 1500); });
+          }
+          return false;
+        });
+      }
+      return poll();
+    },
     // 【v2.1 检测机制】两级策略：
     // 第一级（立即）：从 config.json 读开关状态，无任何 exec，首屏秒开。
     // 第二级（异步）：对【所有】包类功能执行 verifyCmd（无论开关开/关），
@@ -1259,8 +1287,12 @@ var app = Vue.createApp({
     //   - 功能开 + 白名单包   → 期望 enabled（否则 Warn：白名单包被误禁）
     //   - 功能关             → 期望 enabled（否则 Warn：恢复失败）
     // 彻底解决“WebUI 显示正常但实际被禁用”而检测机制无感知的问题。
-    checkItem: function(item, quick) {
+    checkItem: function(item, quick, ready) {
       var self = this;
+      // 【v2.1.2】ready=false 表示 service.sh 尚未跑完（开机时序竞态防御）。
+      // 此时仍解析状态供显示，但禁止产生 Warn——避免"期望禁用却仍启用"
+      // 在 service.sh 还没禁到该包时的误报。
+      var canWarn = (ready !== false);
       var s = this.state[item.key];
       // ---------- 第一级：config.json 状态（零 exec） ----------
       var cfgEnabled = !!(this.config && this.config[item.key] === true);
@@ -1339,11 +1371,16 @@ var app = Vue.createApp({
             if (st === 'unknown') self.pkgStates[item.key][p] = 'unknown';
           });
         }
-        if (problems.length > 0) {
+        if (problems.length > 0 && canWarn) {
           // 校验失败：配置与实际不一致 → Warn + pending
           s.status = 'pending';
           s.enabled = cfgEnabled; // 开关仍按配置显示，但状态标 pending 提示
           self.addLog('⚠️ ' + item.title + ' 检测到状态不一致：' + problems.join('；'), 'warn');
+        } else if (problems.length > 0 && !canWarn) {
+          // 【v2.1.2】service.sh 尚未跑完：真实状态未定，仅记录不 Warn
+          s.status = 'pending';
+          s.enabled = cfgEnabled;
+          self.addLog('⏳ ' + item.title + ' 状态待确认（service.sh 执行中，稍后自动复检）', 'info');
         } else {
           // 校验通过：配置与真实状态一致 → 清除此前的瞬时误报 Warn
           s.status = cfgEnabled ? 'enabled' : 'disabled';
@@ -1395,12 +1432,28 @@ var app = Vue.createApp({
         self.checkItem(item, true);
       });
       self.progress = 40;
+      // 【v2.1.2】时序竞态防御：
+      // 开机后 WebUI 可能比 service.sh 早完成检测（service.sh 需约 17 秒
+      // 逐一禁用各包），导致"期望禁用却仍启用"的误报 Warn。
+      // 第二级校验前先读 $WORK_DIR/service_status.log：
+      //  - status=running / 文件不存在 → 等待轮询（最长 30 秒），期间跳过 Warn
+      //  - status=ok → 正常执行双向校验
+      var svcDone = self.waitServiceReady(30000);
       // 第二级：异步对【全部】包类功能执行 verifyCmd，
       // 双向校验"期望状态 vs 真实 pm 状态"（含已禁用功能的恢复一致性）
-      var chain = Promise.resolve();
+      var chain = svcDone.then(function(ready) {
+        self.serviceReady = ready;
+        if (ready) {
+          self.addLog('ℹ️ service.sh 已完成，执行严格状态校验');
+        } else {
+          self.addLog('ℹ️ service.sh 尚未完成（或状态文件缺失），本次检测跳过 Warn 校验', 'info');
+        }
+        return ready;
+      });
       allItems.forEach(function(item, i) {
-        chain = chain.then(function() {
-          return self.checkItem(item, false).then(function() {
+        chain = chain.then(function(ready) {
+          // 未就绪时传入 ready=false，checkItem 只记录不 Warn
+          return self.checkItem(item, false, ready).then(function() {
             self.progress = 40 + Math.round(((i + 1) / allItems.length) * 60);
           });
         });
@@ -1412,6 +1465,14 @@ var app = Vue.createApp({
       }).then(function() {
         self.addLog('=== 状态检测完成 ===');
         self.checking = false;
+        // 【v2.1.2】若本轮 service.sh 未就绪（跳过 Warn），
+        // 延时自动复检一次，确保最终状态与 Warn 准确。
+        if (!self.serviceReady) {
+          self.addLog('ℹ️ 等待 service.sh 完成后自动复检...', 'info');
+          setTimeout(function() {
+            self.refreshAll();
+          }, 15000);
+        }
       });
     },
     // ---------- Debug ----------
