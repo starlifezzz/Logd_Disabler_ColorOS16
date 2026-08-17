@@ -75,6 +75,21 @@ mdui-dialog .dlg-header, mdui-dialog .dlg-body, mdui-dialog .dlg-actions{width:1
 .about-tips{padding:8px 20px 16px;display:flex;flex-direction:column;gap:10px}
 .tip-row{font-size:13px;line-height:1.6;color:var(--mdui-color-on-surface-variant);padding:10px 12px;border-radius:8px;background:rgba(var(--mdui-color-surface-container-high),.5)}
 .tip-row b{color:var(--mdui-color-on-surface)}
+/* ===== 性能对比页 ===== */
+.perf-tips{padding:4px 20px 8px;display:flex;flex-direction:column;gap:10px}
+.perf-actions{display:flex;gap:10px;flex-wrap:wrap;padding:0 20px 12px}
+.perf-table-wrap{padding:0 16px 12px;overflow-x:auto}
+.perf-table{width:100%;border-collapse:collapse;font-size:13px;min-width:320px}
+.perf-table th,.perf-table td{padding:9px 10px;text-align:left;border-bottom:1px solid rgba(var(--mdui-color-on-surface),.08)}
+.perf-table th{font-size:12px;color:var(--mdui-color-on-surface-variant);font-weight:500;white-space:nowrap}
+.perf-table td{font-family:monospace;font-size:12.5px}
+.perf-table td:first-child{font-family:inherit;color:var(--mdui-color-on-surface-variant)}
+.perf-sub{font-size:10.5px;opacity:.7}
+.perf-note{font-size:11.5px;color:var(--mdui-color-on-surface-variant);padding:6px 2px 0}
+.perf-empty{display:flex;flex-direction:column;align-items:center;gap:8px;padding:26px 20px 28px;font-size:13px;color:var(--mdui-color-on-surface-variant);text-align:center}
+.delta-good{color:#2e7d32;font-weight:500}
+.delta-bad{color:#c62828;font-weight:500}
+.delta-none{color:var(--mdui-color-on-surface-variant)}
 /* ===== GitHub 页（预留） ===== */
 .gh-profile{display:flex;flex-direction:column;align-items:center;gap:8px;padding:32px 20px;text-align:center}
 .gh-avatar{--mdui-avatar-background:var(--mdui-color-primary);color:#fff;font-size:28px;font-weight:600}
@@ -398,6 +413,23 @@ mdui-list-item::part(body){justify-content:center;gap:0}
 
     <mdui-card class="card-gap" variant="elevated">
       <div class="group-header">
+        <span class="group-ico"><mdui-icon name="save--outlined"></mdui-icon></span>
+        <span class="group-name">配置管理</span>
+      </div>
+      <div class="about-tips">
+        <div class="tip-row">备份当前全部开关与白名单到 <b>/storage/emulated/0/Download/coloros16_config.json</b>，刷机/重装后可快速恢复。</div>
+      </div>
+      <div class="perf-actions" style="padding:0 20px 16px">
+        <mdui-button variant="tonal" icon="save_alt--outlined" @click="exportConfig()">导出配置</mdui-button>
+        <mdui-button variant="text" icon="upload_file--outlined" @click="importConfig()">导入配置</mdui-button>
+      </div>
+      <div class="perf-actions" style="padding:0 20px 16px">
+        <mdui-button variant="text" icon="restore--outlined" @click="restoreDefault()">恢复默认（全部未优化）</mdui-button>
+      </div>
+    </mdui-card>
+
+    <mdui-card class="card-gap" variant="elevated">
+      <div class="group-header">
         <span class="group-ico"><mdui-icon name="tips_and_updates--outlined"></mdui-icon></span>
         <span class="group-name">使用说明</span>
       </div>
@@ -423,9 +455,58 @@ mdui-list-item::part(body){justify-content:center;gap:0}
     </mdui-card>
   </div>
 
-  <!-- 底部导航栏（Material 3 Navigation Bar：优化 / 日志 / 关于 / GitHub） -->
+  <!-- ========== 性能对比页（A/B 基准） ========== -->
+  <div class="page" v-show="currentPage==='perf'">
+    <mdui-card class="card-gap" variant="elevated">
+      <div class="group-header">
+        <span class="group-ico"><mdui-icon name="monitoring--outlined"></mdui-icon></span>
+        <span class="group-name">性能基准（优化前后对比）</span>
+        <span class="group-count">{{ perfState.label }}</span>
+      </div>
+      <div class="perf-tips">
+        <div class="tip-row">采集当前 <b>RAM 占用 / CPU 负载 / 运行进程数</b>，与之前的"优化前基准"对比。</div>
+        <div class="tip-row">建议在<b>相同场景</b>（相同时间点、相近使用状态）采集两次：优化前拍一次基准，优化后拍一次现状。</div>
+      </div>
+      <div class="perf-actions">
+        <mdui-button variant="tonal" icon="adjust--outlined" @click="capturePerf()" :disabled="perfCapturing">
+          {{ perfCapturing ? '采集中...' : (perfState.label === '当前' ? '采集当前数据' : '重新采集当前数据') }}
+        </mdui-button>
+        <mdui-button variant="text" icon="restore--outlined" @click="resetPerf()">清除对比</mdui-button>
+      </div>
+
+      <!-- 对照表 -->
+      <div class="perf-table-wrap" v-if="perfState.before || perfState.after">
+        <table class="perf-table">
+          <thead>
+            <tr>
+              <th>指标</th>
+              <th v-if="perfState.before">优化前<br><span class="perf-sub">{{ perfState.before.time }}</span></th>
+              <th v-if="perfState.after">当前<br><span class="perf-sub">{{ perfState.after.time }}</span></th>
+              <th v-if="perfState.before && perfState.after">变化</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr v-for="row in perfRows" :key="row.key">
+              <td>{{ row.name }}</td>
+              <td v-if="perfState.before">{{ row.before }}</td>
+              <td v-if="perfState.after">{{ row.after }}</td>
+              <td v-if="perfState.before && perfState.after" :class="row.deltaClass">{{ row.delta }}</td>
+            </tr>
+          </tbody>
+        </table>
+        <div class="perf-note">变化列：绿色=优化有效（占用下降/负载下降），红色=变差，灰色=无变化</div>
+      </div>
+      <div class="perf-empty" v-if="!perfState.before && !perfState.after">
+        <mdui-icon name="bar_chart--outlined" style="font-size:36px;opacity:.4"></mdui-icon>
+        <div>尚未采集数据。建议在<b>优化前</b>先点"采集当前数据"记录基准。</div>
+      </div>
+    </mdui-card>
+  </div>
+
+  <!-- 底部导航栏（Material 3 Navigation Bar：优化 / 性能 / 日志 / 关于 / GitHub） -->
   <mdui-navigation-bar class="bottom-nav" :value="currentPage" @change="setPage($event.target.value)">
     <mdui-navigation-bar-item value="home" icon="speed--outlined" active-icon="speed--outlined" label="优化"></mdui-navigation-bar-item>
+    <mdui-navigation-bar-item value="perf" icon="monitoring--outlined" active-icon="monitoring--outlined" label="性能"></mdui-navigation-bar-item>
     <mdui-navigation-bar-item value="log" icon="receipt_long--outlined" active-icon="receipt_long--outlined" label="日志"></mdui-navigation-bar-item>
     <mdui-navigation-bar-item value="about" icon="info--outlined" active-icon="info--outlined" label="关于"></mdui-navigation-bar-item>
     <mdui-navigation-bar-item value="github" icon="person--outlined" active-icon="person--outlined" label="GitHub"></mdui-navigation-bar-item>
@@ -766,7 +847,12 @@ var app = Vue.createApp({
       ksuVersion: 'KernelSU',
       selinuxStatus: '检测中...',
       serviceReady: false,
-      currentPage: 'home'
+      currentPage: 'home',
+      // ===== 性能对比（A/B 基准） =====
+      perfState: { before: null, after: null, label: '未采集' },
+      perfCapturing: false,
+      // ===== 配置管理 =====
+      cfgOpBusy: false
     };
   },
   computed: {
@@ -786,9 +872,202 @@ var app = Vue.createApp({
       var n = 0;
       FEATURES.forEach(function(g) { n += g.items.length; });
       return n;
+    },
+    // ===== 性能对比表行（before/after 对照 + 变化列） =====
+    perfRows: function() {
+      var self = this;
+      var before = this.perfState.before;
+      var after = this.perfState.after;
+      var rows = [
+        { key: 'ram', name: '内存占用' },
+        { key: 'cpu', name: 'CPU 负载' },
+        { key: 'procs', name: '运行进程数' }
+      ];
+      return rows.map(function(r) {
+        var b = before ? before[r.key] : null;
+        var a = after ? after[r.key] : null;
+        var out = { key: r.key, name: r.name, before: b !== null ? b : '—', after: a !== null ? a : '—', delta: '', deltaClass: 'delta-none' };
+        if (b !== null && a !== null) {
+          var db = a - b;
+          var better = (r.key === 'ram' || r.key === 'cpu' || r.key === 'procs') ? db < 0 : db > 0;
+          if (Math.abs(db) < 0.05 && r.key !== 'procs') {
+            out.delta = '≈';
+            out.deltaClass = 'delta-none';
+          } else if (r.key === 'procs') {
+            out.delta = (db < 0 ? '−' : db > 0 ? '+' : '') + Math.abs(db) + ' 个';
+            out.deltaClass = db < 0 ? 'delta-good' : db > 0 ? 'delta-bad' : 'delta-none';
+          } else {
+            out.delta = (db < 0 ? '−' : db > 0 ? '+' : '') + Math.abs(db).toFixed(1) + (r.key === 'ram' ? ' GB' : ' %');
+            out.deltaClass = db < 0 ? 'delta-good' : db > 0 ? 'delta-bad' : 'delta-none';
+          }
+        }
+        return out;
+      });
     }
   },
   methods: {
+    // ---------- 性能基准（A/B 对比） ----------
+    // 采集：RAM 占用(GB) / CPU 负载(%) / 运行进程数(个)
+    // 用 /proc/meminfo + top + ps 汇总。label 语义：
+    //  - 首次采集 → "优化前"（基准）
+    //  - 已有基准再采集 → "当前"
+    capturePerf: function() {
+      var self = this;
+      this.perfCapturing = true;
+      // CPU 解析兼容两种 top 格式：
+      //  - 标准 "%Cpu(s): 12.3 us, ..."（busy=100-us）
+      //  - toybox "%cpu 23.4% user, ..."（busy=100-user）
+      // 均取 us/user 前的数字作为"占用"。
+      var cmd = [
+        "memo=$(awk '/MemTotal/{t=$2}/MemAvailable/{a=$2}END{printf \"%.2f\",(t-a)/1024/1024}' /proc/meminfo 2>/dev/null)",
+        "topline=$(top -b -n 2 -d 0.3 2>/dev/null | grep -im1 -E '%c?pu' | tail -1)",
+        "cpu=$(echo \"$topline\" | awk -F'[ ,]+' '{for(i=1;i<=NF;i++){if($i ~ /[0-9]/ && $(i+1) ~ /us|user/){print 100-$i; exit}}}' )",
+        "procs=$(ps -A 2>/dev/null | wc -l)",
+        "echo \"RAM:$memo CPU:$cpu PROCS:$procs\""
+      ].join('; ');
+      this.addLog('正在采集性能数据...');
+      sh(cmd).then(function(r) {
+        var m = String(r.stdout || '').match(/RAM:([0-9.]+)\s+CPU:([0-9.]+)\s+PROCS:(\d+)/);
+        if (!m) {
+          self.addLog('性能采集失败: ' + (r.stdout || r.stderr || '未知'), 'error');
+          self.perfCapturing = false;
+          return;
+        }
+        var now = new Date();
+        var stamp = now.getFullYear() + '-' + ('0'+(now.getMonth()+1)).slice(-2) + '-' + ('0'+now.getDate()).slice(-2) + ' ' + ('0'+now.getHours()).slice(-2) + ':' + ('0'+now.getMinutes()).slice(-2);
+        var snap = { ram: parseFloat(m[1]), cpu: parseFloat(m[2]), procs: parseInt(m[3], 10), time: stamp };
+        if (!self.perfState.before) {
+          self.perfState.before = snap;
+          self.perfState.label = '已有优化前基准';
+          self.addLog('✅ 已记录"优化前"基准：RAM=' + snap.ram + 'GB CPU=' + snap.cpu + '% 进程=' + snap.procs);
+        } else {
+          self.perfState.after = snap;
+          self.perfState.label = '对比完成';
+          self.addLog('✅ 已采集"当前"数据：RAM=' + snap.ram + 'GB CPU=' + snap.cpu + '% 进程=' + snap.procs + '（与优化前基准对比）');
+        }
+        // 持久化性能基准到 perf.json（config 同目录），防止切页/刷新丢失
+        self.savePerf();
+        self.perfCapturing = false;
+      }).catch(function(e) {
+        self.addLog('性能采集异常: ' + e, 'error');
+        self.perfCapturing = false;
+      });
+    },
+    resetPerf: function() {
+      this.perfState = { before: null, after: null, label: '未采集' };
+      // 删除持久化的 perf.json
+      sh('rm -f "' + CONFIG_PATH.replace('config.json', 'perf.json') + '" 2>/dev/null');
+      this.addLog('已清除性能对比数据');
+    },
+    // 持久化 perfState → /data/adb/Logd_Disabler_ColorOS16/perf.json
+    savePerf: function() {
+      var json = JSON.stringify({ before: this.perfState.before, after: this.perfState.after }, null, 2);
+      var b64 = btoa(unescape(encodeURIComponent(json)));
+      var p = CONFIG_PATH.replace('config.json', 'perf.json');
+      var cmd = 'echo "' + b64 + '" | base64 -d > "' + p + '.tmp" && mv "' + p + '.tmp" "' + p + '"';
+      sh(cmd);
+    },
+    // 加载持久化的 perf.json（mounted 时调用）
+    loadPerf: function() {
+      var self = this;
+      var p = CONFIG_PATH.replace('config.json', 'perf.json');
+      sh('cat "' + p + '" 2>/dev/null').then(function(r) {
+        var out = String(r.stdout || '').trim();
+        if (!out) return;
+        try {
+          var d = JSON.parse(out);
+          if (d && d.before) {
+            self.perfState.before = d.before;
+            self.perfState.after = d.after || null;
+            self.perfState.label = d.after ? '对比完成' : '已有优化前基准';
+          }
+        } catch(e) { /* 文件损坏则忽略，下次采集覆盖 */ }
+      });
+    },
+    // ---------- 配置备份 / 导入 ----------
+    // 导出到 /storage/emulated/0/Download/coloros16_config.json
+    exportConfig: function() {
+      var self = this;
+      if (!this.config) { this.addLog('无可导出的配置（config 未加载）', 'warn'); return; }
+      this.cfgOpBusy = true;
+      var json = JSON.stringify(this.config, null, 2);
+      var b64 = btoa(unescape(encodeURIComponent(json)));
+      var cmd = 'echo "' + b64 + '" | base64 -d > /storage/emulated/0/Download/coloros16_config.json && echo OK';
+      sh(cmd).then(function(r) {
+        self.cfgOpBusy = false;
+        if (/OK/.test(r.stdout)) {
+          self.addLog('✅ 配置已导出到 /storage/emulated/0/Download/coloros16_config.json');
+        } else {
+          self.addLog('导出失败: ' + (r.stderr || '未知'), 'error');
+        }
+      });
+    },
+    // 导入：从 Download 读取 coloros16_config.json，覆盖当前配置并立即刷新状态
+    importConfig: function() {
+      var self = this;
+      this.cfgOpBusy = true;
+      sh('cat /storage/emulated/0/Download/coloros16_config.json 2>/dev/null').then(function(r) {
+        var out = String(r.stdout || '').trim();
+        if (!out) {
+          self.cfgOpBusy = false;
+          self.addLog('未找到 /storage/emulated/0/Download/coloros16_config.json', 'warn');
+          return;
+        }
+        var cfg = null;
+        try { cfg = JSON.parse(out); } catch(e) { cfg = null; }
+        if (!cfg || typeof cfg !== 'object') {
+          self.cfgOpBusy = false;
+          self.addLog('导入文件格式无效（非合法 JSON）', 'error');
+          return;
+        }
+        // 覆盖当前配置并原子写回
+        self.config = cfg;
+        self.writeConfig().then(function(ok) {
+          self.cfgOpBusy = false;
+          if (ok) {
+            self.addLog('✅ 配置已导入，刷新状态中...');
+            // 更新全部开关 UI 状态
+            FEATURES.forEach(function(g) {
+              g.items.forEach(function(item) {
+                var v = !!(self.config && self.config[item.key] === true);
+                if (self.state[item.key]) {
+                  self.state[item.key].enabled = v;
+                  self.state[item.key].status = v ? 'enabled' : 'disabled';
+                }
+              });
+            });
+            self.refreshAll();
+          } else {
+            self.addLog('导入配置写回失败', 'error');
+          }
+        });
+      });
+    },
+    // 恢复默认：全部开关置 false，写回并刷新
+    restoreDefault: function() {
+      var self = this;
+      if (!this.config) this.config = {};
+      this.cfgOpBusy = true;
+      // 清掉所有功能开关与 keep，保留 version 字段
+      var keep = { version: this.config.version || 2 };
+      FEATURES.forEach(function(g) {
+        g.items.forEach(function(item) {
+          keep[item.key] = false;
+          delete keep[item.key + '_keep'];
+          if (item.subGroupKey) keep[item.subGroupKey] = false;
+        });
+      });
+      this.config = keep;
+      this.writeConfig().then(function(ok) {
+        self.cfgOpBusy = false;
+        if (ok) {
+          self.addLog('✅ 已恢复默认（全部未优化），刷新状态中...');
+          self.refreshAll();
+        } else {
+          self.addLog('恢复默认写回失败', 'error');
+        }
+      });
+    },
     // ---------- 日志 ----------
     scrollTop: function() {
       window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -1591,6 +1870,8 @@ var app = Vue.createApp({
     this.readConfig().then(function() {
       self.refreshAll();
     });
+    // 【v2.2.0】恢复持久化的性能基准数据
+    this.loadPerf();
   }
 });
 
