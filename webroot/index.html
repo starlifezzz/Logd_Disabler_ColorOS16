@@ -1225,6 +1225,11 @@ var app = Vue.createApp({
       var item = {
         key: sub.subKey,
         title: sub.name + '（总开关）',
+        // 【v2.1.3】补上 synthetic/subItems：onSwitchChange 即时禁用路径
+        // 通过 pkgKeptBySub 检查子项 keep 白名单，缺少 subItems 时
+        // 总开关禁用会把用户单独保留的子包也 pm disable。
+        synthetic: true,
+        subItems: sub.items,
         pkgs: sub.items.reduce(function(a, it) { return a.concat(it.pkgs || []); }, [])
       };
       // 确保 pkgStates 已初始化（刷新时已由合成 item 写入）
@@ -1466,12 +1471,17 @@ var app = Vue.createApp({
         self.addLog('=== 状态检测完成 ===');
         self.checking = false;
         // 【v2.1.2】若本轮 service.sh 未就绪（跳过 Warn），
-        // 延时自动复检一次，确保最终状态与 Warn 准确。
-        if (!self.serviceReady) {
-          self.addLog('ℹ️ 等待 service.sh 完成后自动复检...', 'info');
+        // 延时自动复检，确保最终状态与 Warn 准确。
+        // 【v2.1.3】复检次数上限：service.sh 异常/文件缺失时避免无限循环刷新
+        if (!self.serviceReady && (self.retryCount || 0) < 3) {
+          self.retryCount = (self.retryCount || 0) + 1;
+          self.addLog('ℹ️ 等待 service.sh 完成后自动复检（第 ' + self.retryCount + '/3 次）...', 'info');
           setTimeout(function() {
             self.refreshAll();
           }, 15000);
+        } else if (!self.serviceReady) {
+          self.retryCount = 0;
+          self.addLog('⚠️ service.sh 状态文件缺失或执行异常，已停止自动复检（可稍后手动刷新）', 'warn');
         }
       });
     },
