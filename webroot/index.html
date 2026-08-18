@@ -68,7 +68,10 @@ mdui-dialog .dlg-header, mdui-dialog .dlg-body, mdui-dialog .dlg-actions{width:1
 .dlg-header{display:flex;align-items:center;justify-content:space-between;padding:16px 20px 0;font-size:16px;font-weight:500}
 /* ===== 操作提示 Toast（顶部悬浮卡片，与整体 Material 3 卡片风格统一） ===== */
 .toast{
-  position:fixed;top:20%;left:50%;transform:translateX(-50%);
+  /* 垂直位置：20% 视口基础上再上移 100px（纯百分比+calc，不写死像素）
+     max(72px, ...) 保护：小屏/短视口时最低不低于 72px（64px 顶栏 + 8px 间距），
+     既不会被顶栏遮挡，也不会顶出屏幕 */
+  position:fixed;top:max(72px, calc(20% - 100px));left:50%;transform:translateX(-50%);
   z-index:2001;display:flex;align-items:center;gap:10px;
   max-width:min(92vw,560px);width:fit-content;
   padding:10px 10px 10px 12px;border-radius:14px;

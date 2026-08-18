@@ -1,8 +1,8 @@
 id=Logd_Disabler_ColorOS16
 name=ColorOS16 优化WebUI版
-version=2.2.4
-versionCode=28
+version=2.2.5
+versionCode=29
 author=zhangchongjie
-description=基于Web UI的ColorOS16系统优化模块（v2.2.4：修复Toast被顶栏遮挡）
+description=基于Web UI的ColorOS16系统优化模块（v2.2.5：Toast垂直位置微调上移100px）
 webui=true
 updateJson=https://raw.githubusercontent.com/starlifezzz/Logd_Disabler_ColorOS16/main/update.json
