@@ -1,8 +1,8 @@
 id=Logd_Disabler_ColorOS16
 name=ColorOS16 优化WebUI版
-version=2.2.1
-versionCode=25
+version=2.2.2
+versionCode=26
 author=zhangchongjie
-description=基于Web UI的ColorOS16系统优化模块（v2.2.1：修复性能采集CPU负值bug）
+description=基于Web UI的ColorOS16系统优化模块（v2.2.2：修复导入不生效+增加操作完成提示）
 webui=true
 updateJson=https://raw.githubusercontent.com/starlifezzz/Logd_Disabler_ColorOS16/main/update.json

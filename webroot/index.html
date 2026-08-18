@@ -549,6 +549,11 @@ mdui-list-item::part(body){justify-content:center;gap:0}
       <mdui-button variant="tonal" @click="pkgDetailOpen=false">关闭</mdui-button>
     </div>
   </mdui-dialog>
+
+  <!-- 操作提示 Snackbar（导入/导出/恢复默认等操作的完成反馈） -->
+  <mdui-snackbar :open="snackbarOpen" :message="snackbarMsg" :action="snackbarAction"
+    @close="snackbarOpen=false" @action-click="snackbarActionClick">
+  </mdui-snackbar>
 </div>
 
 <script>
@@ -852,7 +857,12 @@ var app = Vue.createApp({
       perfState: { before: null, after: null, label: '未采集' },
       perfCapturing: false,
       // ===== 配置管理 =====
-      cfgOpBusy: false
+      cfgOpBusy: false,
+      // ===== 操作提示 Snackbar =====
+      snackbarOpen: false,
+      snackbarMsg: '',
+      snackbarAction: '',
+      snackbarActionFn: null
     };
   },
   computed: {
@@ -992,6 +1002,18 @@ var app = Vue.createApp({
       });
     },
     // ---------- 配置备份 / 导入 ----------
+    // Snackbar 提示（带可选操作按钮，如"导入后跳转日志页"）
+    showSnack: function(msg, action, fn) {
+      this.snackbarMsg = msg;
+      this.snackbarAction = action || '';
+      this.snackbarActionFn = fn || null;
+      this.snackbarOpen = true;
+    },
+    // Snackbar action 按钮回调
+    snackbarActionClick: function() {
+      this.snackbarOpen = false;
+      if (this.snackbarActionFn) this.snackbarActionFn();
+    },
     // 导出到 /storage/emulated/0/Download/coloros16_config.json
     exportConfig: function() {
       var self = this;
@@ -999,17 +1021,24 @@ var app = Vue.createApp({
       this.cfgOpBusy = true;
       var json = JSON.stringify(this.config, null, 2);
       var b64 = btoa(unescape(encodeURIComponent(json)));
-      var cmd = 'echo "' + b64 + '" | base64 -d > /storage/emulated/0/Download/coloros16_config.json && echo OK';
+      // 先确保 Download 目录存在，再写文件（原子写 tmp+mv）
+      var cmd = 'mkdir -p /storage/emulated/0/Download 2>/dev/null; echo "' + b64 + '" | base64 -d > /storage/emulated/0/Download/coloros16_config.json.tmp && mv /storage/emulated/0/Download/coloros16_config.json.tmp /storage/emulated/0/Download/coloros16_config.json && echo OK';
       sh(cmd).then(function(r) {
         self.cfgOpBusy = false;
         if (/OK/.test(r.stdout)) {
           self.addLog('✅ 配置已导出到 /storage/emulated/0/Download/coloros16_config.json');
+          self.showSnack('✅ 配置已导出到 Download 目录');
         } else {
           self.addLog('导出失败: ' + (r.stderr || '未知'), 'error');
+          self.showSnack('❌ 导出失败（详见日志页）');
         }
       });
     },
-    // 导入：从 Download 读取 coloros16_config.json，覆盖当前配置并立即刷新状态
+    // 导入：读取 Download 的备份文件，覆盖当前配置并**重新执行 pm 同步**（立即生效）
+    // 【v2.2.2 修复】旧版只写 config.json + 刷新 UI，不执行 pm：
+    // 用户导入后修改某项（pm 即时生效为 B）再导入恢复 config=A，
+    // 但 pm 仍是 B → 双向校验报"期望禁用却仍启用" → 开关显示 pending（未恢复）。
+    // 现在导入后对全部包类功能按新 config 重新 pm disable/enable，真正恢复。
     importConfig: function() {
       var self = this;
       this.cfgOpBusy = true;
@@ -1018,6 +1047,7 @@ var app = Vue.createApp({
         if (!out) {
           self.cfgOpBusy = false;
           self.addLog('未找到 /storage/emulated/0/Download/coloros16_config.json', 'warn');
+          self.showSnack('⚠️ 未找到备份文件 coloros16_config.json');
           return;
         }
         var cfg = null;
@@ -1025,32 +1055,70 @@ var app = Vue.createApp({
         if (!cfg || typeof cfg !== 'object') {
           self.cfgOpBusy = false;
           self.addLog('导入文件格式无效（非合法 JSON）', 'error');
+          self.showSnack('❌ 备份文件格式无效');
           return;
         }
-        // 覆盖当前配置并原子写回
+        // 1) 覆盖内存配置
         self.config = cfg;
+        // 2) 原子写回 config.json（持久化，重启由 service.sh 兜底）
         self.writeConfig().then(function(ok) {
-          self.cfgOpBusy = false;
-          if (ok) {
-            self.addLog('✅ 配置已导入，刷新状态中...');
-            // 更新全部开关 UI 状态
-            FEATURES.forEach(function(g) {
-              g.items.forEach(function(item) {
-                var v = !!(self.config && self.config[item.key] === true);
-                if (self.state[item.key]) {
-                  self.state[item.key].enabled = v;
-                  self.state[item.key].status = v ? 'enabled' : 'disabled';
-                }
+          if (!ok) {
+            self.cfgOpBusy = false;
+            self.addLog('导入配置写回失败', 'error');
+            self.showSnack('❌ 导入配置写回失败');
+            return;
+          }
+          self.addLog('✅ 配置已导入，正在按新配置同步 pm 状态...');
+          // 3) 按新 config 对全部包类功能执行 pm 同步（即时生效）
+          //    普通功能：config[key]=true 且非白名单 → pm disable；否则 pm enable
+          //    合成子组总开关：不单独处理（子项自身配置已覆盖），避免重复/冲突
+          var allPkgs = [];
+          var plan = [];
+          FEATURES.forEach(function(g) {
+            g.items.forEach(function(item) {
+              if (!item.pkgs || !item.pkgs.length) return;
+              var wantOn = !!(self.config && self.config[item.key] === true);
+              var keepList = [];
+              if (self.config) {
+                var raw = self.config[item.key + '_keep'];
+                keepList = String(raw || '').split(',').filter(function(x){ return x && x.trim(); });
+              }
+              item.pkgs.forEach(function(p) {
+                // 去重（同一包可能出现在多个功能，取"任一启用即不禁用"安全策略）
+                if (allPkgs.indexOf(p) >= 0) return;
+                allPkgs.push(p);
+                var shouldDisable = wantOn && keepList.indexOf(p) < 0;
+                plan.push({ pkg: p, disable: shouldDisable });
               });
             });
+          });
+          // 先恢复所有（pm enable），再禁用需要禁用的——避免"先禁后启"顺序问题
+          var chain = Promise.resolve();
+          var fail = 0;
+          plan.forEach(function(pp) {
+            chain = chain.then(function() {
+              var c = pp.disable
+                ? 'pm disable-user --user 0 ' + pp.pkg + ' 2>/dev/null || pm disable ' + pp.pkg
+                : 'pm enable ' + pp.pkg;
+              return sh(c).then(function(r2) {
+                if (r2.errno !== 0 && !/new state: disabled|new state: enabled|Success/i.test(r2.stdout)) fail++;
+              });
+            });
+          });
+          chain.then(function() {
+            self.cfgOpBusy = false;
+            self.addLog(fail > 0
+              ? '⚠️ pm 同步完成，但 ' + fail + ' 个包操作失败（详见 Debug）'
+              : '✅ pm 同步完成（' + plan.length + ' 个包已按配置恢复）');
+            // 4) 刷新全部状态
             self.refreshAll();
-          } else {
-            self.addLog('导入配置写回失败', 'error');
-          }
+            var msg = fail > 0 ? '⚠️ 导入完成，' + fail + ' 个包未生效' : '✅ 导入成功，已按配置恢复';
+            self.showSnack(msg, '查看日志', function() { self.currentPage = 'log'; });
+          });
         });
       });
     },
-    // 恢复默认：全部开关置 false，写回并刷新
+    // 恢复默认：全部开关置 false，写回并刷新（含 pm 恢复）
     restoreDefault: function() {
       var self = this;
       if (!this.config) this.config = {};
@@ -1066,13 +1134,37 @@ var app = Vue.createApp({
       });
       this.config = keep;
       this.writeConfig().then(function(ok) {
-        self.cfgOpBusy = false;
-        if (ok) {
-          self.addLog('✅ 已恢复默认（全部未优化），刷新状态中...');
-          self.refreshAll();
-        } else {
+        if (!ok) {
+          self.cfgOpBusy = false;
           self.addLog('恢复默认写回失败', 'error');
+          self.showSnack('❌ 恢复默认失败');
+          return;
         }
+        self.addLog('✅ 已恢复默认配置，正在恢复全部包...');
+        // 恢复全部包：收集所有可能被禁用的包并 pm enable
+        var pkgs = [];
+        FEATURES.forEach(function(g) {
+          g.items.forEach(function(item) {
+            if (item.pkgs) item.pkgs.forEach(function(p) {
+              if (pkgs.indexOf(p) < 0) pkgs.push(p);
+            });
+          });
+        });
+        var chain = Promise.resolve();
+        var fail = 0;
+        pkgs.forEach(function(p) {
+          chain = chain.then(function() {
+            return sh('pm enable ' + p + ' 2>/dev/null').then(function(r2) {
+              if (r2.errno !== 0 && !/new state: enabled|Success/i.test(r2.stdout)) fail++;
+            });
+          });
+        });
+        chain.then(function() {
+          self.cfgOpBusy = false;
+          self.addLog(fail > 0 ? '⚠️ 恢复完成，但 ' + fail + ' 个包失败' : '✅ 已恢复全部包（' + pkgs.length + ' 个）');
+          self.refreshAll();
+          self.showSnack(fail > 0 ? '⚠️ 恢复默认完成，' + fail + ' 个包失败' : '✅ 已恢复默认配置');
+        });
       });
     },
     // ---------- 日志 ----------
