@@ -914,14 +914,21 @@ var app = Vue.createApp({
     capturePerf: function() {
       var self = this;
       this.perfCapturing = true;
-      // CPU 解析兼容两种 top 格式：
-      //  - 标准 "%Cpu(s): 12.3 us, ..."（busy=100-us）
-      //  - toybox "%cpu 23.4% user, ..."（busy=100-user）
-      // 均取 us/user 前的数字作为"占用"。
+      // CPU 解析：取 top 输出的 **idle 字段**，占用 = 100 - idle。
+      // 兼容三种格式：
+      //  - 标准 "%Cpu(s): 12.3 us, 5.1 sy, 82.6 id"  → idle=82.6 → 17.4
+      //  - toybox "%cpu 23.4% user, 12.0% sys, 64.6% idle" → idle=64.6 → 35.4
+      //  - toybox 多核总和 "CPU: 800.0% user ..."（8 核总和 800）
+      //    此时 idle 也可能 >100 → 按核数换算：idle/核数
+      // 【v2.2.1 修复】旧逻辑取 us/user 做 100-x 会得负值(-700)：
+      // 多核总和格式下 user=800 → 100-800=-700；且 us 本身是占用的一部分，
+      // 100-us 语义也错误。统一改为 idle 方案。
       var cmd = [
         "memo=$(awk '/MemTotal/{t=$2}/MemAvailable/{a=$2}END{printf \"%.2f\",(t-a)/1024/1024}' /proc/meminfo 2>/dev/null)",
-        "topline=$(top -b -n 2 -d 0.3 2>/dev/null | grep -im1 -E '%c?pu' | tail -1)",
-        "cpu=$(echo \"$topline\" | awk -F'[ ,]+' '{for(i=1;i<=NF;i++){if($i ~ /[0-9]/ && $(i+1) ~ /us|user/){print 100-$i; exit}}}' )",
+        "topline=$(top -b -n 2 -d 0.3 2>/dev/null | grep -im1 -E '%c?pu|^CPU' | tail -1)",
+        "ncores=$(getconf _NPROCESSORS_ONLN 2>/dev/null || nproc 2>/dev/null || echo 8)",
+        "idle=$(echo \"$topline\" | awk -F'[ ,]+' '{for(i=1;i<=NF;i++){if($i ~ /[0-9]/ && ($(i+1) ~ /^id/)){gsub(/[^0-9.]/,\"\",$i); print $i; exit}}}' )",
+        "cpu=$(awk -v i=\"$idle\" -v c=\"$ncores\" 'BEGIN{if(i==\"\"){print \"0\"; exit} if(i+0>100) i=i/c; printf \"%.1f\", 100-i}')",
         "procs=$(ps -A 2>/dev/null | wc -l)",
         "echo \"RAM:$memo CPU:$cpu PROCS:$procs\""
       ].join('; ');
