@@ -89,13 +89,32 @@ mdui-dialog .dlg-header, mdui-dialog .dlg-body, mdui-dialog .dlg-actions{width:1
 /* 消息完整显示，长文本自动换行不撑宽容器 */
 .toast-msg{font-size:13.5px;font-weight:500;color:var(--mdui-color-on-surface);line-height:1.4;word-break:break-word;overflow-wrap:anywhere}
 .toast-sub{font-size:11px;color:var(--mdui-color-on-surface-variant);line-height:1.3;word-break:break-word}
-/* 操作按钮：放不下时换行到第二行，margin-left:auto 靠右 */
-.toast-btn{flex-shrink:0;margin-left:auto}
-.toast-close{flex-shrink:0;color:var(--mdui-color-on-surface-variant)}
+/* 【v2.2.7 修复】操作按钮：原生 button 高度锁定 28px（不再用 mdui-button，
+   其不支持 size 属性、默认 40px 高导致手机端换行堆叠到 200px 高）。
+   放不下时换行到第二行，margin-left:auto 靠右 */
+.toast-btn{
+  flex-shrink:0;margin-left:auto;height:28px;line-height:28px;
+  padding:0 12px;border:none;border-radius:14px;outline:none;
+  font-size:12.5px;font-weight:600;white-space:nowrap;cursor:pointer;
+  /* 默认(info)背景：主色容器加深；各类型在下方覆盖为对应配色 */
+  background:rgba(var(--mdui-color-primary-container),.5);color:inherit;
+}
+/* 关闭按钮（无 action 时显示）：同样原生 button，28px 圆形 */
+.toast-close{
+  flex-shrink:0;width:28px;height:28px;margin-left:auto;
+  display:inline-flex;align-items:center;justify-content:center;
+  border:none;border-radius:50%;outline:none;cursor:pointer;
+  background:transparent;color:inherit;
+}
+.toast-close mdui-icon{font-size:16px}
 /* 彩色容器上的按钮/关闭图标：使用容器前景色保证对比度 */
 .toast-success .toast-btn,.toast-success .toast-close{color:rgb(var(--mdui-color-on-primary-container))}
 .toast-error .toast-btn,.toast-error .toast-close{color:rgb(var(--mdui-color-on-error-container))}
 .toast-warn .toast-btn,.toast-warn .toast-close{color:rgb(var(--mdui-color-on-tertiary-container))}
+/* 【v2.2.7】按钮背景跟随 toast 类型：悬浮感 + 类型色，避免紫按钮配红字 */
+.toast-success .toast-btn{background:rgba(var(--mdui-color-primary),.18)}
+.toast-error .toast-btn{background:rgba(var(--mdui-color-error),.18)}
+.toast-warn .toast-btn{background:rgba(var(--mdui-color-tertiary),.18)}
 /* 成功：主色容器（与 app-logo 同色系） */
 .toast-success{background:rgba(var(--mdui-color-primary-container),.92)}
 .toast-success .toast-ico{background:rgb(var(--mdui-color-primary));color:rgb(var(--mdui-color-on-primary))}
@@ -612,10 +631,15 @@ mdui-list-item::part(body){justify-content:center;gap:0}
         <div class="toast-msg">{{ toastMsg }}</div>
         <div class="toast-sub" v-if="toastSub">{{ toastSub }}</div>
       </div>
-      <mdui-button v-if="toastAction" variant="tonal" size="small" class="toast-btn"
-        @click.stop="toastActionClick">{{ toastAction }}</mdui-button>
-      <mdui-button-icon icon="close--outlined" size="small" class="toast-close"
-        @click.stop="toastClose"></mdui-button-icon>
+      <!-- 【v2.2.7 修复】mdui-button/mdui-button-icon 不支持 size 属性，
+           默认 40px 高且 Web Component 尺寸不可控；改为原生 button + CSS，
+           高度锁定 28px。有 action 时隐藏关闭按钮（action 本身可点击关闭），
+           避免两个按钮同时渲染挤爆手机端单行宽度 -->
+      <button type="button" v-if="toastAction" class="toast-btn"
+        @click.stop="toastActionClick">{{ toastAction }}</button>
+      <button type="button" v-else class="toast-close" @click.stop="toastClose">
+        <mdui-icon icon="close--outlined"></mdui-icon>
+      </button>
     </div>
   </transition>
 </div>
