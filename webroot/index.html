@@ -170,11 +170,86 @@ mdui-dialog .dlg-header, mdui-dialog .dlg-body, mdui-dialog .dlg-actions{width:1
 .delta-bad{color:#c62828;font-weight:500}
 .delta-none{color:var(--mdui-color-on-surface-variant)}
 /* ===== GitHub 页（预留） ===== */
-.gh-profile{display:flex;flex-direction:column;align-items:center;gap:8px;padding:32px 20px;text-align:center}
-.gh-avatar{--mdui-avatar-background:var(--mdui-color-primary);color:#fff;font-size:28px;font-weight:600}
-.gh-name{font-size:18px;font-weight:600;margin-top:6px}
-.gh-bio{font-size:13px;color:var(--mdui-color-on-surface-variant);line-height:1.6}
-.gh-links{display:flex;gap:8px;margin-top:12px}
+/* ===== 个人页（GitHub）：复古霓虹终端风 =====
+   复古元素：CRT 扫描线 / 机箱三灯 / 等宽终端字体 / 命令行装饰
+   炫  元素：头像霓虹光环(旋转渐变) / 名字渐变发光 / 光标闪烁
+   不跳脱：所有颜色取自 M3 主题变量(primary 紫 + tertiary)，保留卡片/圆角 */
+.gh-card{overflow:hidden}
+.gh-profile{position:relative;display:flex;flex-direction:column;align-items:center;gap:8px;padding:0 20px 30px;text-align:center}
+/* CRT 扫描线：极淡叠层，仅提"屏幕"质感不刺眼 */
+.gh-profile::before{
+  content:"";position:absolute;inset:0;pointer-events:none;z-index:1;
+  background:repeating-linear-gradient(0deg,rgba(0,0,0,.07) 0 1px,transparent 1px 3px);
+  mix-blend-mode:multiply;opacity:.5;border-radius:inherit;
+}
+/* CRT 状态条：复古机箱灯 + 等宽标签 */
+.gh-crt{
+  position:relative;z-index:2;display:flex;align-items:center;gap:10px;
+  width:100%;padding:10px 16px;
+  border-bottom:1px dashed rgba(var(--mdui-color-outline-variant),.55);
+  background:rgba(var(--mdui-color-surface-container-lowest),.5);
+  font-family:'JetBrains Mono','Cascadia Code','Menlo',monospace;
+}
+.gh-crt-lights{display:flex;gap:5px}
+.gh-led{width:9px;height:9px;border-radius:50%;box-shadow:0 0 6px currentColor}
+.gh-led-r{background:#ff5f57;color:#ff5f57}
+.gh-led-y{background:#febc2e;color:#febc2e}
+.gh-led-g{background:#28c840;color:#28c840;animation:gh-breath 2.4s ease-in-out infinite}
+.gh-crt-tag{margin-left:auto;font-size:10px;letter-spacing:1.5px;color:var(--mdui-color-on-surface-variant)}
+@keyframes gh-breath{0%,100%{opacity:1}50%{opacity:.35}}
+/* 头像：双层霓虹（外层 blur 光晕 + 2px 渐变环旋转），头像本体留白边框 */
+.gh-avatar-wrap{position:relative;z-index:2;margin-top:26px;width:88px;height:88px}
+.gh-avatar-wrap::before{
+  content:"";position:absolute;inset:-6px;border-radius:50%;
+  background:conic-gradient(from 0deg,rgb(var(--mdui-color-primary)),rgb(var(--mdui-color-tertiary)),rgb(var(--mdui-color-primary)),rgb(var(--mdui-color-tertiary)),rgb(var(--mdui-color-primary)));
+  filter:blur(11px);opacity:.6;animation:gh-rotate 7s linear infinite;
+}
+.gh-avatar-wrap::after{
+  content:"";position:absolute;inset:-3px;border-radius:50%;padding:2.5px;z-index:2;
+  background:conic-gradient(from 0deg,rgb(var(--mdui-color-primary)),rgb(var(--mdui-color-tertiary)),rgb(var(--mdui-color-primary)));
+  -webkit-mask:linear-gradient(#000 0 0) content-box,linear-gradient(#000 0 0);
+  -webkit-mask-composite:xor;mask-composite:exclude;
+  animation:gh-rotate 7s linear infinite;
+}
+.gh-avatar{
+  position:relative;z-index:3;display:flex;align-items:center;justify-content:center;
+  --mdui-avatar-background:var(--mdui-color-surface-container-high);
+  color:rgb(var(--mdui-color-primary));font-size:30px;font-weight:700;
+  border:3px solid rgb(var(--mdui-color-surface-container-high));
+}
+@keyframes gh-rotate{to{transform:rotate(360deg)}}
+/* 名字：终端提示符 + 渐变霓虹文字（背景裁剪，主题色系） */
+.gh-name{
+  position:relative;z-index:2;margin-top:10px;
+  font-family:'JetBrains Mono','Cascadia Code','Menlo',monospace;
+  font-size:17px;font-weight:700;letter-spacing:.5px;
+  background:linear-gradient(90deg,rgb(var(--mdui-color-primary)),rgb(var(--mdui-color-tertiary)),rgb(var(--mdui-color-primary)));
+  -webkit-background-clip:text;background-clip:text;color:transparent;
+  filter:drop-shadow(0 0 8px rgba(var(--mdui-color-primary),.45));
+}
+.gh-name a{color:inherit;text-decoration:none}
+.gh-prompt{color:rgb(var(--mdui-color-tertiary));filter:drop-shadow(0 0 5px rgba(var(--mdui-color-tertiary),.6))}
+/* bio：等宽字体，终端副信息 */
+.gh-bio{
+  position:relative;z-index:2;
+  font-family:'JetBrains Mono','Cascadia Code','Menlo',monospace;
+  font-size:12px;color:var(--mdui-color-on-surface-variant);letter-spacing:.3px;line-height:1.6;
+}
+/* 终端命令行装饰行：复古炫的落点 */
+.gh-cmd{
+  position:relative;z-index:2;margin-top:2px;
+  font-family:'JetBrains Mono','Cascadia Code','Menlo',monospace;font-size:12px;
+  color:var(--mdui-color-on-surface-variant);
+  background:rgba(var(--mdui-color-surface-container-lowest),.55);
+  border:1px solid rgba(var(--mdui-color-outline-variant),.5);
+  border-radius:8px;padding:7px 12px;letter-spacing:.3px;
+}
+.gh-cmd-dol{color:rgb(var(--mdui-color-tertiary));font-weight:700;margin-right:6px}
+.gh-cursor{color:rgb(var(--mdui-color-primary));animation:gh-blink 1s steps(2) infinite}
+@keyframes gh-blink{50%{opacity:0}}
+/* 按钮保持 M3 组件，仅加轻微辉光提升"炫"感（不跳脱） */
+.gh-links{position:relative;z-index:2;display:flex;gap:8px;margin-top:14px}
+.gh-links mdui-button{box-shadow:0 0 14px rgba(var(--mdui-color-primary),.28)}
 .hidden{display:none!important}
 mdui-list-item{--mdui-list-item-container-shape:12px}
 /* ===== 统一 list-item 与折叠项(agg-header)高度为 48px，保证右侧开关垂直对齐 =====
@@ -520,13 +595,28 @@ mdui-list-item::part(body){justify-content:center;gap:0}
     </mdui-card>
   </div>
 
-  <!-- ========== GitHub 页 ========== -->
+  <!-- ========== GitHub 页（个人页·复古霓虹终端风） ========== -->
   <div class="page" v-show="currentPage==='github'">
-    <mdui-card class="card-gap" variant="elevated">
+    <mdui-card class="card-gap gh-card" variant="elevated">
       <div class="gh-profile">
-        <mdui-avatar class="gh-avatar" size="64">Z</mdui-avatar>
-        <div class="gh-name"><a href="https://github.com/starlifezzz" target="_blank">starlifezzz</a></div>
+        <!-- CRT 状态条：复古机箱三灯 + 系统标签 -->
+        <div class="gh-crt">
+          <div class="gh-crt-lights">
+            <span class="gh-led gh-led-r"></span>
+            <span class="gh-led gh-led-y"></span>
+            <span class="gh-led gh-led-g"></span>
+          </div>
+          <span class="gh-crt-tag">COLOROS16 · CRT-16</span>
+        </div>
+        <!-- 头像：霓虹光环包裹 -->
+        <div class="gh-avatar-wrap">
+          <mdui-avatar class="gh-avatar" size="80">Z</mdui-avatar>
+        </div>
+        <!-- 名字：终端提示符 + 渐变霓虹 -->
+        <div class="gh-name"><span class="gh-prompt">&gt;_</span> <a href="https://github.com/starlifezzz" target="_blank">starlifezzz</a></div>
         <div class="gh-bio">ColorOS16 优化 WebUI 模块 · KernelSU</div>
+        <!-- 终端命令行装饰 -->
+        <div class="gh-cmd"><span class="gh-cmd-dol">$</span>./opt --mode=retro --neon-on <span class="gh-cursor">▊</span></div>
         <div class="gh-links">
           <mdui-button variant="tonal" icon="open_in_new--outlined" @click="openGithub()">GitHub 主页</mdui-button>
         </div>
