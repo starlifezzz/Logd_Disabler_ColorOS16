@@ -381,19 +381,27 @@ mdui-dialog .dlg-header, mdui-dialog .dlg-body, mdui-dialog .dlg-actions{width:1
 /* ===== 非包类功能「重启后生效」标签 ===== */
 .reboot-hint{font-size:10px;color:var(--mdui-color-tertiary);background:rgba(var(--mdui-color-tertiary-container),.6);padding:1px 6px;border-radius:100px;white-space:nowrap;flex-shrink:0}
 /* ===== 首次使用引导蒙层 ===== */
-.guide-overlay{position:fixed;inset:0;z-index:3000;background:rgba(0,0,0,.8);display:flex;align-items:center;justify-content:center;padding:20px}
+.guide-overlay{position:fixed;inset:0;z-index:3000;background:rgba(0,0,0,.65);display:flex;align-items:center;justify-content:center;padding:20px}
 .guide-card{
-  background:#1a1a2e;border:2px solid rgba(124,77,255,.4);border-radius:20px;
-  padding:28px 24px;max-width:360px;width:100%;text-align:center;
-  box-shadow:0 0 40px rgba(124,77,255,.2),0 8px 32px rgba(0,0,0,.5);
+  background:var(--mdui-color-surface-container);border:1px solid rgba(var(--mdui-color-outline-variant),.5);
+  border-radius:16px;padding:28px 24px;max-width:360px;width:100%;text-align:center;
+  box-shadow:0 8px 32px rgba(0,0,0,.3);position:relative;overflow:hidden;
 }
-.guide-card h3{margin:0 0 12px;font-size:18px;color:#e0e0e0}
-.guide-card p{margin:0 0 8px;font-size:13px;color:#aaa;line-height:1.6}
-.guide-card .guide-step{display:flex;align-items:flex-start;gap:10px;text-align:left;padding:8px 0;color:#ccc;font-size:13px}
-.guide-card .guide-num{width:24px;height:24px;border-radius:50%;background:#7c4dff;color:#fff;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;flex-shrink:0}
+.guide-card::after{
+  content:"";position:absolute;inset:0;pointer-events:none;
+  background:repeating-linear-gradient(0deg,rgba(0,0,0,.04) 0 1px,transparent 1px 3px);
+  border-radius:inherit;
+}
+.guide-card h3{margin:0 0 12px;font-size:18px;color:var(--mdui-color-on-surface);position:relative;z-index:1}
+.guide-card p{margin:0 0 8px;font-size:13px;color:var(--mdui-color-on-surface-variant);line-height:1.6;position:relative;z-index:1}
+.guide-card .guide-step{display:flex;align-items:flex-start;gap:10px;text-align:left;padding:8px 0;position:relative;z-index:1}
+.guide-card .guide-num{width:24px;height:24px;border-radius:50%;background:rgb(var(--mdui-color-primary));color:rgb(var(--mdui-color-on-primary));display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;flex-shrink:0}
 .guide-card .guide-num mdui-icon{font-size:14px}
-.guide-card mdui-button{margin-top:16px;--mdui-color-primary:7c4dff}
-.guide-card b{color:#fff}
+.guide-card mdui-button{margin-top:16px;position:relative;z-index:1}
+
+/* ===== 全局按钮弧度统一（去掉过度圆角，匹配 CRT 棱角风） ===== */
+mdui-button{--mdui-shape-corner-small:8px;--mdui-shape-corner-medium:10px;--mdui-shape-corner-large:12px}
+mdui-button[variant="filled"],mdui-button[variant="tonal"]{border-radius:10px}
 mdui-list-item{--mdui-list-item-container-shape:12px}
 /* ===== 统一 list-item 与折叠项(agg-header)高度为 48px，保证右侧开关垂直对齐 =====
    默认带 description 的 list-item 是两行布局 min-height:3.5rem(56px)，
@@ -846,7 +854,7 @@ mdui-list-item::part(body){justify-content:center;gap:0}
       </div>
       <div class="perf-empty" v-if="!perfState.before && !perfState.after">
         <mdui-icon name="bar_chart--outlined" style="font-size:36px;opacity:.4"></mdui-icon>
-        <div>尚未采集数据。建议在<b>优化前</b>先点"采集当前数据"记录基准。</div>
+        <div>尚未采集数据。请<b>先点上方按钮</b>采集当前基准，开启优化后再采集一次即可对比变化。</div>
       </div>
     </mdui-card>
   </div>
@@ -862,11 +870,16 @@ mdui-list-item::part(body){justify-content:center;gap:0}
 
   <!-- Debug 对话框 -->
   <mdui-dialog :open="debugOpen" @closed="debugOpen=false" close-on-esc close-on-overlay-click style="width:min(92vw,560px)">
-    <div slot="header" class="dlg-header">
-      <span>Debug 面板</span>
-      <mdui-button-icon icon="close--outlined" @click="debugOpen=false"></mdui-button-icon>
+    <div class="dlg-header crt-scanlines" style="border-bottom:1px dashed rgba(var(--mdui-color-outline-variant),.55);gap:10px;font-family:'JetBrains Mono','Cascadia Code',monospace;font-size:12px">
+      <div class="gh-crt-lights">
+        <span class="gh-led gh-led-r"></span>
+        <span class="gh-led gh-led-y led-breath"></span>
+        <span class="gh-led gh-led-g"></span>
+      </div>
+      <span>DEBUG CONSOLE</span>
+      <span class="crt-tag" style="margin-left:auto;flex-shrink:0;font-size:10px;letter-spacing:1.5px">SYS.DEBUG</span>
     </div>
-    <div class="dlg-body" v-html="debugHtml"></div>
+    <div class="dlg-body" v-html="debugHtml" style="font-family:'JetBrains Mono','Cascadia Code',monospace;font-size:12px;line-height:1.7;padding:16px 20px"></div>
     <div slot="action" class="dlg-actions">
       <mdui-button variant="text" @click="copyDebugInfo()">一键复制</mdui-button>
       <mdui-button variant="tonal" @click="debugOpen=false">关闭</mdui-button>
@@ -875,21 +888,24 @@ mdui-list-item::part(body){justify-content:center;gap:0}
 
   <!-- 包详情对话框 -->
   <mdui-dialog :open="pkgDetailOpen" @closed="pkgDetailOpen=false" close-on-esc close-on-overlay-click style="width:min(92vw,480px)">
-    <div slot="header" class="dlg-header">
-      <span>包详情</span>
-      <mdui-button-icon icon="close--outlined" @click="pkgDetailOpen=false"></mdui-button-icon>
+    <div class="dlg-header crt-scanlines" style="border-bottom:1px dashed rgba(var(--mdui-color-outline-variant),.55);gap:10px;font-family:'JetBrains Mono','Cascadia Code',monospace;font-size:12px">
+      <div class="gh-crt-lights">
+        <span class="gh-led gh-led-r"></span>
+        <span class="gh-led gh-led-y"></span>
+        <span class="gh-led gh-led-g led-breath"></span>
+      </div>
+      <span>PKG.INFO</span>
+      <span class="crt-tag" style="margin-left:auto;flex-shrink:0;font-size:10px;letter-spacing:1.5px">{{ pkgDetailGroup }}</span>
     </div>
     <div class="dlg-body">
       <div class="info-row"><span class="k">中文名</span><span class="v">{{ pkgDetailName }}</span></div>
       <mdui-divider></mdui-divider>
-      <div class="info-row"><span class="k">包名</span><span class="v" style="font-family:monospace;font-size:13px;word-break:break-all">{{ pkgDetailPkg }}</span></div>
-      <mdui-divider></mdui-divider>
-      <div class="info-row"><span class="k">所属功能</span><span class="v">{{ pkgDetailGroup }}</span></div>
+      <div class="info-row"><span class="k">包名</span><span class="v" style="font-family:'JetBrains Mono','Cascadia Code',monospace;font-size:12px;word-break:break-all">{{ pkgDetailPkg }}</span></div>
       <mdui-divider></mdui-divider>
       <div class="info-row"><span class="k">当前状态</span><span class="v">{{ pkgDetailState }}</span></div>
       <mdui-divider v-if="pkgDetailSize"></mdui-divider>
       <div class="info-row" v-if="pkgDetailSize"><span class="k">APK 大小</span><span class="v">{{ pkgDetailSize }}</span></div>
-      <div class="info-row" v-if="pkgDetailPath"><span class="k">安装路径</span><span class="v" style="font-family:monospace;font-size:12px;word-break:break-all">{{ pkgDetailPath }}</span></div>
+      <div class="info-row" v-if="pkgDetailPath"><span class="k">安装路径</span><span class="v" style="font-family:'JetBrains Mono','Cascadia Code',monospace;font-size:11px;word-break:break-all">{{ pkgDetailPath }}</span></div>
       <div style="padding:10px 16px;font-size:12px;color:var(--mdui-color-on-surface-variant);line-height:1.6">
         该子项可单独启用/禁用，修改即时生效；父级开关控制整组，重启后完全生效。
       </div>
