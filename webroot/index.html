@@ -75,16 +75,22 @@ mdui-card{width:100%}
 .switch-wrap{position:relative;display:inline-flex;align-items:center}
 .switch-wrap .opt-hint{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:10px;line-height:1;color:var(--mdui-color-on-surface-variant);white-space:nowrap;pointer-events:none;z-index:1}
 .log-box{width:100%;min-height:200px;max-height:55vh;overflow-y:auto;white-space:pre-wrap;word-break:break-all;font-family:monospace;font-size:12px;line-height:1.6;background:var(--mdui-color-surface-container);border-radius:8px;padding:12px;box-sizing:border-box}
-.debug-item{margin-bottom:8px;padding:10px 12px;border-radius:8px;background:var(--mdui-color-surface-container);font-family:monospace;font-size:11px}
-.debug-item .k{color:var(--mdui-color-primary);font-weight:500}
-.debug-item .v{margin-top:4px;word-break:break-all}
-.debug-item .raw{margin-top:6px;padding:6px 8px;border-radius:6px;background:rgba(128,128,128,.08);color:var(--mdui-color-on-surface-variant);font-size:10px;white-space:pre-wrap;word-break:break-all}
+/* debug 面板 CRT 风格 */
+.debug-item{margin-bottom:8px;padding:10px 12px;border-radius:8px;background:rgba(var(--mdui-color-surface-container-lowest),.45);font-family:'JetBrains Mono','Cascadia Code',monospace;font-size:11px}
+.debug-item .k{color:rgb(var(--mdui-color-primary));font-weight:500;font-size:12px}
+.debug-item .v{margin-top:4px;word-break:break-all;color:var(--mdui-color-on-surface)}
+.debug-item .raw{margin-top:6px;padding:6px 8px;border-radius:6px;background:rgba(0,0,0,.2);color:var(--mdui-color-on-surface-variant);font-size:10px;white-space:pre-wrap;word-break:break-all;line-height:1.5}
+.debug-section{margin:14px 0 8px;font-weight:600;font-size:13px;color:var(--mdui-color-primary);letter-spacing:.5px;border-bottom:1px dashed rgba(var(--mdui-color-outline-variant),.3);padding-bottom:6px}
+.debug-ok{color:#4caf50}
+.debug-warn{color:#ff9800}
+.debug-err{color:#f44336}
 .dlg-body{max-height:70vh;overflow-y:auto}
 /* mdui-dialog 居中修复：
    原理：host 是 position:fixed + inset:0（left/right 均为 0），我们内联设置了固定 width。
    此时 left:0 + width 优先、right:0 被忽略 → host 贴左，panel 随之偏左。
    外部 margin:0 auto 覆盖：在 left:0/right:0 均有值 + width 固定时，fixed 元素水平居中于视口。 */
 mdui-dialog{margin:0 auto !important}
+mdui-dialog::part(panel){background:transparent !important;box-shadow:none !important;border:none !important}
 mdui-dialog::part(panel){background:var(--mdui-color-surface-container-high);box-shadow:0 8px 32px rgba(0,0,0,.35);border-radius:16px}
 mdui-dialog .dlg-body{max-height:56vh}
 mdui-dialog .dlg-header, mdui-dialog .dlg-body, mdui-dialog .dlg-actions{width:100%;box-sizing:border-box}
@@ -893,8 +899,8 @@ mdui-list-item::part(body){justify-content:center;gap:0}
         <span>DEBUG CONSOLE</span>
         <span class="crt-tag">SYS.DEBUG</span>
       </div>
-      <div class="crt-dlg-bd">
-        <pre v-html="debugHtml"></pre>
+      <div class="crt-dlg-bd" style="font-family:'JetBrains Mono','Cascadia Code',monospace">
+        <div v-html="debugHtml"></div>
       </div>
       <div class="crt-dlg-ft">
         <mdui-button variant="tonal" icon="content_copy" @click="copyDebugInfo()" style="font-size:12px">一键复制</mdui-button>
@@ -2348,7 +2354,7 @@ var app = Vue.createApp({
     showDebug: function() {
       var self = this;
       this.debugOpen = true;
-      this.debugHtml = '<div style="text-align:center;padding:20px;color:var(--mdui-color-on-surface-variant)">正在收集 Debug 数据...</div>';
+      this.debugHtml = '<div style="text-align:center;padding:30px;font-family:monospace"><div class="led-breath" style="display:inline-block;width:8px;height:8px;border-radius:50%;background:rgb(var(--mdui-color-primary));margin-right:8px;vertical-align:middle"></div> 正在收集 Debug 数据...</div>';
       var chain = Promise.resolve();
       var html = '';
       FEATURES.forEach(function(g) {
@@ -2373,17 +2379,17 @@ var app = Vue.createApp({
           .then(function(r) { self.serviceLogTail = r.stdout.trim(); });
       }).then(function() {
         var s = self.state;
-        html += '<div style="margin-bottom:12px;font-weight:600">⚠️ Warn/Error 日志 (' + self.warnLogs.length + ')</div>';
+        html += '<div class="debug-section">⚠️ WARN/ERROR (' + self.warnLogs.length + ')</div>';
         if (self.warnLogs.length === 0) {
-          html += '<div class="debug-item"><div class="v" style="color:var(--mdui-color-primary)">✅ 无警告或错误</div></div>';
+          html += '<div class="debug-item"><div class="v debug-ok">✅ 无警告或错误</div></div>';
         } else {
           self.warnLogs.forEach(function(l) {
-            html += '<div class="debug-item"><div class="v">' + escapeHtml(l) + '</div></div>';
+            html += '<div class="debug-item"><div class="v debug-warn">' + escapeHtml(l) + '</div></div>';
           });
         }
-        html += '<div style="margin:16px 0 12px;font-weight:600">📜 service.log 尾部 (最后 80 行)</div>';
+        html += '<div class="debug-section">📜 SERVICE.LOG (最后 80 行)</div>';
         html += '<div class="debug-item"><div class="raw">' + escapeHtml(self.serviceLogTail || '(无)') + '</div></div>';
-        html += '<div style="margin:16px 0 12px;font-weight:600">📊 状态检测原始数据</div>';
+        html += '<div class="debug-section">📊 检测原始数据</div>';
         FEATURES.forEach(function(g) {
           g.items.forEach(function(item) {
             var d = self.debugData[item.key];
@@ -2391,12 +2397,12 @@ var app = Vue.createApp({
             var statusText = st.enabled ? '✅ 已启用' : '⭕ 未启用';
             if (st.status === 'error') statusText = '❌ 异常';
             html += '<div class="debug-item">';
-            html += '<div class="k">' + item.title + ' (' + item.key + ')</div>';
-            html += '<div class="v">UI状态: ' + statusText + '</div>';
-            html += '<div class="raw">📌 属性值 (' + PROP_PREFIX + item.key + '):\n' + (d.prop || '(空)') + '</div>';
-            html += '<div class="raw">🔍 checkCmd 输出:\n' + (d.checkRaw || '(空)') + '</div>';
-            html += '<div class="raw">📋 verifyCmd 输出:\n' + (d.verifyRaw || '(空)') + '</div>';
-            html += '<div class="raw">⚙️ 进程存活 (pidof):\n' + (d.procRaw || '(无子包或未检测)') + '</div>';
+            html += '<div class="k">▸ ' + item.title + ' <span style="opacity:.5">(' + item.key + ')</span></div>';
+            html += '<div class="v">UI: ' + statusText + '</div>';
+            html += '<div class="raw">PROP: ' + PROP_PREFIX + item.key + ' = ' + (d.prop || '(空)') + '</div>';
+            html += '<div class="raw">CHECK:\n' + (d.checkRaw || '(空)') + '</div>';
+            html += '<div class="raw">VERIFY:\n' + (d.verifyRaw || '(空)') + '</div>';
+            html += '<div class="raw">PROC: ' + (d.procRaw || '(无子包)') + '</div>';
             html += '</div>';
           });
         });
