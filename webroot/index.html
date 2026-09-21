@@ -84,21 +84,21 @@ mdui-card{width:100%}
    原理：host 是 position:fixed + inset:0（left/right 均为 0），我们内联设置了固定 width。
    此时 left:0 + width 优先、right:0 被忽略 → host 贴左，panel 随之偏左。
    外部 margin:0 auto 覆盖：在 left:0/right:0 均有值 + width 固定时，fixed 元素水平居中于视口。 */
-mdui-dialog{margin:0 auto !important;--md-elevation-level:0;background:transparent !important;box-shadow:none !important;border:none !important}
-mdui-dialog::part(panel){background:transparent !important;box-shadow:none !important;border:none !important;border-radius:0 !important}
+mdui-dialog{margin:0 auto !important}
+mdui-dialog::part(panel){background:var(--mdui-color-surface-container-high);box-shadow:0 8px 32px rgba(0,0,0,.35);border-radius:16px}
 mdui-dialog .dlg-body{max-height:56vh}
 mdui-dialog .dlg-header, mdui-dialog .dlg-body, mdui-dialog .dlg-actions{width:100%;box-sizing:border-box}
 
-/* 对话框硬编码 CRT 终端风（不依赖 M3 变量） */
-.crt-dlg{padding:0;overflow:hidden;border-radius:14px;background:#1a1a2e;box-shadow:0 12px 40px rgba(0,0,0,.6);color:#e0e0e0}
-.crt-dlg-hd{display:flex;align-items:center;gap:10px;padding:12px 16px;background:#12121e;border-bottom:1px dashed #444}
-.crt-dlg-hd span{font-family:'JetBrains Mono','Cascadia Code',monospace;font-size:12px;color:#999;letter-spacing:.5px}
-.crt-dlg-hd .crt-tag{margin-left:auto;font-size:10px;letter-spacing:1.5px;flex-shrink:0}
+/* 对话框 CRT 终端风（基于 M3 主题色） */
+.crt-dlg{padding:0;overflow:hidden;border-radius:16px}
+.crt-dlg-hd{display:flex;align-items:center;gap:10px;padding:12px 16px;background:rgba(var(--mdui-color-surface-container-highest),.6);border-bottom:1px dashed rgba(var(--mdui-color-outline-variant),.4)}
+.crt-dlg-hd span{font-family:'JetBrains Mono','Cascadia Code',monospace;font-size:12px;color:var(--mdui-color-on-surface-variant);letter-spacing:.5px}
+.crt-dlg-hd .crt-tag{margin-left:auto;font-size:10px;letter-spacing:1.5px;flex-shrink:0;color:var(--mdui-color-on-surface-variant)}
 .crt-dlg-bd{padding:14px 18px;max-height:55vh;overflow-y:auto}
-.crt-dlg-bd pre{margin:0;font-family:'JetBrains Mono','Cascadia Code',monospace;font-size:11.5px;line-height:1.75;color:#d4d4d4;white-space:pre-wrap;word-break:break-all}
-.crt-dlg-bd .info-row .k{color:#999}
-.crt-dlg-bd .info-row .v{color:#e0e0e0}
-.crt-dlg-ft{display:flex;justify-content:flex-end;gap:8px;padding:10px 16px;border-top:1px dashed #444;background:#12121e}
+.crt-dlg-bd pre{margin:0;font-family:'JetBrains Mono','Cascadia Code',monospace;font-size:11.5px;line-height:1.75;color:var(--mdui-color-on-surface);white-space:pre-wrap;word-break:break-all}
+.crt-dlg-bd .info-row .k{color:var(--mdui-color-on-surface-variant)}
+.crt-dlg-bd .info-row .v{color:var(--mdui-color-on-surface)}
+.crt-dlg-ft{display:flex;justify-content:flex-end;gap:8px;padding:10px 16px;border-top:1px dashed rgba(var(--mdui-color-outline-variant),.4);background:rgba(var(--mdui-color-surface-container-highest),.6)}
 .dlg-header{display:flex;align-items:center;justify-content:space-between;padding:16px 20px 0;font-size:16px;font-weight:500}
 /* ===== 操作提示 Toast（顶部悬浮卡片，与整体 Material 3 卡片风格统一） ===== */
 .toast{
@@ -897,8 +897,8 @@ mdui-list-item::part(body){justify-content:center;gap:0}
         <pre v-html="debugHtml"></pre>
       </div>
       <div class="crt-dlg-ft">
-        <mdui-button variant="text" @click="copyDebugInfo()" style="font-size:12px;color:#aaa">一键复制</mdui-button>
-        <mdui-button variant="tonal" @click="debugOpen=false" style="font-size:12px">关闭</mdui-button>
+        <mdui-button variant="tonal" icon="content_copy" @click="copyDebugInfo()" style="font-size:12px">一键复制</mdui-button>
+        <mdui-button variant="text" @click="debugOpen=false" style="font-size:12px">关闭</mdui-button>
       </div>
     </div>
   </mdui-dialog>
@@ -917,17 +917,17 @@ mdui-list-item::part(body){justify-content:center;gap:0}
       </div>
       <div class="crt-dlg-bd">
         <div class="info-row"><span class="k">中文名</span><span class="v">{{ pkgDetailName }}</span></div>
-        <mdui-divider style="border-color:#333"></mdui-divider>
+        <mdui-divider></mdui-divider>
         <div class="info-row"><span class="k">包名</span><span class="v" style="font-family:'JetBrains Mono','Cascadia Code',monospace;font-size:12px;word-break:break-all">{{ pkgDetailPkg }}</span></div>
-        <mdui-divider style="border-color:#333"></mdui-divider>
+        <mdui-divider></mdui-divider>
         <div class="info-row"><span class="k">当前状态</span><span class="v">{{ pkgDetailState }}</span></div>
-        <mdui-divider v-if="pkgDetailSize" style="border-color:#333"></mdui-divider>
+        <mdui-divider v-if="pkgDetailSize"></mdui-divider>
         <div class="info-row" v-if="pkgDetailSize"><span class="k">APK 大小</span><span class="v">{{ pkgDetailSize }}</span></div>
         <div class="info-row" v-if="pkgDetailPath"><span class="k">安装路径</span><span class="v" style="font-family:'JetBrains Mono','Cascadia Code',monospace;font-size:11px;word-break:break-all">{{ pkgDetailPath }}</span></div>
       </div>
       <div class="crt-dlg-ft">
-        <mdui-button variant="text" @click="togglePkgDetail" style="font-size:12px;color:#aaa">切换该包</mdui-button>
-        <mdui-button variant="tonal" @click="pkgDetailOpen=false" style="font-size:12px">关闭</mdui-button>
+        <mdui-button variant="tonal" @click="togglePkgDetail" style="font-size:12px">切换该包</mdui-button>
+        <mdui-button variant="text" @click="pkgDetailOpen=false" style="font-size:12px">关闭</mdui-button>
       </div>
     </div>
   </mdui-dialog>
