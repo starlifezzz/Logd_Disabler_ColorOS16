@@ -90,7 +90,10 @@ mdui-card{width:100%}
    此时 left:0 + width 优先、right:0 被忽略 → host 贴左，panel 随之偏左。
    外部 margin:0 auto 覆盖：在 left:0/right:0 均有值 + width 固定时，fixed 元素水平居中于视口。 */
 mdui-dialog{margin:0 auto !important}
-mdui-dialog::part(panel){background:var(--mdui-color-surface) !important;box-shadow:0 8px 32px rgba(0,0,0,.25) !important}
+mdui-dialog::part(panel){
+  background-color:rgb(var(--mdui-color-surface)) !important;
+  box-shadow:var(--mdui-elevation-level3) !important;
+}
 mdui-dialog::part(panel){background:var(--mdui-color-surface-container-high);box-shadow:0 8px 32px rgba(0,0,0,.35);border-radius:16px}
 mdui-dialog .dlg-body{max-height:56vh}
 mdui-dialog .dlg-header, mdui-dialog .dlg-body, mdui-dialog .dlg-actions{width:100%;box-sizing:border-box}
@@ -397,11 +400,11 @@ mdui-dialog .dlg-header, mdui-dialog .dlg-body, mdui-dialog .dlg-actions{width:1
 /* ===== 非包类功能「重启后生效」标签 ===== */
 .reboot-hint{font-size:10px;color:var(--mdui-color-tertiary);background:rgba(var(--mdui-color-tertiary-container),.6);padding:1px 6px;border-radius:100px;white-space:nowrap;flex-shrink:0}
 /* ===== 首次使用引导蒙层 ===== */
-.guide-overlay{position:fixed;inset:0;z-index:3000;background:rgba(0,0,0,.45);display:flex;align-items:center;justify-content:center;padding:20px}
+.guide-overlay{position:fixed;inset:0;z-index:3000;background:rgba(0,0,0,.5);display:flex;align-items:center;justify-content:center;padding:20px}
 .guide-card{
-  background:var(--mdui-color-surface);border:1px solid rgba(var(--mdui-color-outline-variant),.4);
+  background:rgb(var(--mdui-color-surface));border:1px solid rgba(var(--mdui-color-outline-variant),.4);
   border-radius:16px;padding:28px 24px;max-width:360px;width:100%;text-align:center;
-  box-shadow:0 8px 32px rgba(0,0,0,.2);position:relative;overflow:hidden;
+  box-shadow:var(--mdui-elevation-level3);position:relative;overflow:hidden;
 }
 .guide-card::after{
   content:"";position:absolute;inset:0;pointer-events:none;
