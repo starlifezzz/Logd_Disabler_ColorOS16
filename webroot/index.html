@@ -175,13 +175,13 @@ mdui-dialog .dlg-header, mdui-dialog .dlg-body, mdui-dialog .dlg-actions{width:1
 .log-actions{display:flex;justify-content:flex-end;gap:8px;padding-top:12px}
 /* 日志页 CRT 终端风 */
 .log-crt-header{
-  display:flex;align-items:center;gap:10px;width:100%;padding:10px 16px;
+  display:flex;align-items:center;gap:10px;width:100%;padding:10px 16px;box-sizing:border-box;
   border-bottom:1px dashed rgba(var(--mdui-color-outline-variant),.55);
   background:rgba(var(--mdui-color-surface-container-lowest),.5);
   font-family:'JetBrains Mono','Cascadia Code','Menlo',monospace;
   font-size:11px;color:var(--mdui-color-on-surface-variant);
 }
-.log-crt-header .crt-tag{margin-left:auto;font-size:10px;letter-spacing:1.5px}
+.log-crt-header .crt-tag{margin-left:auto;font-size:10px;letter-spacing:1.5px;flex-shrink:0}
 .log-box-retro{
   width:100%;min-height:200px;max-height:55vh;overflow-y:auto;
   white-space:pre-wrap;word-break:break-all;
@@ -209,13 +209,13 @@ mdui-dialog .dlg-header, mdui-dialog .dlg-body, mdui-dialog .dlg-actions{width:1
 .tip-row b{color:var(--mdui-color-on-surface)}
 /* 关于页 CRT 配置屏风 */
 .about-crt-header{
-  display:flex;align-items:center;gap:10px;width:100%;padding:10px 16px;
+  display:flex;align-items:center;gap:10px;width:100%;padding:10px 16px;box-sizing:border-box;
   border-bottom:1px dashed rgba(var(--mdui-color-outline-variant),.55);
   background:rgba(var(--mdui-color-surface-container-lowest),.5);
   font-family:'JetBrains Mono','Cascadia Code','Menlo',monospace;
   font-size:11px;color:var(--mdui-color-on-surface-variant);
 }
-.about-crt-header .crt-tag{margin-left:auto;font-size:10px;letter-spacing:1.5px}
+.about-crt-header .crt-tag{margin-left:auto;font-size:10px;letter-spacing:1.5px;flex-shrink:0}
 .about-info-retro .info-row{
   font-family:'JetBrains Mono','Cascadia Code',monospace;
 }
@@ -245,13 +245,13 @@ mdui-dialog .dlg-header, mdui-dialog .dlg-body, mdui-dialog .dlg-actions{width:1
 .delta-none{color:var(--mdui-color-on-surface-variant)}
 /* 性能页 CRT 仪表盘风 */
 .perf-crt-header{
-  display:flex;align-items:center;gap:10px;width:100%;padding:10px 16px;
+  display:flex;align-items:center;gap:10px;width:100%;padding:10px 16px;box-sizing:border-box;
   border-bottom:1px dashed rgba(var(--mdui-color-outline-variant),.55);
   background:rgba(var(--mdui-color-surface-container-lowest),.5);
   font-family:'JetBrains Mono','Cascadia Code','Menlo',monospace;
   font-size:11px;color:var(--mdui-color-on-surface-variant);
 }
-.perf-crt-header .crt-tag{margin-left:auto;font-size:10px;letter-spacing:1.5px}
+.perf-crt-header .crt-tag{margin-left:auto;font-size:10px;letter-spacing:1.5px;flex-shrink:0}
 .perf-table-retro{
   width:100%;border-collapse:collapse;font-size:13px;min-width:320px;
   font-family:'JetBrains Mono','Cascadia Code',monospace;
@@ -381,8 +381,8 @@ mdui-dialog .dlg-header, mdui-dialog .dlg-body, mdui-dialog .dlg-actions{width:1
 /* ===== 非包类功能「重启后生效」标签 ===== */
 .reboot-hint{font-size:10px;color:var(--mdui-color-tertiary);background:rgba(var(--mdui-color-tertiary-container),.6);padding:1px 6px;border-radius:100px;white-space:nowrap;flex-shrink:0}
 /* ===== 首次使用引导蒙层 ===== */
-.guide-overlay{position:fixed;inset:0;z-index:3000;background:rgba(0,0,0,.55);display:flex;align-items:center;justify-content:center;padding:20px}
-.guide-card{background:var(--mdui-color-surface-container-high);border-radius:20px;padding:28px 24px;max-width:360px;width:100%;text-align:center}
+.guide-overlay{position:fixed;inset:0;z-index:3000;background:rgba(0,0,0,.75);display:flex;align-items:center;justify-content:center;padding:20px}
+.guide-card{background:var(--mdui-color-surface-container);border:1px solid rgba(var(--mdui-color-outline-variant),.3);border-radius:20px;padding:28px 24px;max-width:360px;width:100%;text-align:center;box-shadow:0 8px 32px rgba(0,0,0,.35)}
 .guide-card h3{margin:0 0 12px;font-size:18px;color:var(--mdui-color-on-surface)}
 .guide-card p{margin:0 0 8px;font-size:13px;color:var(--mdui-color-on-surface-variant);line-height:1.6}
 .guide-card .guide-step{display:flex;align-items:flex-start;gap:10px;text-align:left;padding:8px 0}
