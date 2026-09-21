@@ -17,6 +17,27 @@ log() {
 
 log "========== post-fs-data.sh 开始执行 =========="
 
+# ===================== Bootloop 保护 =====================
+# 原理：每次开机 post-fs-data.sh 执行时计数器+1；
+#       boot-completed.sh 在系统成功启动后将计数器归零；
+#       若连续3次开机计数器未被归零（bootloop）→ 自动禁用模块。
+BOOT_COUNT_FILE="/data/adb/coloros16_boot_count"
+BOOTLOOP_FLAG="/data/adb/coloros16_bootloop_flag"
+CURRENT_COUNT=$(cat "$BOOT_COUNT_FILE" 2>/dev/null || echo 0)
+CURRENT_COUNT=$((CURRENT_COUNT + 1))
+echo "$CURRENT_COUNT" > "$BOOT_COUNT_FILE"
+log "[Bootloop] 开机计数: $CURRENT_COUNT"
+if [ "$CURRENT_COUNT" -ge 3 ]; then
+    log "[Bootloop] ⚠️ 连续 $CURRENT_COUNT 次未完成启动，自动禁用模块！"
+    touch "$MODDIR/disable"
+    echo "$CURRENT_COUNT" > "$BOOTLOOP_FLAG"
+    # 紧急恢复：卸载所有 bind mount
+    for bin in logd logcat logpersist.start logpersist.stop logtagd update_engine update_engine_client; do
+        umount "/system/bin/$bin" 2>/dev/null
+    done
+    log "[Bootloop] 已创建 disable 文件，下次重启模块将被禁用"
+fi
+
 # 创建 dummy 文件（用于 mount bind 覆盖二进制）
 DUMMY="$WORK_DIR/dummy"
 if [ ! -f "$DUMMY" ]; then

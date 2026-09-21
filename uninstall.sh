@@ -196,6 +196,9 @@ echo always > /sys/kernel/mm/transparent_hugepage/khugepaged/defrag 2>/dev/null
 ui_print "- 清理配置数据..."
 rm -rf "$CONFIG_DIR" 2>/dev/null
 rm -f "$WORK_DIR/dummy" 2>/dev/null
+# 清理 bootloop 保护文件
+rm -f /data/adb/coloros16_boot_count 2>/dev/null
+rm -f /data/adb/coloros16_bootloop_flag 2>/dev/null
 log "已删除配置目录: $CONFIG_DIR"
 # 清理 WORK_DIR 日志与临时文件
 rm -f "$WORK_DIR/service.log" 2>/dev/null

@@ -2,9 +2,11 @@
 MODDIR=${0%/*}
 
 # 系统完全启动，证明没有发生 Bootloop，重置计数器
-echo "0" > /data/adb/coloros16_boot_count
-rm -f /data/adb/coloros16_safemode_flag
-rm -f /data/adb/coloros16_bootloop_flag
+BOOT_COUNT_FILE="/data/adb/coloros16_boot_count"
+BOOTLOOP_FLAG="/data/adb/coloros16_bootloop_flag"
+echo "0" > "$BOOT_COUNT_FILE"
+rm -f "$BOOTLOOP_FLAG"
+rm -f "$MODDIR/disable"
 
 # 健康校验：检查核心系统服务
 sleep 10 # 等待系统完全稳定
