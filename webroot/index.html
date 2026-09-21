@@ -872,9 +872,9 @@ mdui-list-item::part(body){justify-content:center;gap:0}
 
   <!-- Debug 对话框 -->
   <mdui-dialog :open="debugOpen" @closed="debugOpen=false" close-on-esc close-on-overlay-click style="width:min(94vw,580px)">
-    <div class="dlg-body" style="padding:0;overflow:hidden;border-radius:14px;box-shadow:0 12px 40px rgba(0,0,0,.45)">
+    <div class="dlg-body" style="padding:0;overflow:hidden;border-radius:14px;box-shadow:0 12px 40px rgba(0,0,0,.5);background:var(--mdui-color-surface-container)">
       <!-- CRT 终端头 -->
-      <div style="display:flex;align-items:center;gap:10px;padding:12px 16px;background:rgba(var(--mdui-color-surface-container-lowest),.6);border-bottom:1px dashed rgba(var(--mdui-color-outline-variant),.5)">
+      <div style="display:flex;align-items:center;gap:10px;padding:12px 16px;background:rgba(var(--mdui-color-surface-container-low),.85);border-bottom:1px dashed rgba(var(--mdui-color-outline-variant),.5)">
         <div class="gh-crt-lights">
           <span class="gh-led gh-led-r"></span>
           <span class="gh-led gh-led-y led-breath"></span>
@@ -883,12 +883,12 @@ mdui-list-item::part(body){justify-content:center;gap:0}
         <span style="font-family:'JetBrains Mono','Cascadia Code',monospace;font-size:12px;color:var(--mdui-color-on-surface-variant);letter-spacing:.5px">DEBUG CONSOLE</span>
         <span style="margin-left:auto;font-family:'JetBrains Mono','Cascadia Code',monospace;font-size:10px;letter-spacing:1.5px;color:var(--mdui-color-on-surface-variant);flex-shrink:0">SYS.DEBUG</span>
       </div>
-      <!-- 内容区：等宽字体、满宽、暗底 -->
-      <div style="padding:14px 18px;max-height:55vh;overflow-y:auto;background:rgba(var(--mdui-color-surface-container-lowest),.35)">
+      <!-- 内容区：等宽字体、满宽 -->
+      <div style="padding:14px 18px;max-height:55vh;overflow-y:auto">
         <pre style="margin:0;font-family:'JetBrains Mono','Cascadia Code',monospace;font-size:11.5px;line-height:1.75;color:var(--mdui-color-on-surface);white-space:pre-wrap;word-break:break-all" v-html="debugHtml"></pre>
       </div>
       <!-- 底部操作栏 -->
-      <div style="display:flex;justify-content:flex-end;gap:8px;padding:10px 16px;border-top:1px dashed rgba(var(--mdui-color-outline-variant),.5);background:rgba(var(--mdui-color-surface-container-lowest),.4)">
+      <div style="display:flex;justify-content:flex-end;gap:8px;padding:10px 16px;border-top:1px dashed rgba(var(--mdui-color-outline-variant),.5);background:rgba(var(--mdui-color-surface-container-low),.85)">
         <mdui-button variant="text" @click="copyDebugInfo()" style="font-size:12px">一键复制</mdui-button>
         <mdui-button variant="tonal" @click="debugOpen=false" style="font-size:12px">关闭</mdui-button>
       </div>
@@ -897,9 +897,9 @@ mdui-list-item::part(body){justify-content:center;gap:0}
 
   <!-- 包详情对话框 -->
   <mdui-dialog :open="pkgDetailOpen" @closed="pkgDetailOpen=false" close-on-esc close-on-overlay-click style="width:min(92vw,480px)">
-    <div class="dlg-body" style="padding:0;overflow:hidden;border-radius:14px;box-shadow:0 12px 40px rgba(0,0,0,.45)">
+    <div class="dlg-body" style="padding:0;overflow:hidden;border-radius:14px;box-shadow:0 12px 40px rgba(0,0,0,.5);background:var(--mdui-color-surface-container)">
       <!-- CRT 终端头 -->
-      <div style="display:flex;align-items:center;gap:10px;padding:12px 16px;background:rgba(var(--mdui-color-surface-container-lowest),.6);border-bottom:1px dashed rgba(var(--mdui-color-outline-variant),.5)">
+      <div style="display:flex;align-items:center;gap:10px;padding:12px 16px;background:rgba(var(--mdui-color-surface-container-low),.85);border-bottom:1px dashed rgba(var(--mdui-color-outline-variant),.5)">
         <div class="gh-crt-lights">
           <span class="gh-led gh-led-r"></span>
           <span class="gh-led gh-led-y"></span>
@@ -920,7 +920,7 @@ mdui-list-item::part(body){justify-content:center;gap:0}
         <div class="info-row" v-if="pkgDetailPath"><span class="k">安装路径</span><span class="v" style="font-family:'JetBrains Mono','Cascadia Code',monospace;font-size:11px;word-break:break-all">{{ pkgDetailPath }}</span></div>
       </div>
       <!-- 底部操作栏 -->
-      <div style="display:flex;justify-content:flex-end;gap:8px;padding:10px 16px;border-top:1px dashed rgba(var(--mdui-color-outline-variant),.5)">
+      <div style="display:flex;justify-content:flex-end;gap:8px;padding:10px 16px;border-top:1px dashed rgba(var(--mdui-color-outline-variant),.5);background:rgba(var(--mdui-color-surface-container-low),.85)">
         <mdui-button variant="text" @click="togglePkgDetail" style="font-size:12px">切换该包</mdui-button>
         <mdui-button variant="tonal" @click="pkgDetailOpen=false" style="font-size:12px">关闭</mdui-button>
       </div>
