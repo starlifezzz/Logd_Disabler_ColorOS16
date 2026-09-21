@@ -44,6 +44,28 @@ body{background:var(--mdui-color-surface);color:var(--mdui-color-on-surface);mar
 .progress-row{display:flex;align-items:center;gap:12px;margin-bottom:16px}
 .progress-row mdui-linear-progress{flex:1}
 .progress-text{font-size:12px;color:var(--mdui-color-on-surface-variant);white-space:nowrap}
+/* 主页 CRT 风格：进度条扫描线 + 终端百分比 */
+.progress-crt{position:relative;overflow:hidden;border-radius:8px}
+.progress-crt::after{
+  content:"";position:absolute;inset:0;pointer-events:none;
+  background:repeating-linear-gradient(0deg,rgba(0,0,0,.05) 0 1px,transparent 1px 3px);
+}
+.progress-pct{
+  font-family:'JetBrains Mono','Cascadia Code',monospace;
+  font-size:12px;font-weight:600;letter-spacing:.5px;
+}
+/* 分组标题霓虹增强 */
+.group-name-retro{
+  font-family:'JetBrains Mono','Cascadia Code',monospace;
+  font-size:13px;font-weight:700;letter-spacing:.5px;
+}
+/* 优化计数终端风 */
+.group-count-retro{
+  font-family:'JetBrains Mono','Cascadia Code',monospace;
+  font-size:11px;font-weight:600;letter-spacing:1px;
+  color:rgb(var(--mdui-color-primary));
+  text-shadow:0 0 8px rgba(var(--mdui-color-primary),.3);
+}
 .card-gap{margin-bottom:16px;display:block;width:100%;box-sizing:border-box}
 /* mdui-card 默认 inline-block，强制占满容器宽度（与功能卡片保持一致） */
 mdui-card{width:100%}
@@ -151,10 +173,61 @@ mdui-dialog .dlg-header, mdui-dialog .dlg-body, mdui-dialog .dlg-actions{width:1
 /* ===== 日志页 ===== */
 .log-page-body{padding:8px 16px 16px}
 .log-actions{display:flex;justify-content:flex-end;gap:8px;padding-top:12px}
+/* 日志页 CRT 终端风 */
+.log-crt-header{
+  display:flex;align-items:center;gap:10px;width:100%;padding:10px 16px;
+  border-bottom:1px dashed rgba(var(--mdui-color-outline-variant),.55);
+  background:rgba(var(--mdui-color-surface-container-lowest),.5);
+  font-family:'JetBrains Mono','Cascadia Code','Menlo',monospace;
+  font-size:11px;color:var(--mdui-color-on-surface-variant);
+}
+.log-crt-header .crt-tag{margin-left:auto;font-size:10px;letter-spacing:1.5px}
+.log-box-retro{
+  width:100%;min-height:200px;max-height:55vh;overflow-y:auto;
+  white-space:pre-wrap;word-break:break-all;
+  font-family:'JetBrains Mono','Cascadia Code','Menlo',monospace;
+  font-size:12px;line-height:1.7;
+  background:rgba(var(--mdui-color-surface-container-lowest),.95);
+  border:1px solid rgba(var(--mdui-color-outline-variant),.3);
+  border-radius:10px;padding:14px;box-sizing:border-box;
+  color:rgb(var(--mdui-color-primary));
+  position:relative;
+}
+/* CRT 扫描线叠层 */
+.log-box-retro::after{
+  content:"";position:absolute;inset:0;pointer-events:none;z-index:1;
+  background:repeating-linear-gradient(0deg,rgba(0,0,0,.04) 0 1px,transparent 1px 3px);
+  border-radius:inherit;
+}
+/* 日志行颜色增强 */
+.log-box-retro .log-warn{color:rgb(var(--mdui-color-tertiary))}
+.log-box-retro .log-error{color:rgb(var(--mdui-color-error))}
+.log-box-retro .log-info{color:var(--mdui-color-on-surface-variant)}
 /* ===== 关于页 ===== */
 .about-tips{padding:8px 20px 16px;display:flex;flex-direction:column;gap:10px}
 .tip-row{font-size:13px;line-height:1.6;color:var(--mdui-color-on-surface-variant);padding:10px 12px;border-radius:8px;background:rgba(var(--mdui-color-surface-container-high),.5)}
 .tip-row b{color:var(--mdui-color-on-surface)}
+/* 关于页 CRT 配置屏风 */
+.about-crt-header{
+  display:flex;align-items:center;gap:10px;width:100%;padding:10px 16px;
+  border-bottom:1px dashed rgba(var(--mdui-color-outline-variant),.55);
+  background:rgba(var(--mdui-color-surface-container-lowest),.5);
+  font-family:'JetBrains Mono','Cascadia Code','Menlo',monospace;
+  font-size:11px;color:var(--mdui-color-on-surface-variant);
+}
+.about-crt-header .crt-tag{margin-left:auto;font-size:10px;letter-spacing:1.5px}
+.about-info-retro .info-row{
+  font-family:'JetBrains Mono','Cascadia Code',monospace;
+}
+.about-info-retro .info-row .k{
+  font-size:12px;letter-spacing:.5px;
+  color:rgb(var(--mdui-color-tertiary));
+}
+.about-info-retro .info-row .v{
+  font-size:12px;font-weight:600;
+  color:rgb(var(--mdui-color-primary));
+  text-shadow:0 0 6px rgba(var(--mdui-color-primary),.2);
+}
 /* ===== 性能对比页 ===== */
 .perf-tips{padding:4px 20px 8px;display:flex;flex-direction:column;gap:10px}
 .perf-actions{display:flex;gap:10px;flex-wrap:wrap;padding:0 20px 12px}
@@ -170,6 +243,37 @@ mdui-dialog .dlg-header, mdui-dialog .dlg-body, mdui-dialog .dlg-actions{width:1
 .delta-good{color:#2e7d32;font-weight:500}
 .delta-bad{color:#c62828;font-weight:500}
 .delta-none{color:var(--mdui-color-on-surface-variant)}
+/* 性能页 CRT 仪表盘风 */
+.perf-crt-header{
+  display:flex;align-items:center;gap:10px;width:100%;padding:10px 16px;
+  border-bottom:1px dashed rgba(var(--mdui-color-outline-variant),.55);
+  background:rgba(var(--mdui-color-surface-container-lowest),.5);
+  font-family:'JetBrains Mono','Cascadia Code','Menlo',monospace;
+  font-size:11px;color:var(--mdui-color-on-surface-variant);
+}
+.perf-crt-header .crt-tag{margin-left:auto;font-size:10px;letter-spacing:1.5px}
+.perf-table-retro{
+  width:100%;border-collapse:collapse;font-size:13px;min-width:320px;
+  font-family:'JetBrains Mono','Cascadia Code',monospace;
+}
+.perf-table-retro th{
+  padding:10px;text-align:left;font-size:11px;font-weight:600;
+  color:rgb(var(--mdui-color-primary));letter-spacing:1px;
+  border-bottom:2px solid rgba(var(--mdui-color-primary),.25);
+  text-transform:uppercase;
+}
+.perf-table-retro td{
+  padding:9px 10px;font-family:'JetBrains Mono','Cascadia Code',monospace;
+  font-size:12.5px;border-bottom:1px solid rgba(var(--mdui-color-on-surface),.06);
+}
+.perf-table-retro td:first-child{
+  font-family:inherit;color:var(--mdui-color-on-surface-variant);
+}
+/* LED 指标灯（变化列前的小圆点） */
+.perf-led{display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:6px;vertical-align:middle}
+.perf-led-good{background:#28c840;box-shadow:0 0 6px #28c840}
+.perf-led-bad{background:#ff5f57;box-shadow:0 0 6px #ff5f57}
+.perf-led-none{background:var(--mdui-color-on-surface-variant);opacity:.4}
 /* ===== GitHub 页（预留） ===== */
 /* ===== 个人页（GitHub）：复古霓虹终端风 =====
    复古元素：CRT 扫描线 / 机箱三灯 / 等宽终端字体 / 命令行装饰
@@ -252,6 +356,25 @@ mdui-dialog .dlg-header, mdui-dialog .dlg-body, mdui-dialog .dlg-actions{width:1
 .gh-links{position:relative;z-index:2;display:flex;gap:8px;margin-top:14px}
 .gh-links mdui-button{box-shadow:0 0 14px rgba(var(--mdui-color-primary),.28)}
 .hidden{display:none!important}
+/* ===== 全复古主题（CRT 终端风） =====
+   设计原则：颜色全部取 M3 变量，不新增色值；
+   扫描线/发光仅用 ::before/::after 叠层，不影响交互 */
+/* 公用：CRT 扫描线叠层（用在需要"屏幕感"的容器上） */
+.crt-scanlines{position:relative;overflow:hidden}
+.crt-scanlines::after{
+  content:"";position:absolute;inset:0;pointer-events:none;z-index:1;
+  background:repeating-linear-gradient(0deg,rgba(0,0,0,.06) 0 1px,transparent 1px 3px);
+  mix-blend-mode:multiply;opacity:.45;border-radius:inherit;
+}
+/* 公用：霓虹文字渐变（primary ↔ tertiary 交替） */
+.neon-text{
+  background:linear-gradient(90deg,rgb(var(--mdui-color-primary)),rgb(var(--mdui-color-tertiary)),rgb(var(--mdui-color-primary)));
+  -webkit-background-clip:text;background-clip:text;color:transparent;
+  filter:drop-shadow(0 0 6px rgba(var(--mdui-color-primary),.35));
+}
+/* 公用：LED 呼吸灯（绿灯常亮呼吸） */
+.led-breath{animation:led-breathe 2.4s ease-in-out infinite}
+@keyframes led-breathe{0%,100%{opacity:1}50%{opacity:.35}}
 /* ===== 全局操作栏（一键优化/恢复） ===== */
 .global-actions{display:flex;gap:10px;padding:0 0 12px;flex-wrap:wrap}
 .global-actions mdui-button{flex:1;min-width:120px}
@@ -347,9 +470,9 @@ mdui-list-item::part(body){justify-content:center;gap:0}
   <!-- ========== 优化页（主页） ========== -->
   <div class="page" v-show="currentPage==='home'">
     <!-- 进度条 -->
-    <div class="progress-row" v-if="checking">
+    <div class="progress-row progress-crt" v-if="checking">
       <mdui-linear-progress :value="progress" style="flex:1"></mdui-linear-progress>
-      <span class="progress-text">正在检测 {{ progress }}%</span>
+      <span class="progress-pct neon-text">{{ progress }}%</span>
     </div>
 
     <!-- 全局操作栏 -->
@@ -363,8 +486,8 @@ mdui-list-item::part(body){justify-content:center;gap:0}
       <mdui-card class="card-gap" variant="elevated">
         <div class="group-header">
           <span class="group-ico"><mdui-icon :name="group.groupIcon"></mdui-icon></span>
-          <span class="group-name">{{ group.group }}</span>
-          <span class="group-count">{{ groupOptimizedCount(group) }}/{{ group.items.length }}</span>
+          <span class="group-name group-name-retro">{{ group.group }}</span>
+          <span class="group-count group-count-retro">{{ groupOptimizedCount(group) }}/{{ group.items.length }}</span>
         </div>
 
         <!-- 单项功能列表 -->
@@ -551,14 +674,18 @@ mdui-list-item::part(body){justify-content:center;gap:0}
 
   <!-- ========== 日志页 ========== -->
   <div class="page" v-show="currentPage==='log'">
-    <mdui-card class="card-gap" variant="elevated">
-      <div class="group-header">
-        <span class="group-ico"><mdui-icon name="receipt_long--outlined"></mdui-icon></span>
-        <span class="group-name">操作日志</span>
-        <span class="group-count">{{ warnLogs.length }}</span>
+    <mdui-card class="card-gap crt-scanlines" variant="elevated">
+      <div class="log-crt-header">
+        <div class="gh-crt-lights">
+          <span class="gh-led gh-led-r"></span>
+          <span class="gh-led gh-led-y led-breath"></span>
+          <span class="gh-led gh-led-g"></span>
+        </div>
+        <span>操作日志</span>
+        <span class="crt-tag">{{ warnLogs.length }} WARN</span>
       </div>
       <div class="log-page-body">
-        <div class="log-box">{{ logText || '暂无日志' }}</div>
+        <div class="log-box-retro">{{ logText || '$ tail -f /dev/null\n# 暂无日志' }}</div>
         <div class="log-actions">
           <mdui-button variant="tonal" icon="bug_report--outlined" @click="showDebug()">Debug 面板</mdui-button>
           <mdui-button variant="text" @click="clearLog()">清空日志</mdui-button>
@@ -569,28 +696,34 @@ mdui-list-item::part(body){justify-content:center;gap:0}
 
   <!-- ========== 关于页 ========== -->
   <div class="page" v-show="currentPage==='about'">
-    <mdui-card class="card-gap" variant="elevated">
-      <div class="group-header">
-        <span class="group-ico"><mdui-icon name="info--outlined"></mdui-icon></span>
-        <span class="group-name">模块信息</span>
+    <mdui-card class="card-gap crt-scanlines" variant="elevated">
+      <div class="about-crt-header">
+        <div class="gh-crt-lights">
+          <span class="gh-led gh-led-r"></span>
+          <span class="gh-led gh-led-y"></span>
+          <span class="gh-led gh-led-g led-breath"></span>
+        </div>
+        <span>SYSTEM CONFIG</span>
+        <span class="crt-tag">SYS.INFO</span>
       </div>
-      <mdui-list>
-        <div class="info-row"><span class="k">模块版本</span><span class="v">{{ moduleVersion }}</span></div>
+      <mdui-list class="about-info-retro">
+        <div class="info-row"><span class="k">MODULE</span><span class="v">{{ moduleVersion }}</span></div>
         <mdui-divider></mdui-divider>
-        <div class="info-row"><span class="k">KernelSU</span><span class="v">{{ ksuVersion }}</span></div>
+        <div class="info-row"><span class="k">KERNELSU</span><span class="v">{{ ksuVersion }}</span></div>
         <mdui-divider></mdui-divider>
-        <div class="info-row"><span class="k">SELinux</span><span class="v">{{ selinuxStatus }}</span></div>
+        <div class="info-row"><span class="k">SELINUX</span><span class="v">{{ selinuxStatus }}</span></div>
         <mdui-divider></mdui-divider>
-        <div class="info-row"><span class="k">设备</span><span class="v">OnePlus Ace5</span></div>
+        <div class="info-row"><span class="k">DEVICE</span><span class="v">OnePlus Ace5</span></div>
         <mdui-divider></mdui-divider>
-        <div class="info-row"><span class="k">系统</span><span class="v">ColorOS 16</span></div>
+        <div class="info-row"><span class="k">SYSTEM</span><span class="v">ColorOS 16</span></div>
       </mdui-list>
     </mdui-card>
 
     <mdui-card class="card-gap" variant="elevated">
-      <div class="group-header">
-        <span class="group-ico"><mdui-icon name="save--outlined"></mdui-icon></span>
-        <span class="group-name">配置管理</span>
+      <div class="about-crt-header">
+        <span style="color:rgb(var(--mdui-color-tertiary))">▸</span>
+        <span>CONFIG MANAGER</span>
+        <span class="crt-tag">I/O</span>
       </div>
       <div class="about-tips">
         <div class="tip-row">备份当前全部开关与白名单到 <b>/storage/emulated/0/Download/coloros16_config.json</b>，刷机/重装后可快速恢复。</div>
@@ -605,9 +738,10 @@ mdui-list-item::part(body){justify-content:center;gap:0}
     </mdui-card>
 
     <mdui-card class="card-gap" variant="elevated">
-      <div class="group-header">
-        <span class="group-ico"><mdui-icon name="system_update--outlined"></mdui-icon></span>
-        <span class="group-name">更新与维护</span>
+      <div class="about-crt-header">
+        <span style="color:rgb(var(--mdui-color-primary))">▸</span>
+        <span>UPDATE & MAINTENANCE</span>
+        <span class="crt-tag">NET</span>
       </div>
       <div class="perf-actions" style="padding:0 20px 16px">
         <mdui-button variant="tonal" icon="update--outlined" @click="checkUpdate()">检查更新</mdui-button>
@@ -659,11 +793,15 @@ mdui-list-item::part(body){justify-content:center;gap:0}
 
   <!-- ========== 性能对比页（A/B 基准） ========== -->
   <div class="page" v-show="currentPage==='perf'">
-    <mdui-card class="card-gap" variant="elevated">
-      <div class="group-header">
-        <span class="group-ico"><mdui-icon name="monitoring--outlined"></mdui-icon></span>
-        <span class="group-name">性能基准（优化前后对比）</span>
-        <span class="group-count">{{ perfState.label }}</span>
+    <mdui-card class="card-gap crt-scanlines" variant="elevated">
+      <div class="perf-crt-header">
+        <div class="gh-crt-lights">
+          <span class="gh-led gh-led-r"></span>
+          <span class="gh-led gh-led-y"></span>
+          <span class="gh-led gh-led-g led-breath"></span>
+        </div>
+        <span>性能基准</span>
+        <span class="crt-tag">{{ perfState.label }}</span>
       </div>
       <div class="perf-tips">
         <div class="tip-row">采集当前 <b>RAM 占用 / CPU 负载 / 运行进程数</b>，与之前的"优化前基准"对比。</div>
@@ -679,7 +817,7 @@ mdui-list-item::part(body){justify-content:center;gap:0}
 
       <!-- 对照表 -->
       <div class="perf-table-wrap" v-if="perfState.before || perfState.after">
-        <table class="perf-table">
+        <table class="perf-table-retro">
           <thead>
             <tr>
               <th>指标</th>
@@ -693,7 +831,9 @@ mdui-list-item::part(body){justify-content:center;gap:0}
               <td>{{ row.name }}</td>
               <td v-if="perfState.before">{{ row.before }}</td>
               <td v-if="perfState.after">{{ row.after }}</td>
-              <td v-if="perfState.before && perfState.after" :class="row.deltaClass">{{ row.delta }}</td>
+              <td v-if="perfState.before && perfState.after" :class="row.deltaClass">
+                <span class="perf-led" :class="row.deltaClass === 'delta-good' ? 'perf-led-good' : row.deltaClass === 'delta-bad' ? 'perf-led-bad' : 'perf-led-none'"></span>{{ row.delta }}
+              </td>
             </tr>
           </tbody>
         </table>
