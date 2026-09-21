@@ -358,9 +358,9 @@ else
     echo "   用户设置: 🔴 未启用"
 fi
 echo "   锁屏杂志包状态:"
-check_package_with_config "com.heytap.pictorial" "disable_lockscreen_magazine"
+check_package_with_config "com.heytap.pictorial" "disable_theme_services"
 echo "   系统属性状态:"
-check_system_prop_with_config "persist.sys.lockscreen_magazine" "0" "disable_lockscreen_magazine"
+check_system_prop_with_config "persist.sys.lockscreen_magazine" "0" "disable_theme_services"
 echo ""
 
 # 10. 游戏空间与性能监控状态

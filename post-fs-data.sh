@@ -66,8 +66,7 @@ if is_on "disable_logd"; then
             if [ $? -eq 0 ]; then
                 log "  ✅ 覆盖成功: $TARGET"
             else
-                log "  ❌ 覆盖失败: $TARGET (尝试其他方法)"
-                cp "$DUMMY" "$TARGET" 2>/dev/null
+                log "  ❌ 覆盖失败: $TARGET"
             fi
         fi
     done

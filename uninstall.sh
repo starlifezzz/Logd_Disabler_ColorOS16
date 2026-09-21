@@ -93,6 +93,11 @@ com.heytap.accessory
 com.oplus.linker
 com.oplus.remotecontrol
 com.oplus.travelengine
+com.oplus.nearcomm
+com.oplus.mediaturbo
+com.coloros.colordirectservice
+com.oplus.deepthinker
+com.oplus.engineernetwork
 com.oplus.ota
 com.oplus.sau
 com.oplus.cota
@@ -192,6 +197,13 @@ ui_print "- 清理配置数据..."
 rm -rf "$CONFIG_DIR" 2>/dev/null
 rm -f "$WORK_DIR/dummy" 2>/dev/null
 log "已删除配置目录: $CONFIG_DIR"
+# 清理 WORK_DIR 日志与临时文件
+rm -f "$WORK_DIR/service.log" 2>/dev/null
+rm -f "$WORK_DIR/service_status.log" 2>/dev/null
+rm -f "$WORK_DIR/post-fs-data.log" 2>/dev/null
+rm -f "$WORK_DIR/uninstall.log" 2>/dev/null
+rm -f "$WORK_DIR/debug_info.txt" 2>/dev/null
+log "已清理 WORK_DIR 日志文件"
 log "========== uninstall.sh 完成 =========="
 
 ui_print "✅ 回滚完成！所有被禁用的包、属性、内核参数已恢复。"

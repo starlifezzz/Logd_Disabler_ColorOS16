@@ -19,8 +19,9 @@
 <script src="./assets/vue.global.prod.js"></script>
 <style>
 /* 少量页面布局补充样式（组件主题色由 mdui.css 提供） */
-body{background:var(--mdui-color-surface);color:var(--mdui-color-on-surface);margin:0;padding:0;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif}
-.page{padding:16px 16px 72px;max-width:680px;margin:0 auto}
+[v-cloak]{display:none!important}
+body{background:var(--mdui-color-surface);color:var(--mdui-color-on-surface);margin:0;padding:0;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;padding-bottom:env(safe-area-inset-bottom)}
+.page{padding:80px 16px 72px;max-width:680px;margin:0 auto}
 /* ===== 顶栏 ===== */
 .app-logo{display:inline-flex;align-items:center;justify-content:center;width:36px;height:36px;border-radius:10px;background:rgba(var(--mdui-color-primary-container),.7);color:rgb(var(--mdui-color-on-primary-container));flex-shrink:0}
 .app-logo mdui-icon{font-size:22px}
@@ -143,7 +144,7 @@ mdui-dialog .dlg-header, mdui-dialog .dlg-body, mdui-dialog .dlg-actions{width:1
 .toast-info .toast-ico{background:rgba(var(--mdui-color-primary-container),.8);color:rgb(var(--mdui-color-on-primary-container))}
 /* 动画：顶部滑入淡入 */
 .toast-fade-enter-active,.toast-fade-leave-active{transition:opacity .22s ease,transform .24s cubic-bezier(.2,.8,.3,1)}
-.toast-fade-enter-from,.toast-fade-leave-to{opacity:0;transform:translateX(-50%) translateY(-10px)}
+.toast-fade-enter-from,.toast-fade-leave-to{opacity:0;transform:translateX(-50%) translateY(-12px)}
 .toast-fade-enter-to,.toast-fade-leave-from{opacity:1;transform:translateX(-50%) translateY(0)}
 .dlg-actions{display:flex;justify-content:flex-end;gap:4px;padding:12px 20px}
 .footer{text-align:center;padding:20px 16px;font-size:12px;color:var(--mdui-color-on-surface-variant)}
@@ -251,6 +252,20 @@ mdui-dialog .dlg-header, mdui-dialog .dlg-body, mdui-dialog .dlg-actions{width:1
 .gh-links{position:relative;z-index:2;display:flex;gap:8px;margin-top:14px}
 .gh-links mdui-button{box-shadow:0 0 14px rgba(var(--mdui-color-primary),.28)}
 .hidden{display:none!important}
+/* ===== 全局操作栏（一键优化/恢复） ===== */
+.global-actions{display:flex;gap:10px;padding:0 0 12px;flex-wrap:wrap}
+.global-actions mdui-button{flex:1;min-width:120px}
+/* ===== 非包类功能「重启后生效」标签 ===== */
+.reboot-hint{font-size:10px;color:var(--mdui-color-tertiary);background:rgba(var(--mdui-color-tertiary-container),.6);padding:1px 6px;border-radius:100px;white-space:nowrap;flex-shrink:0}
+/* ===== 首次使用引导蒙层 ===== */
+.guide-overlay{position:fixed;inset:0;z-index:3000;background:rgba(0,0,0,.55);display:flex;align-items:center;justify-content:center;padding:20px}
+.guide-card{background:var(--mdui-color-surface-container-high);border-radius:20px;padding:28px 24px;max-width:360px;width:100%;text-align:center}
+.guide-card h3{margin:0 0 12px;font-size:18px;color:var(--mdui-color-on-surface)}
+.guide-card p{margin:0 0 8px;font-size:13px;color:var(--mdui-color-on-surface-variant);line-height:1.6}
+.guide-card .guide-step{display:flex;align-items:flex-start;gap:10px;text-align:left;padding:8px 0}
+.guide-card .guide-num{width:24px;height:24px;border-radius:50%;background:rgb(var(--mdui-color-primary));color:rgb(var(--mdui-color-on-primary));display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;flex-shrink:0}
+.guide-card .guide-num mdui-icon{font-size:14px}
+.guide-card mdui-button{margin-top:16px}
 mdui-list-item{--mdui-list-item-container-shape:12px}
 /* ===== 统一 list-item 与折叠项(agg-header)高度为 48px，保证右侧开关垂直对齐 =====
    默认带 description 的 list-item 是两行布局 min-height:3.5rem(56px)，
@@ -337,6 +352,12 @@ mdui-list-item::part(body){justify-content:center;gap:0}
       <span class="progress-text">正在检测 {{ progress }}%</span>
     </div>
 
+    <!-- 全局操作栏 -->
+    <div class="global-actions">
+      <mdui-button variant="tonal" icon="flash_on--outlined" @click="globalOptimize()" :disabled="cfgOpBusy">一键全部优化</mdui-button>
+      <mdui-button variant="text" icon="restart_alt--outlined" @click="restoreDefault()" :disabled="cfgOpBusy">恢复默认</mdui-button>
+    </div>
+
     <!-- 功能分组卡片 -->
     <template v-for="group in FEATURES" :key="group.group">
       <mdui-card class="card-gap" variant="elevated">
@@ -357,6 +378,7 @@ mdui-list-item::part(body){justify-content:center;gap:0}
             <div slot="headline">{{ item.title }}</div>
             <div slot="description">{{ item.desc }}</div>
             <span slot="end-icon" style="display:flex;align-items:center;gap:8px">
+              <span v-if="!item.pkgs" class="reboot-hint">重启后生效</span>
               <span class="switch-wrap">
                 <mdui-switch :checked="state[item.key].enabled" :disabled="state[item.key].loading" @click.stop @change="onSwitchChange(item, $event)"></mdui-switch>
                 <span v-if="!state[item.key].enabled" class="opt-hint">未优化</span>
@@ -584,6 +606,17 @@ mdui-list-item::part(body){justify-content:center;gap:0}
 
     <mdui-card class="card-gap" variant="elevated">
       <div class="group-header">
+        <span class="group-ico"><mdui-icon name="system_update--outlined"></mdui-icon></span>
+        <span class="group-name">更新与维护</span>
+      </div>
+      <div class="perf-actions" style="padding:0 20px 16px">
+        <mdui-button variant="tonal" icon="update--outlined" @click="checkUpdate()">检查更新</mdui-button>
+        <mdui-button variant="text" icon="save--outlined" @click="saveLog()">保存日志到文件</mdui-button>
+      </div>
+    </mdui-card>
+
+    <mdui-card class="card-gap" variant="elevated">
+      <div class="group-header">
         <span class="group-ico"><mdui-icon name="tips_and_updates--outlined"></mdui-icon></span>
         <span class="group-name">使用说明</span>
       </div>
@@ -640,6 +673,7 @@ mdui-list-item::part(body){justify-content:center;gap:0}
         <mdui-button variant="tonal" icon="adjust--outlined" @click="capturePerf()" :disabled="perfCapturing">
           {{ perfCapturing ? '采集中...' : (perfState.label === '当前' ? '采集当前数据' : '重新采集当前数据') }}
         </mdui-button>
+        <mdui-button variant="text" icon="save--outlined" @click="exportPerf()" v-if="perfState.before || perfState.after">导出报告</mdui-button>
         <mdui-button variant="text" icon="restore--outlined" @click="resetPerf()">清除对比</mdui-button>
       </div>
 
@@ -708,7 +742,9 @@ mdui-list-item::part(body){justify-content:center;gap:0}
       <div class="info-row"><span class="k">所属功能</span><span class="v">{{ pkgDetailGroup }}</span></div>
       <mdui-divider></mdui-divider>
       <div class="info-row"><span class="k">当前状态</span><span class="v">{{ pkgDetailState }}</span></div>
-      <mdui-divider></mdui-divider>
+      <mdui-divider v-if="pkgDetailSize"></mdui-divider>
+      <div class="info-row" v-if="pkgDetailSize"><span class="k">APK 大小</span><span class="v">{{ pkgDetailSize }}</span></div>
+      <div class="info-row" v-if="pkgDetailPath"><span class="k">安装路径</span><span class="v" style="font-family:monospace;font-size:12px;word-break:break-all">{{ pkgDetailPath }}</span></div>
       <div style="padding:10px 16px;font-size:12px;color:var(--mdui-color-on-surface-variant);line-height:1.6">
         该子项可单独启用/禁用，修改即时生效；父级开关控制整组，重启后完全生效。
       </div>
@@ -740,6 +776,18 @@ mdui-list-item::part(body){justify-content:center;gap:0}
       </button>
     </div>
   </transition>
+
+  <!-- 首次使用引导蒙层 -->
+  <div class="guide-overlay" v-if="showGuide" @click.self="closeGuide()">
+    <div class="guide-card">
+      <h3>👋 欢迎使用 ColorOS16 优化</h3>
+      <p>通过禁用系统冗余服务，释放内存、降低功耗。</p>
+      <div class="guide-step"><span class="guide-num">1</span><span>在主页<b>打开开关</b>禁用不需要的服务（即时生效）</span></div>
+      <div class="guide-step"><span class="guide-num">2</span><span>展开聚合项可<b>单独控制子包</b>（白名单保留）</span></div>
+      <div class="guide-step"><span class="guide-num">3</span><span><b>重启设备</b>后 service.sh 持久化全部配置</span></div>
+      <mdui-button variant="tonal" @click="closeGuide()" style="width:100%">我知道了</mdui-button>
+    </div>
+  </div>
 </div>
 
 <script>
@@ -992,6 +1040,16 @@ function escapeHtml(str) {
   return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/\n/g,'<br>');
 }
 
+// 【v2.3.1】ARCH-2: verifyCmd/checkCmd 模板生成器（消除 FEATURES 中重复的长字符串）
+function makeVerifyCmd(pkgs) {
+  if (!pkgs || !pkgs.length) return '';
+  return 'for p in ' + pkgs.join(' ') + '; do if pm list packages -d --user 0 2>/dev/null | grep -qF "package:$p"; then echo "$p:disabled"; elif ! pm list packages --user 0 2>/dev/null | grep -qF "package:$p"; then echo "$p:missing"; else echo "$p:enabled"; fi; done';
+}
+function makeCheckCmd(pkgs) {
+  if (!pkgs || !pkgs.length) return '';
+  return 'r="ok"; for p in ' + pkgs.join(' ') + '; do pm list packages --user 0 2>/dev/null | grep -qF "package:$p" && r="running"; done; echo "$r"';
+}
+
 // ===================== Vue 应用 =====================
 var app = Vue.createApp({
   data: function() {
@@ -1029,6 +1087,8 @@ var app = Vue.createApp({
       pkgDetailPkg: '',
       pkgDetailGroup: '',
       pkgDetailState: '',
+      pkgDetailSize: '',
+      pkgDetailPath: '',
       openItem: '',
       openSubGroup: '',
       openSubItem: '',      // 二级分组内多包子项的折叠展开状态（如 屏幕服务→速览）
@@ -1044,6 +1104,11 @@ var app = Vue.createApp({
       perfCapturing: false,
       // ===== 配置管理 =====
       cfgOpBusy: false,
+      // ===== 首次使用引导 =====
+      showGuide: false,
+      // ===== OPT-8: 操作历史撤销栈 =====
+      undoStack: [],
+      undoTimer: null,
       // ===== 操作提示 Toast（顶部悬浮卡片，与整体 Material 3 设计统一） =====
       toastOpen: false,
       toastMsg: '',
@@ -1593,12 +1658,26 @@ var app = Vue.createApp({
     },
     // ---------- 包详情对话框 ----------
     showPkgDetail: function(item, pkg, idx) {
+      var self = this;
       this.pkgDetailKey = item.key;
       this.pkgDetailPkg = pkg;
       this.pkgDetailName = (item.subNames && item.subNames[idx]) || pkg;
       this.pkgDetailGroup = item.title;
       this.pkgDetailState = this.pkgStateText(item.key, pkg);
+      this.pkgDetailSize = '';
+      this.pkgDetailPath = '';
       this.pkgDetailOpen = true;
+      // 【v2.3.1】异步获取 APK 大小和安装路径
+      sh('pm path ' + pkg + ' 2>/dev/null | head -1 | sed "s/package://"').then(function(r) {
+        var apkPath = String(r.stdout || '').trim();
+        if (apkPath) {
+          self.pkgDetailPath = apkPath;
+          sh('ls -lh "' + apkPath + '" 2>/dev/null | awk \'{print $5}\'').then(function(r2) {
+            var sz = String(r2.stdout || '').trim();
+            if (sz) self.pkgDetailSize = sz;
+          });
+        }
+      });
     },
     togglePkgDetail: function() {
       // 在详情对话框里一键切换该包：根据当前状态取反
@@ -1794,8 +1873,16 @@ var app = Vue.createApp({
             s.loading = false;
             if (failed > 0) {
               self.addLog('⚠️ ' + item.title + ' ' + action + '完成，但 ' + failed + ' 个包未生效（详见 Debug/verifyCmd）', 'warn');
+              self.showSnack('⚠️ ' + item.title + ' ' + action + '完成，' + failed + ' 个包未生效');
             } else {
               self.addLog(item.title + ' ' + action + '成功（即时生效 + 属性已持久化）');
+              // 【OPT-8】撤销操作：记录反向操作到 undo 栈，Toast 提供撤销按钮
+              self.pushUndo(item.title + ' → ' + action, function() {
+                self.onSwitchChange(item, { target: { checked: !wantOn } });
+              });
+              self.showSnack('✅ ' + item.title + ' 已' + action, '撤销', function() {
+                self.undoLast();
+              });
             }
           });
         } else {
@@ -2161,14 +2248,153 @@ var app = Vue.createApp({
         });
       });
       if (navigator.clipboard && navigator.clipboard.writeText) {
-        navigator.clipboard.writeText(text).then(function() { alert('✅ Debug 信息已复制到剪贴板！'); });
+        navigator.clipboard.writeText(text).then(function() { self.showSnack('✅ Debug 信息已复制到剪贴板'); });
       } else {
-        var safeText = text.replace(/\\/g, '\\\\').replace(/"/g, '\\"').replace(/\n/g, '\\n').replace(/\$/g, '\\$').replace(/`/g, '\\`');
-        sh('echo "' + safeText + '" > /data/adb/logd_disabler/debug_info.txt').then(function() {
-          alert('✅ Debug 信息已保存到:\n/data/adb/logd_disabler/debug_info.txt');
+        // 【v2.3.1 修复】使用 base64 编码避免 shell 特殊字符转义问题
+        var b64 = btoa(unescape(encodeURIComponent(text)));
+        sh('echo "' + b64 + '" | base64 -d > /data/adb/logd_disabler/debug_info.txt 2>/dev/null && echo OK').then(function(r) {
+          if (/OK/.test(r.stdout)) {
+            self.showSnack('✅ Debug 信息已保存到 /data/adb/logd_disabler/debug_info.txt');
+          } else {
+            self.showSnack('❌ Debug 信息保存失败');
+          }
         });
       }
-    }
+    },
+    // ---------- OPT-1: 一键全部优化 ----------
+    globalOptimize: function() {
+      var self = this;
+      this.cfgOpBusy = true;
+      // 将所有包类功能开关设为 true
+      if (!this.config) this.config = {};
+      FEATURES.forEach(function(g) {
+        g.items.forEach(function(item) {
+          self.config[item.key] = true;
+          delete self.config[item.key + '_keep']; // 清除白名单
+          if (item.subGroupKey) self.config[item.subGroupKey] = true;
+        });
+      });
+      this.writeConfig().then(function(ok) {
+        if (!ok) {
+          self.cfgOpBusy = false;
+          self.showSnack('❌ 一键优化写入失败');
+          return;
+        }
+        // 对所有包执行 pm disable
+        var allPkgs = [];
+        FEATURES.forEach(function(g) {
+          g.items.forEach(function(item) {
+            if (item.pkgs) item.pkgs.forEach(function(p) {
+              if (allPkgs.indexOf(p) < 0) allPkgs.push(p);
+            });
+          });
+        });
+        var chain = Promise.resolve();
+        var fail = 0;
+        allPkgs.forEach(function(p) {
+          chain = chain.then(function() {
+            return sh('pm disable-user --user 0 ' + p + ' 2>/dev/null || pm disable ' + p + ' 2>/dev/null').then(function(r) {
+              if (r.errno !== 0 && !/new state: disabled|Success/i.test(r.stdout)) fail++;
+            });
+          });
+        });
+        chain.then(function() {
+          self.cfgOpBusy = false;
+          self.addLog(fail > 0 ? '⚠️ 一键优化完成，' + fail + ' 个包失败' : '✅ 一键优化完成（' + allPkgs.length + ' 个包已禁用）');
+          self.refreshAll();
+          self.showSnack(fail > 0 ? '⚠️ 一键优化完成，' + fail + ' 个包未生效' : '✅ 一键全部优化成功');
+        });
+      });
+    },
+    // ---------- OPT-3: 检查更新 ----------
+    checkUpdate: function() {
+      var self = this;
+      this.addLog('正在检查更新...');
+      sh('cat /data/adb/modules/Logd_Disabler_ColorOS16/update.json 2>/dev/null || curl -sL https://raw.githubusercontent.com/starlifezzz/Logd_Disabler_ColorOS16/main/update.json 2>/dev/null').then(function(r) {
+        var out = String(r.stdout || '').trim();
+        if (!out) {
+          self.showSnack('⚠️ 无法获取更新信息');
+          return;
+        }
+        try {
+          var info = JSON.parse(out);
+          var latestVer = info.version || '';
+          var currentVer = self.moduleVersion || '';
+          if (latestVer && latestVer !== currentVer) {
+            self.showSnack('🆕 发现新版本 ' + latestVer + '（当前 ' + currentVer + '）', '前往下载', function() {
+              window.open('https://github.com/starlifezzz/Logd_Disabler_ColorOS16/releases', '_blank');
+            });
+          } else {
+            self.showSnack('✅ 已是最新版本 ' + currentVer);
+          }
+        } catch(e) {
+          self.showSnack('⚠️ 更新信息解析失败');
+        }
+      });
+    },
+    // ---------- OPT-5: 保存日志到文件 ----------
+    saveLog: function() {
+      var self = this;
+      var text = this.logLines.join('\n');
+      if (!text) {
+        this.showSnack('⚠️ 日志为空，无需保存');
+        return;
+      }
+      var b64 = btoa(unescape(encodeURIComponent(text)));
+      sh('mkdir -p /storage/emulated/0/Download 2>/dev/null; echo "' + b64 + '" | base64 -d > /storage/emulated/0/Download/coloros16_log.txt 2>/dev/null && echo OK').then(function(r) {
+        if (/OK/.test(r.stdout)) {
+          self.showSnack('✅ 日志已保存到 Download/coloros16_log.txt');
+        } else {
+          self.showSnack('❌ 日志保存失败');
+        }
+      });
+    },
+    // ---------- OPT-6: 首次使用引导 ----------
+    closeGuide: function() {
+      this.showGuide = false;
+      sh('echo "1" > /data/adb/Logd_Disabler_ColorOS16/.guide_shown 2>/dev/null');
+    },
+    // ---------- OPT-4: 导出性能报告 ----------
+    exportPerf: function() {
+      var self = this;
+      var before = this.perfState.before;
+      var after = this.perfState.after;
+      if (!before && !after) { this.showSnack('⚠️ 无性能数据可导出'); return; }
+      var text = '=== ColorOS16 性能报告 ===\n导出时间: ' + new Date().toLocaleString() + '\n\n';
+      if (before) text += '优化前基准 (' + before.time + '):\n  RAM: ' + before.ram + ' GB\n  CPU: ' + before.cpu + '%\n  进程: ' + before.procs + ' 个\n\n';
+      if (after) text += '当前数据 (' + after.time + '):\n  RAM: ' + after.ram + ' GB\n  CPU: ' + after.cpu + '%\n  进程: ' + after.procs + ' 个\n\n';
+      if (before && after) {
+        text += '=== 变化 ===\n';
+        text += 'RAM: ' + (after.ram - before.ram > 0 ? '+' : '') + (after.ram - before.ram).toFixed(2) + ' GB\n';
+        text += 'CPU: ' + (after.cpu - before.cpu > 0 ? '+' : '') + (after.cpu - before.cpu).toFixed(1) + '%\n';
+        text += '进程: ' + (after.procs - before.procs > 0 ? '+' : '') + (after.procs - before.procs) + ' 个\n';
+      }
+      var b64 = btoa(unescape(encodeURIComponent(text)));
+      sh('mkdir -p /storage/emulated/0/Download 2>/dev/null; echo "' + b64 + '" | base64 -d > /storage/emulated/0/Download/coloros16_perf_report.txt 2>/dev/null && echo OK').then(function(r) {
+        if (/OK/.test(r.stdout)) {
+          self.showSnack('✅ 性能报告已保存到 Download/coloros16_perf_report.txt');
+        } else {
+          self.showSnack('❌ 导出失败');
+        }
+      });
+    },
+    // ---------- OPT-8: 操作历史撤销 ----------
+    pushUndo: function(desc, undoFn) {
+      this.undoStack.push({ desc: desc, fn: undoFn, time: Date.now() });
+      if (this.undoStack.length > 10) this.undoStack.shift(); // 最多保留 10 步
+      var self = this;
+      clearTimeout(this.undoTimer);
+      // 10 秒后自动清除最近一步（防止误操作堆积）
+      this.undoTimer = setTimeout(function() {
+        if (self.undoStack.length) self.undoStack.shift();
+      }, 10000);
+    },
+    undoLast: function() {
+      if (!this.undoStack.length) { this.showSnack('⚠️ 无操作可撤销'); return; }
+      var last = this.undoStack.pop();
+      if (last && last.fn) last.fn();
+      this.showSnack('↩️ 已撤销: ' + last.desc);
+    },
   },
   mounted: function() {
     var self = this;
@@ -2188,6 +2414,12 @@ var app = Vue.createApp({
     });
     // 【v2.2.0】恢复持久化的性能基准数据
     this.loadPerf();
+    // 【v2.3.1】首次使用引导：检测 .guide_shown 标记
+    sh('cat /data/adb/Logd_Disabler_ColorOS16/.guide_shown 2>/dev/null').then(function(r) {
+      if (!String(r.stdout || '').trim()) {
+        self.showGuide = true;
+      }
+    });
   }
 });
 

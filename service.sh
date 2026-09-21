@@ -183,30 +183,38 @@ fi
 # 原因：pm disable-user 只阻止包再次启动，不会杀掉已运行进程
 # （实测 exsystemservice/subsys 禁用后进程仍存活，直到重启）。
 # 此处补一刀 pkill，让禁用立即生效、立刻释放内存。
-# 警告：pkill 会终止该包全部进程（含 :service 子进程），
-#       仅作用于刚被禁用的包——keep 白名单保留的包不会走到这里。
-# 循环 2 次（间隔 2 秒）：部分常驻系统组件被杀后可能被系统短暂拉起。
+# 【v2.3.1 修复】改用 UID 精确杀进程，避免 pkill -f 子串误杀
+# 循环 3 次（间隔 2 秒）：部分常驻系统组件被杀后可能被系统短暂拉起。
 kill_pkg_procs() {
     local pkg="$1"
     local i
     # 【v2.0.3】先 am force-stop（对 persistent 进程有效，会连同其所有服务/广播一起终止）
     am force-stop "$pkg" 2>/dev/null
+    # 获取包的 UID（用于精确杀进程，避免 pkill -f 子串误杀）
+    local uid
+    uid=$(pmx pm list packages -U --user 0 2>/dev/null | grep "package:${pkg} " | head -1 | grep -oE "uid=[0-9]+" | grep -oE "[0-9]+")
     for i in 1 2 3; do
-        if pkill -f "$pkg" 2>/dev/null; then
-            log "  🔪 已终止残留进程: $pkg (第${i}次)"
-            sleep 2
+        if [ -n "$uid" ]; then
+            # 按 UID 杀进程：精确匹配该包的所有进程
+            if kill -9 $(pgrep -U "$uid" 2>/dev/null) 2>/dev/null; then
+                log "  🔪 已终止残留进程: $pkg (UID=$uid, 第${i}次)"
+                sleep 2
+            else
+                [ "$i" = "1" ] && log "  📭 无残留进程: $pkg (UID=$uid)"
+                return 0
+            fi
         else
-            [ "$i" = "1" ] && log "  📭 无残留进程: $pkg"
-            return 0
+            # UID 获取失败时 fallback 到 pkill -f
+            if pkill -f "$pkg" 2>/dev/null; then
+                log "  🔪 已终止残留进程: $pkg (pkill fallback, 第${i}次)"
+                sleep 2
+            else
+                [ "$i" = "1" ] && log "  📭 无残留进程: $pkg"
+                return 0
+            fi
         fi
     done
-    # 3 轮后仍存活（persistent 被系统拉起），尝试按 UID 清理
-    local uid
-    uid=$(pmx pm list packages --user 0 2>/dev/null | grep -qF "$pkg" && dumpsys package "$pkg" 2>/dev/null | grep -E "^ *userId=" | head -1 | grep -oE "[0-9]+")
-    if [ -n "$uid" ]; then
-        am force-stop --user 0 "$pkg" 2>/dev/null
-        log "  ⚠️ $pkg 持续存活（persistent），已按 UID=$uid 尝试强杀"
-    fi
+    log "  ⚠️ $pkg 持续存活（persistent），已尝试多轮强杀"
 }
 
 # 禁用包：优先 pm disable-user，失败则 fallback 到 pm uninstall
@@ -381,18 +389,10 @@ done
 # ================================================================
 
 # ===================== 1. Logd =====================
+# 【v2.3.1】mount 覆盖已由 post-fs-data.sh 在开机早期执行，
+# service.sh（late_start）仅负责杀进程 + 设置属性，不再重复 mount。
 if is_on "disable_logd"; then
-    log "[Logd] 启用：覆盖文件 + 杀进程..."
-    DUMMY="$WORK_DIR/dummy"
-    for bin in logd logcat logpersist.start logpersist.stop logtagd; do
-        TARGET="/system/bin/$bin"
-        if [ -f "$TARGET" ]; then
-            SIZE=$(stat -c %s "$TARGET" 2>/dev/null)
-            if [ "$SIZE" != "0" ] && [ -n "$SIZE" ]; then
-                mount -o bind "$DUMMY" "$TARGET" 2>/dev/null
-            fi
-        fi
-    done
+    log "[Logd] 启用：杀进程 + 设置属性..."
     stop logd 2>/dev/null
     pkill -9 -x logd 2>/dev/null
     pkill -9 -x logpersistd 2>/dev/null
@@ -403,15 +403,7 @@ if is_on "disable_logd"; then
     setprop logd.logpersistd.enable false 2>/dev/null
     log "[Logd] 完成"
 else
-    log "[Logd] 关闭：恢复文件 + 启动进程..."
-    for bin in logd logcat logpersist.start logpersist.stop logtagd; do
-        TARGET="/system/bin/$bin"
-        umount "$TARGET" 2>/dev/null
-    done
-    for bin in logd logcat; do
-        TARGET="/system/xbin/$bin"
-        umount "$TARGET" 2>/dev/null
-    done
+    log "[Logd] 关闭：恢复属性 + 启动进程..."
     setprop logd.logpersistd.enable true 2>/dev/null
     setprop persist.logd.disabled 0 2>/dev/null
     start logd 2>/dev/null
@@ -441,10 +433,9 @@ else
     enable_pkg "com.oplus.cota"
     enable_pkg "com.oplus.romupdate"
     enable_pkg "com.oplus.upgradeguide"
-    setprop persist.ota.auto_download 1
-    setprop persist.sys.recovery_update 1
-    setprop persist.sys.ota.disabled 0
     setprop persist.ota.auto_download 1 2>/dev/null
+    setprop persist.sys.recovery_update 1 2>/dev/null
+    setprop persist.sys.ota.disabled 0 2>/dev/null
     # 解除 post-fs-data.sh 中挂载覆盖的二进制与 OTA 目录
     for bin in update_engine update_engine_client; do
         TARGET="/system/bin/$bin"
