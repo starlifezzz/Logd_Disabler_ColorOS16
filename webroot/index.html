@@ -381,14 +381,19 @@ mdui-dialog .dlg-header, mdui-dialog .dlg-body, mdui-dialog .dlg-actions{width:1
 /* ===== 非包类功能「重启后生效」标签 ===== */
 .reboot-hint{font-size:10px;color:var(--mdui-color-tertiary);background:rgba(var(--mdui-color-tertiary-container),.6);padding:1px 6px;border-radius:100px;white-space:nowrap;flex-shrink:0}
 /* ===== 首次使用引导蒙层 ===== */
-.guide-overlay{position:fixed;inset:0;z-index:3000;background:rgba(0,0,0,.75);display:flex;align-items:center;justify-content:center;padding:20px}
-.guide-card{background:var(--mdui-color-surface-container);border:1px solid rgba(var(--mdui-color-outline-variant),.3);border-radius:20px;padding:28px 24px;max-width:360px;width:100%;text-align:center;box-shadow:0 8px 32px rgba(0,0,0,.35)}
-.guide-card h3{margin:0 0 12px;font-size:18px;color:var(--mdui-color-on-surface)}
-.guide-card p{margin:0 0 8px;font-size:13px;color:var(--mdui-color-on-surface-variant);line-height:1.6}
-.guide-card .guide-step{display:flex;align-items:flex-start;gap:10px;text-align:left;padding:8px 0}
-.guide-card .guide-num{width:24px;height:24px;border-radius:50%;background:rgb(var(--mdui-color-primary));color:rgb(var(--mdui-color-on-primary));display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;flex-shrink:0}
+.guide-overlay{position:fixed;inset:0;z-index:3000;background:rgba(0,0,0,.8);display:flex;align-items:center;justify-content:center;padding:20px}
+.guide-card{
+  background:#1a1a2e;border:2px solid rgba(124,77,255,.4);border-radius:20px;
+  padding:28px 24px;max-width:360px;width:100%;text-align:center;
+  box-shadow:0 0 40px rgba(124,77,255,.2),0 8px 32px rgba(0,0,0,.5);
+}
+.guide-card h3{margin:0 0 12px;font-size:18px;color:#e0e0e0}
+.guide-card p{margin:0 0 8px;font-size:13px;color:#aaa;line-height:1.6}
+.guide-card .guide-step{display:flex;align-items:flex-start;gap:10px;text-align:left;padding:8px 0;color:#ccc;font-size:13px}
+.guide-card .guide-num{width:24px;height:24px;border-radius:50%;background:#7c4dff;color:#fff;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;flex-shrink:0}
 .guide-card .guide-num mdui-icon{font-size:14px}
-.guide-card mdui-button{margin-top:16px}
+.guide-card mdui-button{margin-top:16px;--mdui-color-primary:7c4dff}
+.guide-card b{color:#fff}
 mdui-list-item{--mdui-list-item-container-shape:12px}
 /* ===== 统一 list-item 与折叠项(agg-header)高度为 48px，保证右侧开关垂直对齐 =====
    默认带 description 的 list-item 是两行布局 min-height:3.5rem(56px)，
