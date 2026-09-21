@@ -84,9 +84,9 @@ mdui-card{width:100%}
    原理：host 是 position:fixed + inset:0（left/right 均为 0），我们内联设置了固定 width。
    此时 left:0 + width 优先、right:0 被忽略 → host 贴左，panel 随之偏左。
    外部 margin:0 auto 覆盖：在 left:0/right:0 均有值 + width 固定时，fixed 元素水平居中于视口。 */
-mdui-dialog{margin:0 auto !important}
+mdui-dialog{margin:0 auto !important;--md-elevation-level:0;background:transparent !important;box-shadow:none !important;border:none !important}
+mdui-dialog::part(panel){background:transparent !important;box-shadow:none !important;border:none !important;border-radius:0 !important}
 mdui-dialog .dlg-body{max-height:56vh}
-/* Debug 面板内容撑宽：panel 宽度随内容自适应（max-width:35rem=560px），长文本自然撑开 */
 mdui-dialog .dlg-header, mdui-dialog .dlg-body, mdui-dialog .dlg-actions{width:100%;box-sizing:border-box}
 .dlg-header{display:flex;align-items:center;justify-content:space-between;padding:16px 20px 0;font-size:16px;font-weight:500}
 /* ===== 操作提示 Toast（顶部悬浮卡片，与整体 Material 3 卡片风格统一） ===== */
@@ -872,7 +872,7 @@ mdui-list-item::part(body){justify-content:center;gap:0}
 
   <!-- Debug 对话框 -->
   <mdui-dialog :open="debugOpen" @closed="debugOpen=false" close-on-esc close-on-overlay-click style="width:min(94vw,580px)">
-    <div class="dlg-body" style="padding:0;overflow:hidden;border-radius:14px">
+    <div class="dlg-body" style="padding:0;overflow:hidden;border-radius:14px;box-shadow:0 12px 40px rgba(0,0,0,.45)">
       <!-- CRT 终端头 -->
       <div style="display:flex;align-items:center;gap:10px;padding:12px 16px;background:rgba(var(--mdui-color-surface-container-lowest),.6);border-bottom:1px dashed rgba(var(--mdui-color-outline-variant),.5)">
         <div class="gh-crt-lights">
@@ -897,7 +897,7 @@ mdui-list-item::part(body){justify-content:center;gap:0}
 
   <!-- 包详情对话框 -->
   <mdui-dialog :open="pkgDetailOpen" @closed="pkgDetailOpen=false" close-on-esc close-on-overlay-click style="width:min(92vw,480px)">
-    <div class="dlg-body" style="padding:0;overflow:hidden;border-radius:14px">
+    <div class="dlg-body" style="padding:0;overflow:hidden;border-radius:14px;box-shadow:0 12px 40px rgba(0,0,0,.45)">
       <!-- CRT 终端头 -->
       <div style="display:flex;align-items:center;gap:10px;padding:12px 16px;background:rgba(var(--mdui-color-surface-container-lowest),.6);border-bottom:1px dashed rgba(var(--mdui-color-outline-variant),.5)">
         <div class="gh-crt-lights">
