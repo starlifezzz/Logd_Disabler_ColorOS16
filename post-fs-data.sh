@@ -317,14 +317,21 @@ else
         rm -f "$WORK_DIR/.wifi_fb_conf_created" 2>/dev/null
         log "[WiFiLog] 已移除本模块创建的 fallback 配置"
     fi
-    # 【警告】只回收【本模块创建】的写入目录（凭证在 marker 内）。
-    #   用 rmdir 而非 rm -rf：非空说明系统已在使用，一律保留不删。
+    # 【警告】回收本模块创建的写入目录。用 rmdir 而非 rm -rf：
+    #   非空说明系统已在使用，一律保留不删。
     if [ -f "$WORK_DIR/.wifi_dirs_created" ]; then
         while IFS= read -r _d; do
             [ -n "$_d" ] && rmdir "$_d" 2>/dev/null
         done < "$WORK_DIR/.wifi_dirs_created"
         rm -f "$WORK_DIR/.wifi_dirs_created" 2>/dev/null
         log "[WiFiLog] 已回收本模块创建的写入目录（仅空目录）"
+    else
+        # 【兼容 ≤v2.3.6】那两个目录由旧版创建，当时还没有 marker 机制。
+        # 只回退这两个实测确认模块新建的路径；/data/vendor/wifi/logs 是系统原生目录，
+        # 任何情况下都不碰。仍只用 rmdir（空才删），非空即保留。
+        rmdir /data/vendor/wifi/wlan_logs 2>/dev/null
+        rmdir /data/vendor/wifi/buffered_wlan_logs 2>/dev/null
+        log "[WiFiLog] 已回收兼容目录（仅空目录）"
     fi
     log "[WiFiLog] 未启用，跳过"
 fi

@@ -223,13 +223,20 @@ if [ -f "$WORK_DIR/.wifi_fb_conf_created" ]; then
     rm -f /data/vendor/wifi/cnss_diag.conf 2>/dev/null
     rm -f "$WORK_DIR/.wifi_fb_conf_created" 2>/dev/null
 fi
-# 【警告】只回收【本模块创建】的写入目录（umount 已在第 2 节完成）。
-#   用 rmdir 而非 rm -rf：非空说明系统已在使用，一律保留不删。
+# 【警告】回收写入目录（umount 已在第 2 节完成）。用 rmdir 而非 rm -rf：
+#   非空说明系统正在使用，一律保留不删。
 if [ -f "$WORK_DIR/.wifi_dirs_created" ]; then
+    # v2.3.7+：marker 精确记录本模块新建的目录
     while IFS= read -r _d; do
         [ -n "$_d" ] && rmdir "$_d" 2>/dev/null
     done < "$WORK_DIR/.wifi_dirs_created"
     rm -f "$WORK_DIR/.wifi_dirs_created" 2>/dev/null
+else
+    # 【兼容 ≤v2.3.6】那两个目录由旧版创建，当时还没有 marker 机制。
+    # 只回退这两个【实测确认模块新建】的路径；/data/vendor/wifi/logs 是系统原生目录，
+    # 任何情况下都不碰。仍只用 rmdir（空才删），非空即保留。
+    rmdir /data/vendor/wifi/wlan_logs 2>/dev/null
+    rmdir /data/vendor/wifi/buffered_wlan_logs 2>/dev/null
 fi
 # 清理 bootloop 保护文件
 rm -f /data/adb/coloros16_boot_count 2>/dev/null
