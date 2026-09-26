@@ -21,6 +21,19 @@ log() {
     echo "[$(date '+%Y-%m-%d %H:%M:%S')] $1" >> "$LOG_FILE"
 }
 
+# 【C 改造】日志轮转：超过 2000 行只保留最近 500 行。
+#   原 log() 只有 >>，实测已累积到 1.3MB / 159 次开机（≈8.2KB/次），无界增长。
+#   本脚本时钟在 late_start 已同步，date 时间可信，保留跨开机历史。
+#   （post-fs-data.log 另用 uptime 时间戳 + 每次开机清空，见 post-fs-data.sh）
+if [ -f "$LOG_FILE" ]; then
+    _lines=$(wc -l < "$LOG_FILE" 2>/dev/null | tr -d ' ')
+    if [ "${_lines:-0}" -gt 2000 ] 2>/dev/null; then
+        tail -500 "$LOG_FILE" > "$LOG_FILE.tmp" 2>/dev/null \
+            && mv "$LOG_FILE.tmp" "$LOG_FILE"
+        echo "[$(date '+%Y-%m-%d %H:%M:%S')] [日志] 已轮转：$_lines 行 → 保留 500 行" >> "$LOG_FILE"
+    fi
+fi
+
 log "========== service.sh 开始执行 =========="
 # 【v2.1.2】开始即写入"运行中"标记（status=running），结束后覆写为 status=ok。
 # WebUI 检测逻辑：读到 running/无文件 → 判定为开机优化未完成，跳过 Warn，
@@ -49,8 +62,8 @@ if [ ! -f "$CONFIG" ]; then
     log "[迁移] 未找到 config.json，尝试从旧 persist 属性迁移..."
     CONFIG_DIR="$(dirname "$CONFIG")"
     mkdir -p "$CONFIG_DIR"
-    # 全部 30 个开关 key（含 2 个总开关），与 WebUI FEATURES 一一对应
-    ALL_KEYS="disable_logd block_ota lock_developer_options block_ads_and_tracking kill_redundant_processes system_prop_toggles memory_io_optimization extra_kernel_optimization disable_health_services disable_network_monitoring disable_gamespace disable_wallet_services disable_backup_services disable_ai_assistants disable_voice_assistants disable_theme_services disable_network_optimization disable_security_services disable_media_services disable_system_tools disable_speedview disable_app_recover disable_double_tap disable_notification_mgr disable_device_link disable_device_connect disable_remote_control disable_travel_engine disable_settings_related disable_screen_services"
+    # 全部 32 个开关 key（含 2 个总开关），与 WebUI FEATURES 一一对应
+    ALL_KEYS="disable_logd block_ota lock_developer_options block_ads_and_tracking kill_redundant_processes system_prop_toggles memory_io_optimization extra_kernel_optimization disable_health_services disable_network_monitoring disable_gamespace disable_wallet_services disable_backup_services disable_ai_assistants disable_voice_assistants disable_theme_services disable_network_optimization disable_security_services disable_media_services disable_system_tools disable_speedview disable_app_recover disable_double_tap disable_notification_mgr disable_device_link disable_device_connect disable_remote_control disable_travel_engine disable_settings_related disable_screen_services disable_wifi_log disable_bluetooth_log"
     # keep 白名单 key（有子包的功能）
     KEEP_KEYS="block_ota_keep block_ads_and_tracking_keep disable_health_services_keep disable_network_monitoring_keep disable_gamespace_keep disable_wallet_services_keep disable_backup_services_keep disable_ai_assistants_keep disable_voice_assistants_keep disable_theme_services_keep disable_network_optimization_keep disable_security_services_keep disable_media_services_keep disable_system_tools_keep disable_speedview_keep disable_app_recover_keep disable_double_tap_keep disable_notification_mgr_keep disable_device_link_keep disable_device_connect_keep disable_remote_control_keep disable_travel_engine_keep"
     {
@@ -84,7 +97,7 @@ if ! grep -q '"version"' "$CONFIG" 2>/dev/null; then
     {
         echo "{"
         echo "  \"version\": 2,"
-        ALL_KEYS="disable_logd block_ota lock_developer_options block_ads_and_tracking kill_redundant_processes system_prop_toggles memory_io_optimization extra_kernel_optimization disable_health_services disable_network_monitoring disable_gamespace disable_wallet_services disable_backup_services disable_ai_assistants disable_voice_assistants disable_theme_services disable_network_optimization disable_security_services disable_media_services disable_system_tools disable_speedview disable_app_recover disable_double_tap disable_notification_mgr disable_device_link disable_device_connect disable_remote_control disable_travel_engine disable_settings_related disable_screen_services"
+        ALL_KEYS="disable_logd block_ota lock_developer_options block_ads_and_tracking kill_redundant_processes system_prop_toggles memory_io_optimization extra_kernel_optimization disable_health_services disable_network_monitoring disable_gamespace disable_wallet_services disable_backup_services disable_ai_assistants disable_voice_assistants disable_theme_services disable_network_optimization disable_security_services disable_media_services disable_system_tools disable_speedview disable_app_recover disable_double_tap disable_notification_mgr disable_device_link disable_device_connect disable_remote_control disable_travel_engine disable_settings_related disable_screen_services disable_wifi_log disable_bluetooth_log"
         first=1
         for key in $ALL_KEYS; do
             [ $first -eq 0 ] && echo ","
@@ -616,6 +629,30 @@ else
     ! is_on "disable_double_tap" && enable_pkg "com.oplus.exsystemservice"
     ! is_on "disable_speedview" && enable_pkg "com.coloros.ocs.opencapabilityservice"
 fi
+
+# ===================== 挂载复核（开机后最终证据） =====================
+# 【B 自检】本脚本跑在 late_start（实测开机 +71~93 秒）。
+#           wifiserver 的 cp 在【开机 +10 秒】就已完成 → 本段读到的 persist
+#           副本是【cp 之后、模块 bind 之后】的最终状态，就是最终证据。
+#           首次刷入实测：/odm=0 但 persist=1（当时只盖了 /odm，已修复）。
+#           修复后两者都应为 0，挂载数应为 4。
+# 本段全部为【只读】观察（grep /proc/mounts、读文件、ls -Z、getprop），
+#           不产生任何副作用，也不执行任何 mount/pkill/pm。
+# 4 个 WiFi dump 属性首版【不修改】，仅记录观测值用于排查线索。
+log "[复核][WiFi] /proc/mounts 挂载数=$(grep -c cnss_diag /proc/mounts 2>/dev/null || true) (期望 4 = /odm 2 + persist 2)"
+log "[复核][WiFi] /odm 源 LOG_PATH_FLAG=$(grep -E 'LOG_PATH_FLAG' /odm/etc/wifi/cnss_diag.conf 2>/dev/null | tr -d '\r') (期望 = 0)"
+log "[复核][WiFi] persist 副本 LOG_PATH_FLAG=$(grep -E 'LOG_PATH_FLAG' /mnt/vendor/persist/wlan/cnss_diag.conf 2>/dev/null | tr -d '\r') (期望 = 0 ← 决定性证据)"
+log "[复核][WiFi] persist always_on LOG_PATH_FLAG=$(grep -E 'LOG_PATH_FLAG' /mnt/vendor/persist/wlan/cnss_diag_always_on.conf 2>/dev/null | tr -d '\r') (期望 = 0)"
+log "[复核][WiFi] 写入目录 /data/vendor/wifi/logs: 文件数=$(ls -A /data/vendor/wifi/logs 2>/dev/null | wc -l) 占用=$(du -sh /data/vendor/wifi/logs 2>/dev/null | cut -f1)"
+FB_VAL=$(grep -E 'LOG_PATH_FLAG' /data/vendor/wifi/cnss_diag.conf 2>/dev/null | tr -d '\r')
+log "[复核][WiFi] 路径3 fallback 配置 /data/vendor/wifi/cnss_diag.conf=${FB_VAL:-未创建（系统本无此文件）} (期望 = 0)"
+log "[复核][WiFi] 写入目录 tmpfs: logs=$(grep -c ' /data/vendor/wifi/logs ' /proc/mounts 2>/dev/null || true) wlan_logs=$(grep -c ' /data/vendor/wifi/wlan_logs ' /proc/mounts 2>/dev/null || true) buffered=$(grep -c ' /data/vendor/wifi/buffered_wlan_logs ' /proc/mounts 2>/dev/null || true) (期望 1/1/1 = 写入只进内存)"
+log "[复核][WiFi] 启动状态 wifidriverlog_on=[$(getprop init.svc.wifidriverlog_on 2>/dev/null)] always_on=[$(getprop init.svc.wifidriverlog_always_on 2>/dev/null)] (期望 空或 stopped，绝不能是 running。注：空 = 该 service 从未被 start/stop 引用过，不代表未注册)"
+log "[复核][WiFi] 触发条件 qms_setting=$(getprop persist.sys.oplus.wifi.qms_setting 2>/dev/null) assert_panic=$(getprop persist.sys.assert.panic 2>/dev/null) debuglog_config=$(getprop persist.sys.debuglog.config 2>/dev/null) firmware_log=$(getprop sys.oplus.wifi.connect.firmware_log 2>/dev/null) (期望 qms=0/panic=0 = 未触发)"
+log "[复核][WiFi] 属性观测 fulldump=$(getprop persist.sys.oplus.wifi.fulldump.enable) minidump=$(getprop ro.oplus.wifi.minidump.enable.state)"
+log "[复核][BtLog] /proc/mounts 挂载数=$(grep -c 'bluetooth/logs' /proc/mounts 2>/dev/null || true) (期望 1)"
+log "[复核][BtLog] 目录上下文=$(ls -Zd /data/misc/bluetooth/logs 2>/dev/null || echo 读取失败) (期望 bluetooth_logs_data_file)"
+log "[复核][BtLog] tmpfs 内文件数=$(ls -A /data/misc/bluetooth/logs 2>/dev/null | wc -l) (>0 正常：BT 在 tmpfs 内新建，磁盘旧日志已被遮蔽)"
 
 # ===================== 写入状态 =====================
 # 【v2.1.2】写入完成标记：WebUI 检测前先读此文件判断 service.sh 是否已跑完。

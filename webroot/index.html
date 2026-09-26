@@ -84,30 +84,15 @@ mdui-card{width:100%}
 .debug-ok{color:#4caf50}
 .debug-warn{color:#ff9800}
 .debug-err{color:#f44336}
-.dlg-body{max-height:70vh;overflow-y:auto}
-/* mdui-dialog 居中修复：
-   原理：host 是 position:fixed + inset:0（left/right 均为 0），我们内联设置了固定 width。
-   此时 left:0 + width 优先、right:0 被忽略 → host 贴左，panel 随之偏左。
-   外部 margin:0 auto 覆盖：在 left:0/right:0 均有值 + width 固定时，fixed 元素水平居中于视口。 */
+/* mdui-dialog 居中修复 */
 mdui-dialog{margin:0 auto !important}
 mdui-dialog::part(panel){
-  background-color:rgb(var(--mdui-color-surface)) !important;
-  box-shadow:var(--mdui-elevation-level3) !important;
+  background-color:rgb(var(--mdui-color-surface-container-high)) !important;
+  box-shadow:0 8px 32px rgba(0,0,0,.35) !important;
+  border-radius:16px !important;
 }
-mdui-dialog::part(panel){background:var(--mdui-color-surface-container-high);box-shadow:0 8px 32px rgba(0,0,0,.35);border-radius:16px}
-mdui-dialog .dlg-body{max-height:56vh}
-mdui-dialog .dlg-header, mdui-dialog .dlg-body, mdui-dialog .dlg-actions{width:100%;box-sizing:border-box}
-
-/* 对话框 CRT 终端风（跟随 M3 主题） */
-.crt-dlg{padding:0;overflow:hidden;border-radius:16px}
-.crt-dlg-hd{display:flex;align-items:center;gap:10px;padding:12px 16px;border-bottom:1px dashed rgba(var(--mdui-color-outline-variant),.4)}
-.crt-dlg-hd span{font-family:'JetBrains Mono','Cascadia Code',monospace;font-size:12px;color:var(--mdui-color-on-surface-variant);letter-spacing:.5px}
-.crt-dlg-hd .crt-tag{margin-left:auto;font-size:10px;letter-spacing:1.5px;flex-shrink:0}
-.crt-dlg-bd{padding:14px 18px;max-height:55vh;overflow-y:auto}
-.crt-dlg-bd .info-row .k{color:var(--mdui-color-on-surface-variant)}
-.crt-dlg-bd .info-row .v{color:var(--mdui-color-on-surface)}
-.crt-dlg-ft{display:flex;justify-content:flex-end;gap:8px;padding:10px 16px;border-top:1px dashed rgba(var(--mdui-color-outline-variant),.4)}
-.dlg-header{display:flex;align-items:center;justify-content:space-between;padding:16px 20px 0;font-size:16px;font-weight:500}
+/* 对话框 slot=header 底部分割线 */
+mdui-dialog [slot=header]{border-bottom:1px dashed rgba(var(--mdui-color-outline-variant),.3);padding-bottom:12px}
 /* ===== 操作提示 Toast（顶部悬浮卡片，与整体 Material 3 卡片风格统一） ===== */
 .toast{
   /* 垂直位置：20% 视口基础上再上移 100px（纯百分比+calc，不写死像素）
@@ -187,7 +172,6 @@ mdui-dialog .dlg-header, mdui-dialog .dlg-body, mdui-dialog .dlg-actions{width:1
 .toast-fade-enter-active,.toast-fade-leave-active{transition:opacity .22s ease,transform .24s cubic-bezier(.2,.8,.3,1)}
 .toast-fade-enter-from,.toast-fade-leave-to{opacity:0;transform:translateX(-50%) translateY(-12px)}
 .toast-fade-enter-to,.toast-fade-leave-from{opacity:1;transform:translateX(-50%) translateY(0)}
-.dlg-actions{display:flex;justify-content:flex-end;gap:4px;padding:12px 20px}
 .footer{text-align:center;padding:20px 16px;font-size:12px;color:var(--mdui-color-on-surface-variant)}
 /* ===== 日志页 ===== */
 .log-page-body{padding:8px 16px 16px}
@@ -309,12 +293,12 @@ mdui-dialog .dlg-header, mdui-dialog .dlg-body, mdui-dialog .dlg-actions{width:1
 /* CRT 状态条：复古机箱灯 + 等宽标签 */
 .gh-crt{
   position:relative;z-index:2;display:flex;align-items:center;gap:10px;
-  width:100%;padding:10px 16px;
+  width:calc(100% + 40px);margin:0 -20px;padding:10px 16px;box-sizing:border-box;
   border-bottom:1px dashed rgba(var(--mdui-color-outline-variant),.55);
   background:rgba(var(--mdui-color-surface-container-lowest),.5);
   font-family:'JetBrains Mono','Cascadia Code','Menlo',monospace;
 }
-.gh-crt-lights{display:flex;gap:5px}
+.gh-crt-lights{display:flex;gap:5px;flex-shrink:0}
 .gh-led{width:9px;height:9px;border-radius:50%;box-shadow:0 0 6px currentColor}
 .gh-led-r{background:#ff5f57;color:#ff5f57}
 .gh-led-y{background:#febc2e;color:#febc2e}
@@ -566,7 +550,7 @@ mdui-list-item::part(body){justify-content:center;gap:0}
         <mdui-collapse accordion v-if="groupAgg(group).length" class="agg-collapse" @change="onCollapseChange">
           <mdui-collapse-item
             v-for="item in groupAgg(group)"
-            :key="'agg-' + item.key + '-' + String(state[item.key].enabled)"
+            :key="'agg-' + item.key"
             :value="item.key"
             :disabled="state[item.key].loading"
           >
@@ -889,53 +873,56 @@ mdui-list-item::part(body){justify-content:center;gap:0}
 
   <!-- Debug 对话框 -->
   <mdui-dialog :open="debugOpen" @closed="debugOpen=false" close-on-esc close-on-overlay-click style="width:min(94vw,580px)">
-    <div class="dlg-body crt-dlg">
-      <div class="crt-dlg-hd">
-        <div class="gh-crt-lights">
-          <span class="gh-led gh-led-r"></span>
-          <span class="gh-led gh-led-y led-breath"></span>
-          <span class="gh-led gh-led-g"></span>
-        </div>
-        <span>DEBUG CONSOLE</span>
-        <span class="crt-tag">SYS.DEBUG</span>
+    <div slot="header" style="display:flex;align-items:center;gap:10px">
+      <div class="gh-crt-lights">
+        <span class="gh-led gh-led-r"></span>
+        <span class="gh-led gh-led-y led-breath"></span>
+        <span class="gh-led gh-led-g"></span>
       </div>
-      <div class="crt-dlg-bd" style="font-family:'JetBrains Mono','Cascadia Code',monospace">
-        <div v-html="debugHtml"></div>
-      </div>
-      <div class="crt-dlg-ft">
-        <mdui-button variant="tonal" icon="content_copy" @click="copyDebugInfo()" style="font-size:12px">一键复制</mdui-button>
-        <mdui-button variant="text" @click="debugOpen=false" style="font-size:12px">关闭</mdui-button>
-      </div>
+      <span style="font-family:'JetBrains Mono','Cascadia Code',monospace;font-size:13px;font-weight:500">DEBUG CONSOLE</span>
+      <span style="margin-left:auto;font-family:'JetBrains Mono','Cascadia Code',monospace;font-size:10px;letter-spacing:1.5px;opacity:.5">SYS.DEBUG</span>
     </div>
+    <div style="font-family:'JetBrains Mono','Cascadia Code',monospace;max-height:55vh;overflow-y:auto">
+      <div v-html="debugHtml"></div>
+    </div>
+    <mdui-button slot="action" variant="tonal" @click="copyDebugInfo()">一键复制</mdui-button>
+    <mdui-button slot="action" variant="text" @click="debugOpen=false">关闭</mdui-button>
   </mdui-dialog>
 
   <!-- 包详情对话框 -->
   <mdui-dialog :open="pkgDetailOpen" @closed="pkgDetailOpen=false" close-on-esc close-on-overlay-click style="width:min(92vw,480px)">
-    <div class="dlg-body crt-dlg">
-      <div class="crt-dlg-hd">
-        <div class="gh-crt-lights">
-          <span class="gh-led gh-led-r"></span>
-          <span class="gh-led gh-led-y"></span>
-          <span class="gh-led gh-led-g led-breath"></span>
-        </div>
-        <span>PKG.INFO</span>
-        <span class="crt-tag">{{ pkgDetailGroup }}</span>
+    <div slot="header" style="display:flex;align-items:center;gap:10px">
+      <div class="gh-crt-lights">
+        <span class="gh-led gh-led-r"></span>
+        <span class="gh-led gh-led-y"></span>
+        <span class="gh-led gh-led-g led-breath"></span>
       </div>
-      <div class="crt-dlg-bd">
-        <div class="info-row"><span class="k">中文名</span><span class="v">{{ pkgDetailName }}</span></div>
-        <mdui-divider></mdui-divider>
-        <div class="info-row"><span class="k">包名</span><span class="v" style="font-family:'JetBrains Mono','Cascadia Code',monospace;font-size:12px;word-break:break-all">{{ pkgDetailPkg }}</span></div>
-        <mdui-divider></mdui-divider>
-        <div class="info-row"><span class="k">当前状态</span><span class="v">{{ pkgDetailState }}</span></div>
-        <mdui-divider v-if="pkgDetailSize"></mdui-divider>
-        <div class="info-row" v-if="pkgDetailSize"><span class="k">APK 大小</span><span class="v">{{ pkgDetailSize }}</span></div>
-        <div class="info-row" v-if="pkgDetailPath"><span class="k">安装路径</span><span class="v" style="font-family:'JetBrains Mono','Cascadia Code',monospace;font-size:11px;word-break:break-all">{{ pkgDetailPath }}</span></div>
-      </div>
-      <div class="crt-dlg-ft">
-        <mdui-button variant="tonal" @click="togglePkgDetail" style="font-size:12px">切换该包</mdui-button>
-        <mdui-button variant="text" @click="pkgDetailOpen=false" style="font-size:12px">关闭</mdui-button>
-      </div>
+      <span style="font-family:'JetBrains Mono','Cascadia Code',monospace;font-size:13px;font-weight:500">PKG.INFO</span>
+      <span style="margin-left:auto;font-family:'JetBrains Mono','Cascadia Code',monospace;font-size:10px;letter-spacing:1.5px;opacity:.5">{{ pkgDetailGroup }}</span>
     </div>
+    <div style="max-height:55vh;overflow-y:auto">
+      <div class="info-row"><span class="k">中文名</span><span class="v">{{ pkgDetailName }}</span></div>
+      <mdui-divider></mdui-divider>
+      <div class="info-row"><span class="k">包名</span><span class="v" style="font-family:'JetBrains Mono','Cascadia Code',monospace;font-size:12px;word-break:break-all">{{ pkgDetailPkg }}</span></div>
+      <mdui-divider></mdui-divider>
+      <div class="info-row"><span class="k">当前状态</span><span class="v">{{ pkgDetailState }}</span></div>
+      <mdui-divider v-if="pkgDetailSize"></mdui-divider>
+      <div class="info-row" v-if="pkgDetailSize"><span class="k">APK 大小</span><span class="v">{{ pkgDetailSize }}</span></div>
+      <div class="info-row" v-if="pkgDetailPath"><span class="k">安装路径</span><span class="v" style="font-family:'JetBrains Mono','Cascadia Code',monospace;font-size:11px;word-break:break-all">{{ pkgDetailPath }}</span></div>
+    </div>
+    <mdui-button slot="action" variant="tonal" @click="togglePkgDetail">切换该包</mdui-button>
+    <mdui-button slot="action" variant="text" @click="pkgDetailOpen=false">关闭</mdui-button>
+  </mdui-dialog>
+
+  <!-- 二次确认弹窗 -->
+  <mdui-dialog :open="confirmOpen" @closed="confirmOpen=false" close-on-esc close-on-overlay-click style="width:min(90vw,400px)">
+    <div slot="header" style="display:flex;align-items:center;gap:10px">
+      <mdui-icon name="warning--outlined" style="color:rgb(var(--mdui-color-error))"></mdui-icon>
+      <span style="font-family:'JetBrains Mono','Cascadia Code',monospace;font-size:13px;font-weight:500">{{ confirmTitle }}</span>
+    </div>
+    <div style="padding:8px 0;font-size:14px;line-height:1.6">{{ confirmMsg }}</div>
+    <mdui-button slot="action" variant="tonal" @click="confirmOk()">确认</mdui-button>
+    <mdui-button slot="action" variant="text" @click="confirmOpen=false">取消</mdui-button>
   </mdui-dialog>
 
   <!-- 操作提示 Toast（顶部悬浮卡片，随操作类型变色，与整体设计统一） -->
@@ -1002,8 +989,18 @@ var FEATURES = [
     desc: '禁用 preload / monitor / hotstart 属性',
     checkCmd: 'test "$(getprop persist.sys.preload)" = "0" && echo set || echo unset',
     verifyCmd: 'echo "preload=$(getprop persist.sys.preload 2>/dev/null)"; echo "monitor=$(getprop persist.sys.monitor 2>/dev/null)"; echo "hotstart=$(getprop persist.sys.hotstart 2>/dev/null)"'
+  },
+  { key: 'disable_wifi_log', icon: 'wifi--outlined', title: 'WiFi 诊断日志 (cnss_diag)',
+    desc: '双路径 bind 配置 + 写入目录 tmpfs 纵深防御；cnss_diag 由属性触发，当前未激活（重启后生效）',
+    checkCmd: 'a=$(grep -E "^LOG_PATH_FLAG" /odm/etc/wifi/cnss_diag.conf 2>/dev/null | tr -d "\r" | grep -oE "[0-9]+$"); b=$(grep -E "^LOG_PATH_FLAG" /odm/etc/wifi/cnss_diag_always_on.conf 2>/dev/null | tr -d "\r" | grep -oE "[0-9]+$"); c=$(grep -E "^LOG_PATH_FLAG" /mnt/vendor/persist/wlan/cnss_diag.conf 2>/dev/null | tr -d "\r" | grep -oE "[0-9]+$"); d=$(grep -E "^LOG_PATH_FLAG" /mnt/vendor/persist/wlan/cnss_diag_always_on.conf 2>/dev/null | tr -d "\r" | grep -oE "[0-9]+$"); t=$(grep -cE " /data/vendor/wifi/(logs|wlan_logs|buffered_wlan_logs) " /proc/mounts 2>/dev/null || true); if [ "${a:-x}" = "0" ] && [ "${b:-x}" = "0" ] && [ "${c:-x}" = "0" ] && [ "${d:-x}" = "0" ] && [ "${t:-0}" = "3" ]; then echo disabled; else echo enabled; fi',
+    verifyCmd: 'echo "== A. 启动状态（期望 空或 stopped，绝不能是 running）=="; echo "wifidriverlog_on        = [$(getprop init.svc.wifidriverlog_on)]"; echo "wifidriverlog_always_on = [$(getprop init.svc.wifidriverlog_always_on)]  (空=从未被 start/stop 引用过，不代表未注册)"; echo "cnss_diag_pid 属性      = [$(getprop vendor.oplus.wifi.cnss_diag_pid)] (空=本次开机从未运行)"; echo "== B. 触发条件（任一满足即拉起 cnss_diag）=="; echo "qms_setting     = $(getprop persist.sys.oplus.wifi.qms_setting)  (=1 直接启动)"; echo "assert.panic    = $(getprop persist.sys.assert.panic)  (rc 要求字面 true，0/1 均不触发)"; echo "debuglog.config = $(getprop persist.sys.debuglog.config)"; echo "firmware_log    = [$(getprop sys.oplus.wifi.connect.firmware_log)]  (=1 启动 always_on)"; echo "== C. 挂载（期望 4 条 = /odm 2 + persist 2）=="; grep cnss_diag /proc/mounts 2>/dev/null | sed "s/ f2fs.*//" | sed "s/ ext4.*//" || echo "(无挂载)"; echo "== D. 路径1 /odm 源（期望 = 0）=="; grep -H "^LOG_PATH_FLAG" /odm/etc/wifi/cnss_diag.conf /odm/etc/wifi/cnss_diag_always_on.conf 2>/dev/null | tr -d "\r"; echo "== E. 路径2 persist 副本（cnss_diag -m 实际读取 ← 决定性证据，期望 = 0）=="; grep -H "^LOG_PATH_FLAG" /mnt/vendor/persist/wlan/cnss_diag.conf /mnt/vendor/persist/wlan/cnss_diag_always_on.conf 2>/dev/null | tr -d "\r"; echo "== persist 副本 mtime（应晚于本模块 post-fs-data 执行时刻）=="; stat -c "%y %n" /mnt/vendor/persist/wlan/cnss_diag.conf 2>/dev/null; echo "== F. 路径3 fallback 配置（期望 = 0 或 未创建）=="; if [ -f /data/vendor/wifi/cnss_diag.conf ]; then grep -H "^LOG_PATH_FLAG" /data/vendor/wifi/cnss_diag.conf 2>/dev/null | tr -d "\r"; else echo "未创建（系统本无此文件）"; fi; echo "== G. 写入目录 tmpfs 化（期望 1/1/1 = 写入只进内存，重启清零）=="; for d in logs wlan_logs buffered_wlan_logs; do c=$(grep -c " /data/vendor/wifi/$d " /proc/mounts 2>/dev/null || true); echo "  $d: tmpfs=$c"; done; echo "  当前占用:"; du -sh /data/vendor/wifi/logs /data/vendor/wifi/wlan_logs /data/vendor/wifi/buffered_wlan_logs 2>/dev/null; echo "  (未列出者 = 不存在)"; echo "== H. SELinux 上下文（odm=vendor_configs_file / persist=mnt_vendor_file / wifi 目录按 file_contexts）=="; ls -Z /odm/etc/wifi/cnss_diag.conf /mnt/vendor/persist/wlan/cnss_diag.conf 2>/dev/null; ls -Zd /data/vendor/wifi/logs /data/vendor/wifi/wlan_logs /data/vendor/wifi/buffered_wlan_logs 2>/dev/null; echo "== I. 写入者进程 =="; pid=$(pidof cnss_diag 2>/dev/null); echo "cnss_diag: ${pid:-未运行}"; echo "== J. 属性观测(不改) =="; echo "fulldump=$(getprop persist.sys.oplus.wifi.fulldump.enable 2>/dev/null)"; echo "minidump=$(getprop ro.oplus.wifi.minidump.enable.state 2>/dev/null)"'
+  },
+  { key: 'disable_bluetooth_log', icon: 'bluetooth--outlined', title: '蓝牙诊断日志',
+    desc: '蓝牙日志改为 tmpfs 临时存储，不再写入磁盘（重启后生效）',
+    checkCmd: 'if grep -q " /data/misc/bluetooth/logs " /proc/mounts 2>/dev/null; then echo tmpfs_mounted; else echo disk; fi',
+    verifyCmd: 'echo "== 挂载（期望 1 条 tmpfs）=="; grep "bluetooth/logs" /proc/mounts 2>/dev/null || echo "(未 overlay)"; echo "== 目录上下文（期望 bluetooth_logs_data_file）=="; ls -Zd /data/misc/bluetooth/logs 2>/dev/null; echo "== 属主权限（期望 770 1002:1002）=="; stat -c "%a %u:%g" /data/misc/bluetooth/logs 2>/dev/null; echo "== 当前内容（应是本次开机在 tmpfs 内新建；磁盘旧日志已被遮蔽）=="; ls -la /data/misc/bluetooth/logs 2>/dev/null | tail -n +2; echo "== tmpfs 内占用（不落盘，重启清零）=="; du -sh /data/misc/bluetooth/logs 2>/dev/null; echo "== 写入进程 =="; pid=$(pidof com.android.bluetooth 2>/dev/null); echo "com.android.bluetooth: ${pid:-stopped}"'
   }
-]},
+  ]},
 { group: '隐私与广告', groupIcon: 'visibility_off--outlined', items: [
   { key: 'block_ads_and_tracking', icon: 'block--outlined', title: '广告与数据收集',
     desc: '关闭个性化广告、用户体验计划、数据统计',
@@ -1287,6 +1284,11 @@ var app = Vue.createApp({
       perfCapturing: false,
       // ===== 配置管理 =====
       cfgOpBusy: false,
+      // ===== 二次确认弹窗 =====
+      confirmOpen: false,
+      confirmTitle: '',
+      confirmMsg: '',
+      confirmCb: null,
       // ===== 首次使用引导 =====
       showGuide: false,
       // ===== OPT-8: 操作历史撤销栈 =====
@@ -1583,8 +1585,26 @@ var app = Vue.createApp({
         });
       });
     },
+    // ---------- 二次确认弹窗 ----------
+    showConfirm: function(title, msg, cb) {
+      this.confirmTitle = title;
+      this.confirmMsg = msg;
+      this.confirmCb = cb;
+      this.confirmOpen = true;
+    },
+    confirmOk: function() {
+      this.confirmOpen = false;
+      if (typeof this.confirmCb === 'function') this.confirmCb();
+      this.confirmCb = null;
+    },
     // 恢复默认：全部开关置 false，写回并刷新（含 pm 恢复）
     restoreDefault: function() {
+      var self = this;
+      this.showConfirm('⚠️ 恢复默认', '将关闭所有优化项并恢复全部被禁用的包，确定继续？', function() {
+        self._doRestoreDefault();
+      });
+    },
+    _doRestoreDefault: function() {
       var self = this;
       if (!this.config) this.config = {};
       this.cfgOpBusy = true;
@@ -1815,28 +1835,88 @@ var app = Vue.createApp({
         self.addLog('子包白名单 ' + kkey + '=' + (self.config[kkey] || '(空)') + (ok ? '' : ' 写入失败'));
       });
     },
+    // 确保 pkgStates[item.key] 已初始化
+    ensurePkgStates: function(item) {
+      if (!this.pkgStates[item.key]) {
+        this.pkgStates[item.key] = {};
+        if (item.pkgs) {
+          var ps = this.pkgStates[item.key];
+          item.pkgs.forEach(function(p) { ps[p] = 'unknown'; });
+        }
+      }
+    },
+    // ---------- 父项联动 ----------
+    // 【v2.3.6】同步更新 UI 状态：立即修改 state/pkgStates，不等异步
+    //  全 disabled → 父项 ON；有任一 enabled → 父项 OFF
+    syncParentSwitch: function(item) {
+      var self = this;
+      var ps = this.state[item.key];
+      if (!ps) return;
+      this.ensurePkgStates(item);
+      var allDisabled = item.pkgs && item.pkgs.length > 0 && item.pkgs.every(function(p) {
+        return self.pkgStates[item.key][p] === 'disabled';
+      });
+      ps.enabled = allDisabled;
+      ps.status = allDisabled ? 'enabled' : 'disabled';
+      this.config[item.key] = allDisabled;
+      if (!allDisabled) delete this.config[item.key + '_keep'];
+      this.writeConfig();
+    },
+    // 【v2.3.6】子包独立开关：点击时立即更新 UI，异步只管 pm 命令
     onPkgSwitch: function(item, pkg, e) {
       var self = this;
       var wantDisabled = !!(e.target && e.target.checked);
       var action = wantDisabled ? '禁用' : '恢复';
-      // 即时对单个包执行 pm 命令
+      this.ensurePkgStates(item);
+
+      // === 1. 立即更新 UI 状态（同步）===
+      this.pkgStates[item.key][pkg] = wantDisabled ? 'disabled' : 'enabled';
+      this.syncParentSwitch(item);
+      this.syncSubGroupSwitch(item.key);
+
+      // === 2. 异步执行 pm 命令 ===
       var cmd = wantDisabled
         ? 'pm disable-user --user 0 ' + pkg + ' 2>/dev/null || pm disable ' + pkg
         : 'pm enable ' + pkg;
       this.addLog('正在' + action + ' ' + pkg + '...');
       sh(cmd).then(function(r) {
         if (r.errno === 0) {
-          if (self.pkgStates[item.key]) {
-            self.pkgStates[item.key][pkg] = wantDisabled ? 'disabled' : 'enabled';
-          }
-          // 【修复】同步白名单：恢复→加入白名单（重启后跳过禁用）；
-          // 禁用→移出白名单。保证用户单独启用/禁用的选择在重启后保持。
           self.updatePkgKeep(item, pkg, wantDisabled);
-          self.addLog(pkg + ' ' + action + '成功（即时生效 + 白名单已同步）');
+          self.addLog(pkg + ' ' + action + '成功');
         } else {
-          self.addLog(pkg + ' ' + action + '失败: ' + (r.stderr || '未知错误'), 'error');
+          // === 失败回滚：恢复 UI 到操作前状态 ===
+          self.pkgStates[item.key][pkg] = wantDisabled ? 'enabled' : 'disabled';
+          self.syncParentSwitch(item);
+          self.syncSubGroupSwitch(item.key);
           e.target.checked = !wantDisabled;
+          self.addLog(pkg + ' ' + action + '失败: ' + (r.stderr || '未知错误'), 'error');
         }
+      });
+    },
+    // 【v2.3.3】二级分组总开关联动：子项开关变化后同步所属 sub-group 总开关
+    syncSubGroupSwitch: function(itemKey) {
+      var self = this;
+      // 找到 itemKey 所属的 sub-group
+      FEATURES.forEach(function(g) {
+        self.groupSubGroups(g).forEach(function(sub) {
+          if (!sub.subKey || !sub.items) return;
+          var match = sub.items.some(function(it) { return it.key === itemKey; });
+          if (!match) return;
+          var ssk = sub.subKey;
+          var ss = self.state[ssk];
+          if (!ss || ss.loading) return;
+          // sub-group 总开关：所有子项 config 均为 true → ON；否则 OFF
+          // 注意：只更新总开关，不覆盖子项各自的 config（保留用户单独操作）
+          var allOn = sub.items.every(function(it) {
+            return !!(self.config && self.config[it.key] === true);
+          });
+          if (ss.enabled === allOn) return;
+          ss.enabled = allOn;
+          ss.status = allOn ? 'enabled' : 'disabled';
+          self.config[ssk] = allOn;
+          self.writeConfig();
+          self.addLog('🔄 二级分组联动：' + sub.name + ' → ' + (allOn ? '优化全开' : '未优化'));
+        });
       });
     },
     // ---------- 包详情对话框 ----------
@@ -1998,41 +2078,55 @@ var app = Vue.createApp({
         return ok;
       });
     },
-    // ---------- 开关 ----------
+    // 【v2.3.6】父项开关：点击时立即更新所有子项 UI 状态，异步只管 pm 命令
     onSwitchChange: function(item, e) {
       var self = this;
       var wantOn = !!(e.target && e.target.checked);
       var s = this.state[item.key];
       if (s.loading) {
-        // 恢复 switch 到真实状态
         e.target.checked = s.enabled;
         return;
       }
       s.loading = true;
       var action = wantOn ? '禁用' : '恢复';
       this.addLog('正在' + action + ' ' + item.title + '...');
-      // 1) 写属性（持久化，重启后由 service.sh 兜底执行）
+
+      // === 1. 立即更新所有 UI 状态（同步）===
+      if (item.pkgs && item.pkgs.length) {
+        this.ensurePkgStates(item);
+        var target = wantOn ? 'disabled' : 'enabled';
+        item.pkgs.forEach(function(p) {
+          self.pkgStates[item.key][p] = target;
+        });
+        delete self.config[item.key + '_keep'];
+      }
+      // 立即设置父项状态（不等异步）
+      s.enabled = wantOn;
+      s.status = wantOn ? 'enabled' : 'disabled';
+      this.config[item.key] = wantOn;
+
+      // === 2. 异步执行 pm 命令（不改 UI，只执行实际操作）===
       this.writeProp(item.key, wantOn).then(function(ok) {
         if (!ok) {
-          s.status = 'error';
-          self.addLog(item.title + ' ' + action + '失败', 'error');
+          // 属性写入失败：回滚所有 UI 状态
+          s.enabled = !wantOn;
+          s.status = !wantOn ? 'enabled' : 'disabled';
+          self.config[item.key] = !wantOn;
+          if (item.pkgs && item.pkgs.length) {
+            var revertTarget = !wantOn ? 'disabled' : 'enabled';
+            item.pkgs.forEach(function(p) {
+              self.pkgStates[item.key][p] = revertTarget;
+            });
+          }
           s.loading = false;
+          self.addLog(item.title + ' ' + action + '失败', 'error');
           return;
         }
-        // 2) 【修复】立即执行实际 pm 命令，让开关操作即时生效（而非等重启）
-        //    这样 UI 开关与实际命令真正一一对应。
+        // 写属性成功，执行实际 pm 命令
         if (item.pkgs && item.pkgs.length) {
-          // 聚合项/单包项：对每个子包执行 pm disable/enable
           var chain = Promise.resolve();
           var failed = 0;
           item.pkgs.forEach(function(p) {
-            // 【修复】即时禁用时尊重白名单：白名单包=用户保留启用，禁止禁用。
-            // 否则总开关切换会把这些包 pm disable，导致与子包开关状态不一致。
-            // 【v2.1.1】合成子组(总开关)额外检查子项自身 keep：
-            // 用户在子包的"恢复"操作写入的是子项 key 的 _keep 字段
-            // （如 disable_app_recover_keep），若只查总开关 keep 会漏掉，
-            // 导致总开关切换把子项白名单包误禁。
-            if (wantOn && !self.pkgKeptBySub(item, p)) return;
             var c = wantOn
               ? 'pm disable-user --user 0 ' + p + ' 2>/dev/null || pm disable ' + p
               : 'pm enable ' + p;
@@ -2045,21 +2139,12 @@ var app = Vue.createApp({
             });
           });
           chain.then(function() {
-            // 更新子包状态（白名单包保持启用，不被标为已禁用）
-            if (self.pkgStates[item.key]) {
-              item.pkgs.forEach(function(p) {
-                self.pkgStates[item.key][p] = (wantOn && !self.isKept(item.key, p)) ? 'disabled' : 'enabled';
-              });
-            }
-            s.enabled = wantOn;
-            s.status = wantOn ? 'enabled' : 'disabled';
             s.loading = false;
             if (failed > 0) {
-              self.addLog('⚠️ ' + item.title + ' ' + action + '完成，但 ' + failed + ' 个包未生效（详见 Debug/verifyCmd）', 'warn');
+              self.addLog('⚠️ ' + item.title + ' ' + action + '完成，但 ' + failed + ' 个包未生效', 'warn');
               self.showSnack('⚠️ ' + item.title + ' ' + action + '完成，' + failed + ' 个包未生效');
             } else {
               self.addLog(item.title + ' ' + action + '成功（即时生效 + 属性已持久化）');
-              // 【OPT-8】撤销操作：记录反向操作到 undo 栈，Toast 提供撤销按钮
               self.pushUndo(item.title + ' → ' + action, function() {
                 self.onSwitchChange(item, { target: { checked: !wantOn } });
               });
@@ -2069,9 +2154,6 @@ var app = Vue.createApp({
             }
           });
         } else {
-          // 非包类功能（如系统属性/内核优化）：只写属性，等待 service.sh
-          s.enabled = wantOn;
-          s.status = wantOn ? 'enabled' : 'disabled';
           s.loading = false;
           self.addLog(item.title + ' ' + action + '成功，重启后生效');
         }
@@ -2090,35 +2172,42 @@ var app = Vue.createApp({
       var item = {
         key: sub.subKey,
         title: sub.name + '（总开关）',
-        // 【v2.1.3】补上 synthetic/subItems：onSwitchChange 即时禁用路径
-        // 通过 pkgKeptBySub 检查子项 keep 白名单，缺少 subItems 时
-        // 总开关禁用会把用户单独保留的子包也 pm disable。
         synthetic: true,
         subItems: sub.items,
         pkgs: sub.items.reduce(function(a, it) { return a.concat(it.pkgs || []); }, [])
       };
-      // 确保 pkgStates 已初始化（刷新时已由合成 item 写入）
+      // 确保 pkgStates 已初始化
       if (!this.pkgStates[item.key]) {
         this.pkgStates[item.key] = {};
         item.pkgs.forEach(function(p) { self.pkgStates[item.key][p] = 'unknown'; });
       }
-      // 同步子项开关状态为总开关目标值（保持 UI 层级一致）
       var wantOn = e.target.checked;
+      var target = wantOn ? 'disabled' : 'enabled';
+
+      // 【v2.3.6】同步更新所有子项的 UI 状态 + pkgStates
       sub.items.forEach(function(it) {
         if (self.state[it.key]) {
           self.state[it.key].enabled = wantOn;
           self.state[it.key].status = wantOn ? 'enabled' : 'disabled';
         }
-      });
-      // 【v2.0】同步写入 config.json，保证重启后子项与总开关一致
-      if (!this.config) this.config = {};
-      sub.items.forEach(function(it) {
         self.config[it.key] = wantOn;
+        // 同步每个子项的 pkgStates（子项开关绑定的是 it.key 的 pkgStates）
+        self.ensurePkgStates(it);
+        if (it.pkgs) {
+          it.pkgs.forEach(function(p) {
+            self.pkgStates[it.key][p] = target;
+          });
+        }
+        delete self.config[it.key + '_keep'];
       });
+
+      // 总开关自身的 pkgStates 和 config
+      item.pkgs.forEach(function(p) { self.pkgStates[item.key][p] = target; });
       this.config[item.key] = wantOn;
-      this.writeConfig().then(function(ok) {
-        if (!ok) self.addLog('⚠️ 总开关状态写入 config.json 失败', 'warn');
-      });
+      delete this.config[item.key + '_keep'];
+      this.writeConfig();
+
+      // 异步执行 pm 命令（不改 UI）
       this.onSwitchChange(item, e);
     },
     // ---------- 状态检测 ----------
@@ -2446,6 +2535,12 @@ var app = Vue.createApp({
     },
     // ---------- OPT-1: 一键全部优化 ----------
     globalOptimize: function() {
+      var self = this;
+      this.showConfirm('⚡ 一键全部优化', '将禁用所有可优化的包并清除白名单，确定继续？', function() {
+        self._doGlobalOptimize();
+      });
+    },
+    _doGlobalOptimize: function() {
       var self = this;
       this.cfgOpBusy = true;
       // 将所有包类功能开关设为 true

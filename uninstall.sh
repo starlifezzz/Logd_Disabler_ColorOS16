@@ -3,7 +3,7 @@
 # Logd_Disabler_ColorOS16 卸载回滚脚本（uninstall.sh）
 # - 恢复所有被禁用的包（pm enable / install-existing）
 # - 恢复被修改的系统属性与内核参数
-# - 卸载 bind mount 覆盖（logd/update_engine/OTA 目录）
+# - 卸载 bind mount 覆盖（logd/update_engine/OTA 目录/WiFi conf/蓝牙日志 tmpfs）
 # - 清理 config.json 数据目录与日志
 # 说明：KernelSU 卸载模块时自动执行本脚本（存在即调用）
 # ============================================================
@@ -131,16 +131,34 @@ log "包恢复完成: 恢复 $RESTORED 个, 跳过 $SKIPPED 个"
 ui_print "  已恢复 $RESTORED 个包"
 
 # ===================== 2. 卸载 bind mount =====================
+# 【v2.3.7】范围补全：原版只覆盖 /system/bin 的 logd/update_engine + OTA 目录，
+#   漏了 /system/xbin，也完全没覆盖 v2.3.7 新增的 WiFi/蓝牙日志挂载。
+#   漏 umount 的后果：卸载模块后挂载依然存在，配置看似"没恢复"。
 ui_print "- 卸载挂载覆盖..."
 for bin in logd logcat logpersist.start logpersist.stop logtagd update_engine update_engine_client; do
     umount "/system/bin/$bin" 2>/dev/null
-done
-for bin in logd logcat; do
     umount "/system/xbin/$bin" 2>/dev/null
 done
 for apk_dir in /system/app/OTA /system/priv-app/OTA /system/app/OplusOTA /system/priv-app/OplusOTA; do
     umount "$apk_dir" 2>/dev/null
 done
+# --- WiFi 日志：卸载对 /odm 源 conf 的 bind，恢复原始 LOG_PATH_FLAG = 1 ---
+umount /odm/etc/wifi/cnss_diag.conf 2>/dev/null
+umount /odm/etc/wifi/cnss_diag_always_on.conf 2>/dev/null
+# --- WiFi 日志：卸载对 persist 副本的 bind（v2.3.7 新增，wifiserver 的 cp 目标）---
+umount /mnt/vendor/persist/wlan/cnss_diag.conf 2>/dev/null
+umount /mnt/vendor/persist/wlan/cnss_diag_always_on.conf 2>/dev/null
+# --- WiFi 日志：卸载路径3 的 tmpfs 覆盖与 fallback 配置（纵深防御层）---
+#   三个写入目录 umount 后露出底层真实空目录，写入恢复落盘行为。
+umount /data/vendor/wifi/logs 2>/dev/null
+umount /data/vendor/wifi/wlan_logs 2>/dev/null
+umount /data/vendor/wifi/buffered_wlan_logs 2>/dev/null
+umount /data/vendor/wifi/cnss_diag.conf 2>/dev/null
+# --- 蓝牙日志：卸载 tmpfs overlay ---
+#   tmpfs 内容随 umount 一并消失；磁盘上原有的 bluetooth_*.log 因此重新可见
+#   （本模块从不删除它们，只是被遮蔽）。
+umount /data/misc/bluetooth/logs 2>/dev/null
+log "挂载卸载完成（含 WiFi conf / WiFi 写入目录 tmpfs / 蓝牙日志 tmpfs）"
 
 # ===================== 3. 恢复系统属性 =====================
 ui_print "- 恢复系统属性..."
@@ -196,6 +214,23 @@ echo always > /sys/kernel/mm/transparent_hugepage/khugepaged/defrag 2>/dev/null
 ui_print "- 清理配置数据..."
 rm -rf "$CONFIG_DIR" 2>/dev/null
 rm -f "$WORK_DIR/dummy" 2>/dev/null
+# v2.3.7：清理 WiFi persist 副本临时文件
+rm -f "$WORK_DIR/cnss_diag.persist.conf" 2>/dev/null
+rm -f "$WORK_DIR/cnss_diag_always_on.persist.conf" 2>/dev/null
+# 【警告】fallback 配置仅在【本模块创建】时删除（靠 marker 判定），
+#   系统原本就有该文件的情况一律保留，绝不误删。
+if [ -f "$WORK_DIR/.wifi_fb_conf_created" ]; then
+    rm -f /data/vendor/wifi/cnss_diag.conf 2>/dev/null
+    rm -f "$WORK_DIR/.wifi_fb_conf_created" 2>/dev/null
+fi
+# 【警告】只回收【本模块创建】的写入目录（umount 已在第 2 节完成）。
+#   用 rmdir 而非 rm -rf：非空说明系统已在使用，一律保留不删。
+if [ -f "$WORK_DIR/.wifi_dirs_created" ]; then
+    while IFS= read -r _d; do
+        [ -n "$_d" ] && rmdir "$_d" 2>/dev/null
+    done < "$WORK_DIR/.wifi_dirs_created"
+    rm -f "$WORK_DIR/.wifi_dirs_created" 2>/dev/null
+fi
 # 清理 bootloop 保护文件
 rm -f /data/adb/coloros16_boot_count 2>/dev/null
 rm -f /data/adb/coloros16_bootloop_flag 2>/dev/null

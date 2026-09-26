@@ -14,8 +14,8 @@ set_perm_recursive "$MODPATH" 0 0 0755 0644
 set_perm "$MODPATH/post-fs-data.sh" 0 0 0755
 set_perm "$MODPATH/service.sh" 0 0 0755
 set_perm "$MODPATH/boot-completed.sh" 0 0 0755
-set_perm "$MODPATH/verify_status.sh" 0 0 0755
 set_perm "$MODPATH/uninstall.sh" 0 0 0755
+# 注：verify_status.sh 已删除（全仓无调用点的死代码）
 
 ui_print "- 检测系统环境..."
 if ! grep -qE "ColorOS|oplus|OnePlus" /system/build.prop /system_ext/build.prop /vendor/build.prop 2>/dev/null; then

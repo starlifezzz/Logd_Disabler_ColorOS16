@@ -28,19 +28,42 @@ jobs:
           echo "version_code=$(grep '^versionCode=' module.prop | cut -d= -f2)" >> "$GITHUB_OUTPUT"
           echo "tag=${{ github.ref_name }}"
 
-      # 打包可刷 zip：只包含模块运行必需文件
-      # 排除规则与本地 zip.sh 保持一致（不含 update.json，它是仓库级文件不是模块文件）
+      # 打包可刷 zip：改用【排除法】，与本地 zip.sh 完全一致
+      # 【本次修复】旧版用白名单，导致 sepolicy.rule 与 uninstall.sh 被漏打包：
+      #   - 缺 sepolicy.rule → pm 全部报 "Can't find service: package"
+      #   - 缺 uninstall.sh  → 卸载后不回滚，包/属性/挂载永久残留
+      #   实测 Release v2.3.0 zip(15 条目) 确认两文件缺失。
+      #   排除法可自动包含后续新增文件（如 cnss_diag_*.conf），不会再漏。
       - name: Package module zip
         run: |
           sudo apt-get update && sudo apt-get install -y zip
-          zip -r Logd_Disabler_ColorOS16.zip \
-            module.prop customize.sh service.sh post-fs-data.sh boot-completed.sh \
-            verify_status.sh \
-            webroot \
+          zip -9 -r Logd_Disabler_ColorOS16.zip . \
             -x "*.git*" "*.github*" "*.lingma*" ".gitignore" "README.md" \
-            "Logd_Disabler_ColorOS16.zip" "zip.sh" "services.txt" "update.json"
+            "Logd_Disabler_ColorOS16.zip" "zip.sh" "update.json" "reference/*"
           echo "--- zip contents ---"
           unzip -l Logd_Disabler_ColorOS16.zip
+
+      # 【本次新增】打包自检：必需文件缺失直接失败，防止再次漏打包
+      - name: Verify zip contains required files
+        run: |
+          FAIL=0
+          for f in module.prop customize.sh service.sh post-fs-data.sh \
+                   boot-completed.sh uninstall.sh sepolicy.rule \
+                   cnss_diag_off.conf cnss_diag_always_on_off.conf \
+                   webroot/index.html; do
+            if unzip -l Logd_Disabler_ColorOS16.zip | grep -qE "[[:space:]](\./)?${f}\$"; then
+              echo "✅ $f"
+            else
+              echo "::error::zip 缺少必需文件: $f"
+              FAIL=1
+            fi
+          done
+          if unzip -l Logd_Disabler_ColorOS16.zip | grep -qE "[[:space:]](\./)?verify_status.sh\$"; then
+            echo "::error::verify_status.sh 应已删除，不应出现在 zip 中"
+            FAIL=1
+          fi
+          [ "$FAIL" -eq 0 ] || exit 1
+          echo "✅ 打包自检通过"
 
       # 生成 update.json 到临时位置（不污染当前工作区）
       - name: Generate update.json
