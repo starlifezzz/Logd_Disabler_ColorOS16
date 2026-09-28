@@ -72,5 +72,27 @@ detail.length===0?ok("「第X章第N节」级引用全部精确命中"):no(detai
 if(lines.some(l=>l.includes("截至 v2.3.19"))) ok("条数快照已标注基准版本（防过时误导）");
 else no("存在未标注基准的硬编码条数");
 
+// 8 计数类断言：标题声称「下面 N 条」必须等于表格实际数据行数
+//    背景：本项目实际发生过——加了一行陷阱却忘了改计数（10 → 实际 11），
+//    而我当时的统计脚本范围写错，还报了"✅ 一致"。机器核对，不靠人眼。
+const cntBad=[]; let cntSeen=0;
+lines.forEach((l,i)=>{
+  if(inCode[i]) return;
+  const m=l.match(/下面\s*(\d+)\s*条/);
+  if(!m) return;
+  cntSeen++;
+  const claimed=+m[1];
+  let j=i+1;
+  while(j<lines.length && !/^\|/.test(lines[j])) j++;
+  if(j>=lines.length) return;
+  let rows=0;
+  while(j<lines.length && /^\|/.test(lines[j])) { rows++; j++; }
+  const data=rows-2;                       // 扣掉表头行 + 分隔行
+  if(data!==claimed) cntBad.push(`L${i+1}: 标题写 ${claimed} 条、实际 ${data} 条`);
+});
+if(cntSeen===0)      console.log("  ℹ 计数类断言：文档已去数字化（无「N 条」类硬编码），无需校验");
+else if(cntBad.length===0) ok(`计数类断言 ${cntSeen} 处：标题条数与表格实际行数一致`);
+else no("计数矛盾: "+cntBad.join(" | "));
+
 console.log(`\n═══ 解析结果：${P} 通过 / ${Fc} 失败 ═══`);
 process.exit(Fc);

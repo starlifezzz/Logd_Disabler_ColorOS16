@@ -29,18 +29,28 @@
 .perf-crt-header .crt-tag{margin-left:auto;font-size:10px;letter-spacing:1.5px;flex-shrink:0}
 /* ===== 关于页 ===== */
 .about-tips{padding:8px 20px 16px;display:flex;flex-direction:column;gap:10px}
-.tip-row{font-size:13px;line-height:1.6;color:rgb(var(--mdui-color-on-surface-variant));padding:10px 12px;border-radius:8px;background:rgba(var(--mdui-color-surface-container-high),.5)}
-.tip-row b{color:rgb(var(--mdui-color-on-surface))}
+/* min-width:0 允许 flex 子项收缩 + overflow-wrap 强制断词 —— 同 .agg-dep-warn 的双保险，
+   否则长路径 /storage/.../coloros16_config.json 会被 min-width:auto 撑出屏幕 */
+.tip-row{font-size:13px;line-height:1.6;color:rgb(var(--mdui-color-on-surface-variant));padding:10px 12px;border-radius:8px;background:rgba(var(--mdui-color-surface-container-high),.5);min-width:0;white-space:normal;overflow-wrap:anywhere;word-break:break-word}
+.tip-row b{color:rgb(var(--mdui-color-on-surface));min-width:0;overflow-wrap:anywhere;word-break:break-word}
 /* ===== 性能对比页 ===== */
 .perf-tips{padding:4px 20px 8px;display:flex;flex-direction:column;gap:10px}
 .perf-actions{display:flex;gap:10px;flex-wrap:wrap;padding:0 20px 12px}
-.perf-table-wrap{padding:0 16px 12px;overflow-x:auto}
-.perf-table{width:100%;border-collapse:collapse;font-size:13px;min-width:320px}
-.perf-table th,.perf-table td{padding:9px 10px;text-align:left;border-bottom:1px solid rgba(var(--mdui-color-on-surface),.08)}
-.perf-table th{font-size:12px;color:rgb(var(--mdui-color-on-surface-variant));font-weight:500;white-space:nowrap}
+/* min-width:0 + max-width:100%：双重保证横向滚动只发生在本容器内，不撑破页面。
+    实测竖屏 1264px ÷ 3.5(density 560/160) = 361dp，可用宽 361−32(page)−32(wrap)=297px；
+    表 min-content 需压到 ≈291px（时间戳关掉继承的 letter-spacing 后 313→291）才能在竖屏放下，
+    overflow-x:auto 只作为极小屏兜底，正常情况不应出现横向滚动 */
+.perf-table-wrap{padding:0 16px 12px;overflow-x:auto;min-width:0;max-width:100%;box-sizing:border-box;overscroll-behavior-x:contain}
+.perf-table{width:100%;border-collapse:collapse;font-size:13px}
+.perf-table th,.perf-table td{padding:8px 6px;text-align:left;border-bottom:1px solid rgba(var(--mdui-color-on-surface),.08);overflow-wrap:anywhere}
+/* 不设 white-space:nowrap —— 否则已有的 overflow-wrap:anywhere 被 nowrap 覆盖而失效，
+   空间不足时时间戳无法折行、表必然溢出竖屏 */
+.perf-table th{font-size:12px;color:rgb(var(--mdui-color-on-surface-variant));font-weight:500}
 .perf-table td{font-family:monospace;font-size:12.5px}
 .perf-table td:first-child{font-family:inherit;color:rgb(var(--mdui-color-on-surface-variant))}
-.perf-sub{font-size:10.5px;opacity:.7}
+/* letter-spacing:0 —— 时间戳位于 th 内，会继承 CRT 表头的 letter-spacing:1px，
+   使两个时间列各白宽约 11px(合计 22px)，正是竖屏超宽 16px 的主因；时间无需表头字距 */
+.perf-sub{font-size:10.5px;opacity:.7;letter-spacing:0}
 .perf-note{font-size:11.5px;color:rgb(var(--mdui-color-on-surface-variant));padding:6px 2px 0}
 .perf-empty{display:flex;flex-direction:column;align-items:center;gap:8px;padding:26px 20px 28px;font-size:13px;color:rgb(var(--mdui-color-on-surface-variant));text-align:center}
 .delta-good{color:#2e7d32;font-weight:500}
