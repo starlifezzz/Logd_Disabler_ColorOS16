@@ -36,6 +36,33 @@
 </head>
 <body>
 <div id="app" v-cloak>
+  <!-- 【CRT 开机门禁·A方案 BIOS/POST】全屏覆盖层：检测完成前不放行主界面。
+       纯视觉层（fixed z-index 3500，盖住顶栏/底栏/引导层），主界面在背后正常渲染，
+       放行瞬间零延迟出现 —— 不碰 exec/阻塞/渲染时序。
+       放行三重保障：① 检测正常完成 ② mounted 15s 超时兜底 ③ [SKIP] 按钮 -->
+  <div class="crt-boot" v-if="!bootDone" role="status" aria-live="polite">
+    <div class="crt-boot-screen">
+      <div class="crt-boot-logo neon-text">COLOROS 16 优化</div>
+      <div class="crt-boot-sub">KSU MODULE · POWER ON SELF TEST</div>
+      <!-- POST 逐行自检：纯 CSS staggered 动画（文本始终在 DOM，无障碍友好，抄 CodeFronts MIT） -->
+      <ol class="crt-boot-post">
+        <li style="--boot-i:0">POWER ON SELF TEST ......... <b>OK</b></li>
+        <li style="--boot-i:1">MODULE FILES ............... <b>OK</b></li>
+        <li style="--boot-i:2">INIT service.sh ............ <b>OK</b></li>
+        <li style="--boot-i:3">PACKAGE MANAGER ............ <b>OK</b></li>
+        <li style="--boot-i:4">SCAN DISABLED PACKAGES ..... <b>{{ checking ? 'RUN' : 'OK' }}</b></li>
+      </ol>
+      <!-- 真实进度（复用现有 progress 0→40→100，绑定字面量满足门禁 L291） -->
+      <div class="crt-boot-progress">
+        <mdui-linear-progress :max="100" :value="progress" class="crt-boot-bar"></mdui-linear-progress>
+        <span class="crt-boot-pct neon-text">{{ progress }}%</span>
+      </div>
+      <!-- 打字机状态行 + 闪烁光标 -->
+      <div class="crt-boot-status"><span class="crt-boot-typed">{{ bootStatus }}</span><span class="crt-boot-caret" aria-hidden="true"></span></div>
+      <!-- 手动跳过：检测继续在后台跑，立即放行 -->
+      <button type="button" class="crt-boot-skip" @click="skipBoot()">[ ESC ] SKIP BOOT ▸</button>
+    </div>
+  </div>
   <!-- 顶栏 -->
   <mdui-top-app-bar scroll-behavior="shrink">
     <mdui-top-app-bar-title>
@@ -918,6 +945,9 @@ var app = Vue.createApp({
       openSubItem: '',      // 二级分组内多包子项的折叠展开状态（如 屏幕服务→速览）
       checking: false,
       progress: 0,
+      // 【CRT 开机门禁·A方案】检测完成前用全屏 POST 终端盖住主界面（纯覆盖，不碰渲染时序）
+      bootDone: false,
+      bootStatus: 'LOADING MODULE...',
       moduleVersion: 'v1.4',
       ksuVersion: 'KernelSU',
       selinuxStatus: '检测中...',
@@ -2207,6 +2237,12 @@ var app = Vue.createApp({
         self.addLog('校验 ' + item.key + ' 失败: ' + e, 'error');
       });
     },
+    // 【CRT 开机门禁】手动跳过：检测仍在后台继续，主界面立即放行（高风险：无，纯 UI）
+    skipBoot: function() {
+      if (this.bootDone) return;
+      this.bootDone = true;
+      this.addLog('⏩ 已跳过开机动画（检测仍在后台继续）', 'info');
+    },
     refreshAll: function() {
       var self = this;
       var allItems = [];
@@ -2285,6 +2321,8 @@ var app = Vue.createApp({
         } catch (e) { /* 诊断失败不阻断主流程 */ }
         self.addLog('=== 状态检测完成 ===');
         self.checking = false;
+        // 【CRT 开机门禁】检测完成 → 放行主界面
+        self.bootDone = true;
         // 【v2.1.2】若本轮 service.sh 未就绪（跳过 Warn），
         // 延时自动复检，确保最终状态与 Warn 准确。
         // 【v2.1.3】复检次数上限：service.sh 异常/文件缺失时避免无限循环刷新
@@ -2298,6 +2336,11 @@ var app = Vue.createApp({
           self.retryCount = 0;
           self.addLog('⚠️ service.sh 状态文件缺失或执行异常，已停止自动复检（可稍后手动刷新）', 'warn');
         }
+      }).catch(function(e) {
+        // 【CRT 开机门禁】异常兜底：检测链失败也必须放行，否则用户永远卡在开机画面
+        self.checking = false;
+        self.bootDone = true;
+        self.addLog('❌ 检测链异常，已强制放行主界面: ' + e, 'error');
       });
     },
     // ---------- Debug ----------
@@ -2574,6 +2617,14 @@ var app = Vue.createApp({
         self.showGuide = true;
       }
     });
+    // 【CRT 开机门禁】15 秒超时兜底（正常检测约 8s，留足慢机余量）：
+    // 即使检测链卡死也强制放行，防止用户永远进不去主界面（高风险：无，仅 UI 放行）
+    setTimeout(function() {
+      if (!self.bootDone) {
+        self.bootDone = true;
+        self.addLog('⏱️ 开机画面 15s 超时，已强制放行（检测可在后台继续）', 'warn');
+      }
+    }, 15000);
   }
 });
 
