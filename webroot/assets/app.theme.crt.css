@@ -1,0 +1,167 @@
+/* ============================================================
+ * app.theme.crt.css — 主题层（CRT 复古终端风）
+ * L2 拆分自 index.html <style>，最后加载以覆盖中性基线
+ *
+ * ===== 主题契约（本文件是唯一的「主题开关面」）=====
+ * 本文件里每一条规则都必须带 [data-theme="crt"] 前缀；
+ * @keyframes 不带选择器、无法加前缀 —— 它们是惰性定义，不被引用就零开销，故豁免。
+ *
+ *   html[data-theme="crt"]   → CRT 复古终端风（默认，与历史版本观感一致）
+ *   html[data-theme="普通"]   → 见下方 :not 兜底；实际值为 plain
+ *
+ * 关闭主题时的回落链：
+ *   组件的「中性排版」写在 app.base / app.components / app.pages，
+ *   本文件只负责追加 CRT 特征（等宽字体 / 虚线分隔 / 屏幕底色 /
+ *   扫描线 / 霓虹渐变 / 发光 / LED / 呼吸灯）。
+ *   所以关掉主题 = 自动回落到中性基线，模板一个字都不用改。
+ *
+ * 纯装饰、关闭后会变成零宽空占位的元素（机箱灯组），在文件末尾统一隐藏。
+ * ============================================================ */
+
+/* ===== A. 通用装饰：扫描线 / 霓虹文字 / LED 呼吸 ===== */
+[data-theme="crt"] .crt-scanlines::after{
+  content:"";position:absolute;inset:0;pointer-events:none;z-index:1;
+  background:repeating-linear-gradient(0deg,rgba(0,0,0,.06) 0 1px,transparent 1px 3px);
+  mix-blend-mode:multiply;opacity:.45;border-radius:inherit;
+}
+[data-theme="crt"] .neon-text{
+  background:linear-gradient(90deg,rgb(var(--mdui-color-primary)),rgb(var(--mdui-color-tertiary)),rgb(var(--mdui-color-primary)));
+  -webkit-background-clip:text;background-clip:text;color:transparent;
+  filter:drop-shadow(0 0 6px rgba(var(--mdui-color-primary),.35));
+}
+[data-theme="crt"] .led-breath{animation:led-breathe 2.4s ease-in-out infinite}
+@keyframes led-breathe{0%,100%{opacity:1}50%{opacity:.35}}
+
+/* ===== B. 主页进度条：扫描线叠层 + 等宽百分比 ===== */
+[data-theme="crt"] .progress-crt::after{
+  content:"";position:absolute;inset:0;pointer-events:none;
+  background:repeating-linear-gradient(0deg,rgba(0,0,0,.05) 0 1px,transparent 1px 3px);
+}
+[data-theme="crt"] .progress-pct{
+  font-family:var(--app-font-mono);
+  letter-spacing:.5px;
+}
+
+/* ===== C. 分组标题 / 优化计数（与基线类成对，关主题回落 .group-name/.group-count） ===== */
+[data-theme="crt"] .group-name-retro{
+  font-family:var(--app-font-mono);
+  font-size:13px;font-weight:700;letter-spacing:.5px;
+}
+[data-theme="crt"] .group-count-retro{
+  font-family:var(--app-font-mono);
+  font-size:11px;font-weight:600;letter-spacing:1px;
+  color:rgb(var(--mdui-color-primary));
+  text-shadow:0 0 8px rgba(var(--mdui-color-primary),.3);
+}
+
+/* ===== D. 日志页：终端配色 + 屏幕底色 + 扫描线 ===== */
+[data-theme="crt"] .log-box-retro{
+  font-family:var(--app-font-mono-wide);
+  line-height:1.7;
+  background:rgba(var(--mdui-color-surface-container-lowest),.95);
+  border:1px solid rgba(var(--mdui-color-outline-variant),.3);
+  border-radius:10px;padding:14px;
+  color:rgb(var(--mdui-color-primary));
+  position:relative;
+}
+[data-theme="crt"] .log-box-retro::after{
+  content:"";position:absolute;inset:0;pointer-events:none;z-index:1;
+  background:repeating-linear-gradient(0deg,rgba(0,0,0,.04) 0 1px,transparent 1px 3px);
+  border-radius:inherit;
+}
+[data-theme="crt"] .log-box-retro .log-warn{color:rgb(var(--mdui-color-tertiary))}
+[data-theme="crt"] .log-box-retro .log-error{color:rgb(var(--mdui-color-error))}
+[data-theme="crt"] .log-box-retro .log-info{color:rgb(var(--mdui-color-on-surface-variant))}
+
+/* ===== E. 头部条：虚线分隔 + 屏幕底色 + 等宽标签（布局/字号在 pages 层中性提供） ===== */
+[data-theme="crt"] .log-crt-header,
+[data-theme="crt"] .about-crt-header,
+[data-theme="crt"] .perf-crt-header,
+[data-theme="crt"] .gh-crt{
+  border-bottom:1px dashed rgba(var(--mdui-color-outline-variant),.55);
+  background:rgba(var(--mdui-color-surface-container-lowest),.5);
+  font-family:var(--app-font-mono-wide);
+}
+
+/* ===== F. 关于页配置屏：等宽 + 主题色键值 ===== */
+[data-theme="crt"] .about-info-retro .info-row{
+  font-family:var(--app-font-mono);
+}
+[data-theme="crt"] .about-info-retro .info-row .k{
+  font-size:12px;letter-spacing:.5px;
+  color:rgb(var(--mdui-color-tertiary));
+}
+[data-theme="crt"] .about-info-retro .info-row .v{
+  font-size:12px;font-weight:600;
+  color:rgb(var(--mdui-color-primary));
+  text-shadow:0 0 6px rgba(var(--mdui-color-primary),.2);
+}
+
+/* ===== G. 性能页仪表盘：等宽表 + 大写表头 + LED 发光 ===== */
+[data-theme="crt"] .perf-table-retro{
+  font-family:var(--app-font-mono);
+}
+[data-theme="crt"] .perf-table-retro th{
+  padding:10px;text-align:left;font-size:11px;font-weight:600;
+  color:rgb(var(--mdui-color-primary));letter-spacing:1px;
+  border-bottom:2px solid rgba(var(--mdui-color-primary),.25);
+  text-transform:uppercase;
+}
+[data-theme="crt"] .perf-table-retro td{
+  padding:9px 10px;font-family:var(--app-font-mono);
+  font-size:12.5px;border-bottom:1px solid rgba(var(--mdui-color-on-surface),.06);
+}
+[data-theme="crt"] .perf-table-retro td:first-child{
+  font-family:inherit;color:rgb(var(--mdui-color-on-surface-variant));
+}
+[data-theme="crt"] .perf-led-good{box-shadow:0 0 6px #28c840}
+[data-theme="crt"] .perf-led-bad{box-shadow:0 0 6px #ff5f57}
+
+/* ===== H. 个人页（GitHub）：扫描线 / 机箱三灯 / 霓虹光环 / 发光文字 ===== */
+/* CRT 扫描线：极淡叠层，仅提"屏幕"质感不刺眼 */
+[data-theme="crt"] .gh-profile::before{
+  content:"";position:absolute;inset:0;pointer-events:none;z-index:1;
+  background:repeating-linear-gradient(0deg,rgba(0,0,0,.07) 0 1px,transparent 1px 3px);
+  mix-blend-mode:multiply;opacity:.5;border-radius:inherit;
+}
+/* 复古机箱三灯 */
+[data-theme="crt"] .gh-crt-lights{display:flex;gap:5px;flex-shrink:0}
+[data-theme="crt"] .gh-led{width:9px;height:9px;border-radius:50%;box-shadow:0 0 6px currentColor}
+[data-theme="crt"] .gh-led-r{background:#ff5f57;color:#ff5f57}
+[data-theme="crt"] .gh-led-y{background:#febc2e;color:#febc2e}
+[data-theme="crt"] .gh-led-g{background:#28c840;color:#28c840;animation:gh-breath 2.4s ease-in-out infinite}
+@keyframes gh-breath{0%,100%{opacity:1}50%{opacity:.35}}
+/* 头像双层霓虹：外层 blur 光晕 + 2px 渐变环旋转（头像本体中性样式在 pages 层） */
+[data-theme="crt"] .gh-avatar-wrap::before{
+  content:"";position:absolute;inset:-6px;border-radius:50%;
+  background:conic-gradient(from 0deg,rgb(var(--mdui-color-primary)),rgb(var(--mdui-color-tertiary)),rgb(var(--mdui-color-primary)),rgb(var(--mdui-color-tertiary)),rgb(var(--mdui-color-primary)));
+  filter:blur(11px);opacity:.6;animation:gh-rotate 7s linear infinite;
+}
+[data-theme="crt"] .gh-avatar-wrap::after{
+  content:"";position:absolute;inset:-3px;border-radius:50%;padding:2.5px;z-index:2;
+  background:conic-gradient(from 0deg,rgb(var(--mdui-color-primary)),rgb(var(--mdui-color-tertiary)),rgb(var(--mdui-color-primary)));
+  -webkit-mask:linear-gradient(#000 0 0) content-box,linear-gradient(#000 0 0);
+  -webkit-mask-composite:xor;mask-composite:exclude;
+  animation:gh-rotate 7s linear infinite;
+}
+@keyframes gh-rotate{to{transform:rotate(360deg)}}
+/* 名字：终端提示符 + 渐变霓虹（中性排版在 pages 层） */
+[data-theme="crt"] .gh-name{
+  font-family:var(--app-font-mono-wide);
+  letter-spacing:.5px;
+  background:linear-gradient(90deg,rgb(var(--mdui-color-primary)),rgb(var(--mdui-color-tertiary)),rgb(var(--mdui-color-primary)));
+  -webkit-background-clip:text;background-clip:text;color:transparent;
+  filter:drop-shadow(0 0 8px rgba(var(--mdui-color-primary),.45));
+}
+[data-theme="crt"] .gh-prompt{color:rgb(var(--mdui-color-tertiary));filter:drop-shadow(0 0 5px rgba(var(--mdui-color-tertiary),.6))}
+[data-theme="crt"] .gh-bio{font-family:var(--app-font-mono-wide)}
+[data-theme="crt"] .gh-cmd{font-family:var(--app-font-mono-wide)}
+[data-theme="crt"] .gh-cursor{color:rgb(var(--mdui-color-primary));animation:gh-blink 1s steps(2) infinite}
+@keyframes gh-blink{50%{opacity:0}}
+/* 按钮轻微辉光 */
+[data-theme="crt"] .gh-links mdui-button{box-shadow:0 0 14px rgba(var(--mdui-color-primary),.28)}
+
+/* ===== I. 关主题（plain）时的显式兜底 =====
+   以下元素在 CRT 下才被赋尺寸/颜色；不加这条，它们会退化成
+   「0 宽 flex 占位 + 一段多余 gap」，标题会被顶偏。 */
+html:not([data-theme="crt"]) .gh-crt-lights{display:none}

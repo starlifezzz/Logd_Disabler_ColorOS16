@@ -1,0 +1,95 @@
+/* ============================================================
+ * app.pages.css — 页面层
+ * 页面层：日志页 / 关于页 / 性能页 / 个人页(GitHub)
+ * L2 拆分自 index.html <style>
+ * 加载顺序：tokens → base → components → pages → theme
+ *
+ * 【主题契约】本文件只放「两种主题下都要有」的中性排版：
+ *   flex 布局 / 间距 / 字号 / 圆角 / 中性分隔线 / 颜色取 mdui token
+ * CRT 特征（等宽字体、虚线分隔、扫描线、霓虹、LED、呼吸灯、发光）
+ * 一律不写在这里，由 app.theme.crt.css 以 [data-theme="crt"] 前缀接管，
+ * 这样关掉主题即可回落到本文件的中性基线，无需改模板。
+ * ============================================================ */
+.log-box{width:100%;min-height:200px;max-height:55vh;overflow-y:auto;white-space:pre-wrap;word-break:break-all;font-family:monospace;font-size:12px;line-height:1.6;background:rgb(var(--mdui-color-surface-container));border-radius:8px;padding:12px;box-sizing:border-box}
+/* ===== 日志页 ===== */
+.log-page-body{padding:8px 16px 16px}
+.log-actions{display:flex;justify-content:flex-end;gap:8px;padding-top:12px}
+/* CRT 头部条：中性基线（等宽字体 / 虚线边 / 屏幕底色在 theme 层覆盖） */
+.log-crt-header,
+.about-crt-header,
+.perf-crt-header{
+  display:flex;align-items:center;gap:10px;width:100%;padding:10px 16px;box-sizing:border-box;
+  border-bottom:1px solid rgba(var(--mdui-color-outline-variant),.35);
+  background:transparent;
+  font-size:11px;color:rgb(var(--mdui-color-on-surface-variant));
+}
+/* 头部右侧标签：承载真实数据（WARN 计数 / SYS.INFO / perfState.label），两种主题都要显示 */
+.log-crt-header .crt-tag,
+.about-crt-header .crt-tag,
+.perf-crt-header .crt-tag{margin-left:auto;font-size:10px;letter-spacing:1.5px;flex-shrink:0}
+/* ===== 关于页 ===== */
+.about-tips{padding:8px 20px 16px;display:flex;flex-direction:column;gap:10px}
+.tip-row{font-size:13px;line-height:1.6;color:rgb(var(--mdui-color-on-surface-variant));padding:10px 12px;border-radius:8px;background:rgba(var(--mdui-color-surface-container-high),.5)}
+.tip-row b{color:rgb(var(--mdui-color-on-surface))}
+/* ===== 性能对比页 ===== */
+.perf-tips{padding:4px 20px 8px;display:flex;flex-direction:column;gap:10px}
+.perf-actions{display:flex;gap:10px;flex-wrap:wrap;padding:0 20px 12px}
+.perf-table-wrap{padding:0 16px 12px;overflow-x:auto}
+.perf-table{width:100%;border-collapse:collapse;font-size:13px;min-width:320px}
+.perf-table th,.perf-table td{padding:9px 10px;text-align:left;border-bottom:1px solid rgba(var(--mdui-color-on-surface),.08)}
+.perf-table th{font-size:12px;color:rgb(var(--mdui-color-on-surface-variant));font-weight:500;white-space:nowrap}
+.perf-table td{font-family:monospace;font-size:12.5px}
+.perf-table td:first-child{font-family:inherit;color:rgb(var(--mdui-color-on-surface-variant))}
+.perf-sub{font-size:10.5px;opacity:.7}
+.perf-note{font-size:11.5px;color:rgb(var(--mdui-color-on-surface-variant));padding:6px 2px 0}
+.perf-empty{display:flex;flex-direction:column;align-items:center;gap:8px;padding:26px 20px 28px;font-size:13px;color:rgb(var(--mdui-color-on-surface-variant));text-align:center}
+.delta-good{color:#2e7d32;font-weight:500}
+.delta-bad{color:#c62828;font-weight:500}
+.delta-none{color:rgb(var(--mdui-color-on-surface-variant))}
+/* ===== GitHub 页（预留） ===== */
+/* ===== 个人页（GitHub） =====
+   中性基线只负责：定位 / 层级 / 间距 / 字号 / 颜色。
+   CRT 特征（扫描线、霓虹光环、渐变发光文字、等宽字体、光标闪烁）
+   由 app.theme.crt.css 以 [data-theme="crt"] 前缀接管。 */
+.gh-card{overflow:hidden}
+.gh-profile{position:relative;display:flex;flex-direction:column;align-items:center;gap:8px;padding:0 20px 30px;text-align:center}
+/* 状态条：中性分隔条（虚线 + 屏幕底色 + 等宽字体由 theme 层覆盖） */
+.gh-crt{
+  position:relative;z-index:2;display:flex;align-items:center;gap:10px;
+  width:calc(100% + 40px);margin:0 -20px;padding:10px 16px;box-sizing:border-box;
+  border-bottom:1px solid rgba(var(--mdui-color-outline-variant),.35);
+  background:transparent;
+}
+.gh-crt-tag{margin-left:auto;font-size:10px;letter-spacing:1.5px;color:rgb(var(--mdui-color-on-surface-variant))}
+/* 头像容器：只留中性尺寸定位；霓虹双环(伪元素)在 theme 层 */
+.gh-avatar-wrap{position:relative;z-index:2;margin-top:26px;width:88px;height:88px}
+.gh-avatar{
+  position:relative;z-index:3;display:flex;align-items:center;justify-content:center;
+  --mdui-avatar-background:var(--mdui-color-surface-container-high);
+  color:rgb(var(--mdui-color-primary));font-size:30px;font-weight:700;
+  border:3px solid rgb(var(--mdui-color-surface-container-high));
+}
+/* 名字：中性排版；渐变霓虹 + 等宽 + 发光在 theme 层 */
+.gh-name{
+  position:relative;z-index:2;margin-top:10px;
+  font-size:17px;font-weight:700;
+}
+.gh-name a{color:inherit;text-decoration:none}
+/* bio：中性副信息 */
+.gh-bio{
+  position:relative;z-index:2;
+  font-size:12px;color:rgb(var(--mdui-color-on-surface-variant));letter-spacing:.3px;line-height:1.6;
+}
+/* 终端命令行：中性卡片；等宽字体在 theme 层 */
+.gh-cmd{
+  position:relative;z-index:2;margin-top:2px;
+  font-size:12px;
+  color:rgb(var(--mdui-color-on-surface-variant));
+  background:rgba(var(--mdui-color-surface-container-lowest),.55);
+  border:1px solid rgba(var(--mdui-color-outline-variant),.5);
+  border-radius:8px;padding:7px 12px;letter-spacing:.3px;
+}
+.gh-cmd-dol{color:rgb(var(--mdui-color-tertiary));font-weight:700;margin-right:6px}
+/* 按钮行：M3 组件，辉光在 theme 层 */
+.gh-links{position:relative;z-index:2;display:flex;gap:8px;margin-top:14px}
+.hidden{display:none!important}

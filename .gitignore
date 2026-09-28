@@ -1,3 +1,7 @@
 /.lingma
 Logd_Disabler_ColorOS16.zip
 /reference/
+# 门禁脚本的运行时产物（.ci/ 本身要入库，只有临时输出不入库）
+/.ci/.tmp/
+/.ci/__pycache__/
+*.pyc

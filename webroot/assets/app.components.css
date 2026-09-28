@@ -1,0 +1,221 @@
+/* ============================================================
+ * app.components.css — 组件层
+ * 组件层：进度条 / 开关提示 / debug / Toast / 引导蒙层 / list-item ::part 对齐 / 聚合折叠行
+ * L2 拆分自 index.html <style>
+ * 加载顺序：tokens → base → components → pages → theme
+ * ============================================================ */
+/* ===== 进度条区域 ===== */
+.progress-row{display:flex;align-items:center;gap:12px;margin-bottom:16px}
+.progress-row mdui-linear-progress{flex:1}
+.progress-text{font-size:12px;color:rgb(var(--mdui-color-on-surface-variant));white-space:nowrap}
+.switch-wrap{position:relative;display:inline-flex;align-items:center}
+.switch-wrap .opt-hint{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:10px;line-height:1;color:rgb(var(--mdui-color-on-surface-variant));white-space:nowrap;pointer-events:none;z-index:1}
+/* 【v2.3.11】异步 verifyCmd 尚未回填 pkgStates 时的占位文案，淡化显示，
+   与真实的「未优化」（深色）在视觉上区分开，避免误读为优化未生效 */
+.switch-wrap .opt-hint.checking{opacity:.55;letter-spacing:-.3px}
+/* 已保留：用户主动写进白名单、故意不禁用的包。与灰字「未优化」区分开，
+   否则父开关开着、子项却一堆"未优化"，会被误判成禁用失败。 */
+.switch-wrap .opt-hint.kept{color:rgb(var(--mdui-color-primary));opacity:.85;letter-spacing:-.3px}
+/* debug 面板 CRT 风格（跟随 M3 主题） */
+.debug-item{margin-bottom:8px;padding:10px 12px;border-radius:8px;background:rgba(var(--mdui-color-primary),.06);font-family:var(--app-font-mono);font-size:11px}
+.debug-item .k{color:rgb(var(--mdui-color-primary));font-weight:500;font-size:12px}
+.debug-item .v{margin-top:4px;word-break:break-all}
+.debug-item .raw{margin-top:6px;padding:6px 8px;border-radius:6px;background:rgba(var(--mdui-color-surface-container-highest),.5);color:rgb(var(--mdui-color-on-surface-variant));font-size:10px;white-space:pre-wrap;word-break:break-all;line-height:1.5}
+.debug-section{margin:14px 0 8px;font-weight:600;font-size:13px;color:rgb(var(--mdui-color-primary));letter-spacing:.5px;border-bottom:1px dashed rgba(var(--mdui-color-outline-variant),.3);padding-bottom:6px}
+.debug-ok{color:#4caf50}
+.debug-warn{color:#ff9800}
+.debug-err{color:#f44336}
+/* ===== 操作提示 Toast（顶部悬浮卡片，与整体 Material 3 卡片风格统一） ===== */
+.toast{
+  /* 垂直位置：20% 视口基础上再上移 100px（纯百分比+calc，不写死像素）
+     max(72px, ...) 保护：小屏/短视口时最低不低于 72px（64px 顶栏 + 8px 间距），
+     既不会被顶栏遮挡，也不会顶出屏幕 */
+  position:fixed;top:max(72px, calc(20% - 100px));left:50%;transform:translateX(-50%);
+  z-index:2001;display:flex;align-items:center;gap:10px;
+  /* 【v2.2.8 修复】显式固定宽度，彻底告别 width:fit-content：
+     之前 fit-content + flex-basis:0 + min-width:0 + overflow:hidden 组合下，
+     容器宽度被收缩算法算成极窄(≈图标+按钮)，body 分得近 0 宽，
+     消息文字被逐字断行成"竖排"，高度膨胀到 200px+。
+     现在宽度 = 视口-48px(两侧24px边距)，PC 上限 560px，flex 分配可预测：
+     图标/按钮固定，剩余全部给消息(正常换行，绝不竖排) */
+  width:calc(100vw - 48px);max-width:560px;box-sizing:border-box;
+  padding:10px 10px 10px 12px;border-radius:14px;
+  box-shadow:0 6px 20px rgba(0,0,0,.16);
+  cursor:pointer;user-select:none;
+  /* 【v2.3.19 #4b】必须包成 rgb(var(...))：--mdui-color-* 的值是 "48,48,52"
+     这种 RGB 三元组，裸 var() 不是合法 background-color → 整条声明被丢弃 →
+     底色透明（「检查更新」的 🆕 提示框因此没有底色）。
+     参考 debug 弹窗的修法：rgb(var(--mdui-color-surface-container-high)) */
+  background:rgb(var(--mdui-color-surface-container-high));
+  border:1px solid rgba(var(--mdui-color-outline-variant),.5);
+}
+.toast-ico{display:inline-flex;align-items:center;justify-content:center;width:32px;height:32px;border-radius:10px;flex-shrink:0}
+.toast-ico mdui-icon{font-size:19px}
+/* 文本区：flex:1 吸收剩余空间 + min-width:0 允许收缩。
+   【v2.2.8】flex:1 1 auto（basis 用 auto 而非 0%）+ 移除 overflow:hidden：
+   1) basis 0% 会让宽度收缩算法认为 body 天然宽度为 0，配合 fit-content 把容器算窄
+   2) overflow:hidden 会把 body 的 min-content 压成 0，两者叠加是"文字竖排"的元凶 */
+.toast-body{display:flex;flex-direction:column;gap:1px;flex:1 1 auto;min-width:0}
+/* 消息完整显示，长文本自动换行不撑宽容器
+   【v2.3.19 #4b】color 必须包 rgb(var(...))：裸 var() 展开后是 "33,0,94"
+   这种三元组 → 非法 color → 声明被丢弃 → 继承 body（body 的 color 同样损坏）
+   → 最终退回默认黑字。底色修好后若不一起修，暗色模式下会是黑字压深灰不可读。 */
+.toast-msg{font-size:13.5px;font-weight:500;color:rgb(var(--mdui-color-on-surface));line-height:1.4;word-break:break-word;overflow-wrap:anywhere}
+.toast-sub{font-size:11px;color:rgb(var(--mdui-color-on-surface-variant));line-height:1.3;word-break:break-word}
+/* 【v2.2.7 修复】操作按钮：原生 button 高度锁定 28px（不再用 mdui-button，
+   其不支持 size 属性、默认 40px 高导致手机端换行堆叠到 200px 高）。
+   【v2.2.8】容器已改固定宽度+单行 flex（移除 flex-wrap），
+   按钮 flex-shrink:0 始终与图标/消息同行，message 过长时仅在消息区内换行 */
+.toast-btn{
+  flex-shrink:0;margin-left:auto;height:28px;line-height:28px;
+  padding:0 12px;border:none;border-radius:14px;outline:none;
+  font-size:12.5px;font-weight:600;white-space:nowrap;cursor:pointer;
+  /* 默认(info)背景：主色容器加深；各类型在下方覆盖为对应配色 */
+  background:rgba(var(--mdui-color-primary-container),.5);color:inherit;
+}
+/* 关闭按钮（无 action 时显示）：同样原生 button，28px 圆形 */
+.toast-close{
+  flex-shrink:0;width:28px;height:28px;margin-left:auto;
+  display:inline-flex;align-items:center;justify-content:center;
+  border:none;border-radius:50%;outline:none;cursor:pointer;
+  background:transparent;color:inherit;
+}
+.toast-close mdui-icon{font-size:16px}
+/* 彩色容器上的按钮/关闭图标：使用容器前景色保证对比度 */
+.toast-success .toast-btn,.toast-success .toast-close{color:rgb(var(--mdui-color-on-primary-container))}
+.toast-error .toast-btn,.toast-error .toast-close{color:rgb(var(--mdui-color-on-error-container))}
+.toast-warn .toast-btn,.toast-warn .toast-close{color:rgb(var(--mdui-color-on-tertiary-container))}
+/* 【v2.2.7】按钮背景跟随 toast 类型：悬浮感 + 类型色，避免紫按钮配红字 */
+.toast-success .toast-btn{background:rgba(var(--mdui-color-primary),.18)}
+.toast-error .toast-btn{background:rgba(var(--mdui-color-error),.18)}
+.toast-warn .toast-btn{background:rgba(var(--mdui-color-tertiary),.18)}
+/* 成功：主色容器（与 app-logo 同色系） */
+.toast-success{background:rgba(var(--mdui-color-primary-container),.92)}
+.toast-success .toast-ico{background:rgb(var(--mdui-color-primary));color:rgb(var(--mdui-color-on-primary))}
+.toast-success .toast-msg{color:rgb(var(--mdui-color-on-primary-container))}
+.toast-success .toast-sub{color:rgb(var(--mdui-color-on-primary-container));opacity:.8}
+/* 错误：错误色容器 */
+.toast-error{background:rgba(var(--mdui-color-error-container),.94)}
+.toast-error .toast-ico{background:rgb(var(--mdui-color-error));color:rgb(var(--mdui-color-on-error))}
+.toast-error .toast-msg{color:rgb(var(--mdui-color-on-error-container))}
+.toast-error .toast-sub{color:rgb(var(--mdui-color-on-error-container));opacity:.8}
+/* 警告：三色容器 */
+.toast-warn{background:rgba(var(--mdui-color-tertiary-container),.94)}
+.toast-warn .toast-ico{background:rgb(var(--mdui-color-tertiary));color:rgb(var(--mdui-color-on-tertiary))}
+.toast-warn .toast-msg{color:rgb(var(--mdui-color-on-tertiary-container))}
+.toast-warn .toast-sub{color:rgb(var(--mdui-color-on-tertiary-container));opacity:.8}
+/* 信息：中性容器（【v2.3.19 #4b】同上，裸 var() 会被丢弃导致底色透明） */
+.toast-info{background:rgb(var(--mdui-color-surface-container-high))}
+.toast-info .toast-ico{background:rgba(var(--mdui-color-primary-container),.8);color:rgb(var(--mdui-color-on-primary-container))}
+/* 动画：顶部滑入淡入 */
+.toast-fade-enter-active,.toast-fade-leave-active{transition:opacity .22s ease,transform .24s cubic-bezier(.2,.8,.3,1)}
+.toast-fade-enter-from,.toast-fade-leave-to{opacity:0;transform:translateX(-50%) translateY(-12px)}
+.toast-fade-enter-to,.toast-fade-leave-from{opacity:1;transform:translateX(-50%) translateY(0)}
+/* ===== 首次使用引导蒙层 ===== */
+.guide-overlay{position:fixed;inset:0;z-index:3000;background:rgba(0,0,0,.5);display:flex;align-items:center;justify-content:center;padding:20px}
+.guide-card{
+  background:rgb(var(--mdui-color-surface));border:1px solid rgba(var(--mdui-color-outline-variant),.4);
+  border-radius:16px;padding:28px 24px;max-width:360px;width:100%;text-align:center;
+  box-shadow:var(--mdui-elevation-level3);position:relative;overflow:hidden;
+}
+.guide-card::after{
+  content:"";position:absolute;inset:0;pointer-events:none;
+  background:repeating-linear-gradient(0deg,rgba(0,0,0,.03) 0 1px,transparent 1px 3px);
+  border-radius:inherit;
+}
+.guide-card h3{margin:0 0 14px;font-size:18px;font-weight:600;color:rgb(var(--mdui-color-primary));position:relative;z-index:1}
+.guide-card p{margin:0 0 8px;font-size:13px;color:rgb(var(--mdui-color-on-surface-variant));line-height:1.6;position:relative;z-index:1}
+.guide-card .guide-step{display:flex;align-items:flex-start;gap:10px;text-align:left;padding:8px 0;position:relative;z-index:1}
+.guide-card .guide-num{width:24px;height:24px;border-radius:50%;background:rgb(var(--mdui-color-primary));color:rgb(var(--mdui-color-on-primary));display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;flex-shrink:0}
+.guide-card .guide-num mdui-icon{font-size:14px}
+.guide-card mdui-button{margin-top:18px;position:relative;z-index:1}
+/* ===== 统一 list-item 与折叠项(agg-header)高度为 48px，保证右侧开关垂直对齐 =====
+   默认带 description 的 list-item 是两行布局 min-height:3.5rem(56px)，
+   与 48px 的 agg-header 相差 4px → 右侧开关错位。
+   这里通过 ::part() 覆盖 shadow DOM 内部样式，压缩为 48px 紧凑两行。 */
+mdui-list-item::part(container){min-height:3rem;padding:2px .75rem;box-sizing:border-box}
+/* 【v2.3.19 #2】功能行排版统一：
+   mdui 组件 shadow 树里 .headline 默认 16px/400、.description 默认继承色，
+   而折叠头 .agg-title-main 是 15px/500 —— 于是「守护进程 1-7 / 性能优化 2 项 /
+   可选禁用服务·健康服务」这些走 mdui-list-item 的行，与走 .agg-header 的行
+   字号字重颜色三样都对不上。这里把两条路径显式钉成同一套：
+     标题   15px · 500 · on-surface
+     副标题 12px · 400 · on-surface-variant
+   规范(css-shadow-1)只定义了 :host()/:host-context()/:slotted() 的特异性，
+   没定义 ::part() —— 浏览器按「伪元素 + 参数按类计」实现，(0,1,2) 已高于
+   shadow 内的 .headline(0,1,0)，所以无需 !important 即可覆盖。 */
+mdui-list-item::part(headline){font-size:15px;font-weight:500;line-height:1.3;color:rgb(var(--mdui-color-on-surface))}
+mdui-list-item::part(description){font-size:12px;font-weight:400;line-height:1.35;color:rgb(var(--mdui-color-on-surface-variant));margin:0;white-space:normal;overflow-wrap:break-word;word-break:break-word;display:block;max-width:100%}
+/* body 两行内容垂直居中，不撑高容器 */
+mdui-list-item::part(body){justify-content:center;gap:0}
+/* ===== 聚合功能（mdui-collapse）样式 ===== */
+/* 顶部 padding 归零：保证折叠首个 header 与 list-item 在同一水平线 */
+.agg-collapse{width:100%;padding:0 0 8px;box-sizing:border-box}
+.agg-collapse mdui-collapse-item{display:block;border-radius:12px;overflow:hidden;margin-bottom:4px}
+.agg-collapse mdui-collapse-item:hover{background:rgba(var(--mdui-color-on-surface),.04)}
+/* header padding 与 mdui-list-item 完全对齐：
+   switch 高 2.5rem(40px) + 垂直 padding 4px*2 = 48px = list-item height:3rem
+   左侧标题与未折叠 list-item 的标题同基线（padding 统一 2px 上下） */
+.agg-header{display:flex;align-items:center;justify-content:space-between;gap:8px;min-height:3rem;padding:2px 12px;width:100%;box-sizing:border-box;cursor:pointer}
+/* 折叠项单行标题 vs 未折叠项两行(headline在上方)：标题中心差约8px，
+   负 margin-top 让折叠项标题与未折叠项 headline 同基线；switch 不受影响(独立 flex 子项) */
+.agg-title{flex:1;min-width:0;margin-top:-8px}
+/* 【v2.3.19 #2】原 color:var(--mdui-color-on-surface) 是裸 token（值为
+   "255,255,255" 这种三元组），不是合法 color → 整条声明被丢弃 → 颜色变成继承值。
+   必须包成 rgb(var(...))，并与 mdui-list-item::part(headline) 完全一致。 */
+.agg-title-main{font-size:15px;font-weight:500;color:rgb(var(--mdui-color-on-surface));display:flex;align-items:center;gap:4px}
+.agg-item-icon{display:inline-flex;align-items:center;justify-content:center;width:36px;height:36px;border-radius:10px;background:rgba(var(--mdui-color-surface-container-high),.8);color:rgb(var(--mdui-color-on-surface-variant));flex-shrink:0;margin-right:4px}
+.agg-item-icon mdui-icon{font-size:20px}
+.agg-chevron{display:inline-flex;align-items:center;flex-shrink:0;color:rgb(var(--mdui-color-on-surface-variant));margin-left:2px}
+.agg-chevron mdui-icon{font-size:18px;transition:transform .25s cubic-bezier(.4,0,.2,1);transform:rotate(0deg)}
+.agg-chevron.open mdui-icon{transform:rotate(90deg)}
+.agg-control{display:flex;align-items:center;gap:8px;flex-shrink:0;margin-left:12px}
+.agg-body{padding:4px 12px 12px;border-top:1px solid var(--mdui-color-surface-variant)}
+.agg-hint{font-size:12px;color:rgb(var(--mdui-color-on-surface-variant));padding:8px 0}
+/* 【连带性提示】静态说明(deps)与动态检测(depProblem)警示条 */
+/* 【v2.3.19 #3】修复「遥测与云回传服务」警告文字顶出琥珀色框：
+   deps 文案里有一整串 63 字符的连写 token「mydevices/athena/pantanal.ums/
+   ctautoregist/thirdkit/appplatform」，CSS 默认不在 "/" 处断行 → 该 token
+   min-content ≈ 410px。而 .agg-dep-warn 是 flex 容器，<span> 是 flex item，
+   默认 min-width:auto 会拒绝收缩到 min-content 以下，可用宽度只有约 300px，
+   于是整段被撑出边框。
+   修法双保险：span 设 min-width:0 允许收缩 + overflow-wrap:anywhere 强制断词。 */
+.agg-dep-warn{display:flex;align-items:flex-start;gap:4px;font-size:12px;line-height:1.5;color:#8a5a00;background:rgba(255,193,7,.14);border:1px solid rgba(255,193,7,.35);border-radius:8px;padding:7px 9px;margin:6px 0;white-space:normal;overflow-wrap:anywhere;word-break:break-word}
+.agg-dep-warn>span{flex:1 1 auto;min-width:0;white-space:normal;overflow-wrap:anywhere;word-break:break-word}
+.agg-dep-warn.strong{color:#9a2b00;background:rgba(255,87,34,.14);border-color:rgba(255,87,34,.4);font-weight:500}
+.agg-row{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:7px 4px;font-size:13px;border-radius:8px}
+.agg-row:nth-child(odd){background:rgba(var(--mdui-color-on-surface),.03)}
+.agg-pkg{font-family:monospace;font-size:12px;color:rgb(var(--mdui-color-on-surface));word-break:break-all}
+/* ===== 细分模式（子包独立开关 + 详情）样式 ===== */
+.agg-row.sub{display:flex;align-items:center;gap:8px;padding:8px 6px}
+.agg-pkg-main{flex:1;min-width:0}
+.agg-pkg-name{font-size:13px;font-weight:500;color:rgb(var(--mdui-color-on-surface));display:block}
+.agg-pkg-code{font-family:monospace;font-size:11px;color:rgb(var(--mdui-color-on-surface-variant));word-break:break-all;display:block;margin-top:1px}
+.agg-pkg-ops{display:flex;align-items:center;gap:6px;flex-shrink:0}
+.pkg-info-btn{--mdui-button-icon-container-size:28px;--mdui-button-icon-icon-size:16px;color:rgb(var(--mdui-color-on-surface-variant));flex-shrink:0}
+.agg-group-actions{display:flex;align-items:center;justify-content:flex-end;gap:8px;padding:6px 4px 2px;border-top:1px dashed var(--mdui-color-surface-variant);margin-top:6px}
+.agg-group-btn{display:inline-flex;align-items:center;gap:4px;padding:5px 12px;font-size:12px;font-weight:500;border:none;border-radius:100px;cursor:pointer;transition:background .15s}
+.agg-group-btn.all{background:rgba(var(--mdui-color-primary),.1);color:rgb(var(--mdui-color-primary))}
+.agg-group-btn.none{background:rgb(var(--mdui-color-surface-variant));color:rgb(var(--mdui-color-on-surface-variant))}
+.agg-group-btn:active{opacity:.7}
+/* ===== 二级分组（subGroup 折叠）样式 ===== */
+.agg-sub-count{font-size:12px;color:rgb(var(--mdui-color-on-surface-variant));background:rgba(var(--mdui-color-on-surface),.06);border-radius:100px;padding:1px 8px;margin-left:6px;font-weight:400}
+/* 二级折叠 body 内的三级子项列表：与一级 list 视觉一致 */
+.sub-list{width:100%;border-radius:12px;overflow:hidden}
+.sub-list mdui-list-item{min-height:3rem}
+/* 多包子项展开的子包清单（纯 v-if，视觉对齐折叠 body） */
+.sub-pkg-body{padding:4px 12px 12px;border-top:1px solid var(--mdui-color-surface-variant);margin:0 8px}
+/* 二级折叠 header 标题用主题色以示区分（比一级折叠项更醒目） */
+.agg-collapse .agg-header[data-sub="1"] .agg-title-main{color:rgb(var(--mdui-color-primary))}
+/* ===== 【主题基线】CRT 装饰容器的中性部分 =====
+   关掉 CRT 主题时，这些容器仍要有正常的尺寸/定位/裁剪，
+   否则进度条百分比会退回 16px 默认字、卡片会失去圆角裁剪。
+   扫描线 ::after、等宽字体、霓虹渐变一律在 app.theme.crt.css。 */
+.progress-crt{position:relative;overflow:hidden;border-radius:8px}
+.progress-pct{font-size:12px;font-weight:600}
+.crt-scanlines{position:relative;overflow:hidden}
+/* 【主题基线】性能表变化指示灯：圆点是功能件（两种主题都要有），发光只在 CRT 主题 */
+.perf-led{display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:6px;vertical-align:middle}
+.perf-led-good{background:#28c840}
+.perf-led-bad{background:#ff5f57}
+.perf-led-none{background:rgb(var(--mdui-color-on-surface-variant));opacity:.4}

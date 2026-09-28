@@ -3,7 +3,8 @@
 # Logd_Disabler_ColorOS16 卸载回滚脚本（uninstall.sh）
 # - 恢复所有被禁用的包（pm enable / install-existing）
 # - 恢复被修改的系统属性与内核参数
-# - 卸载 bind mount 覆盖（logd/update_engine/OTA 目录/WiFi conf/蓝牙日志 tmpfs）
+# - 卸载 bind mount 覆盖（logd/update_engine/OTA 目录/WiFi conf/蓝牙日志 tmpfs/数据回传 7 二进制）
+# - 恢复 MGLRU 内核参数（lru_gen.enabled → 出厂值 0x0003；v2.3.9 起仅作升级兜底，见第 4 节）
 # - 清理 config.json 数据目录与日志
 # 说明：KernelSU 卸载模块时自动执行本脚本（存在即调用）
 # ============================================================
@@ -105,7 +106,16 @@ com.oplus.romupdate
 com.oplus.upgradeguide
 com.oplus.statistics.rom
 com.coloros.assistantscreen
+com.heytap.quicksearchbox
 com.coloros.sceneservice
+com.heytap.htms
+com.heytap.mcs
+com.heytap.mydevices
+com.oplus.athena
+com.oplus.pantanal.ums
+com.oppo.ctautoregist
+com.oplus.thirdkit
+com.oplus.appplatform
 "
 RESTORED=0
 SKIPPED=0
@@ -138,6 +148,16 @@ ui_print "- 卸载挂载覆盖..."
 for bin in logd logcat logpersist.start logpersist.stop logtagd update_engine update_engine_client; do
     umount "/system/bin/$bin" 2>/dev/null
     umount "/system/xbin/$bin" 2>/dev/null
+done
+# --- 【v2.3.8】数据回传与采集守护：卸载对 6 个二进制的 bind，恢复原始可执行文件 ---
+#   /system/vendor 是指向 /vendor 的软链，rc 里的 /system/vendor/bin/xxx
+#   实际解析到 /vendor/bin/xxx，故只需 umount /vendor 路径即可。
+#   注：mediametrics 已于 v2.3.10 移出禁用清单（禁用会让 Oboe/AAudio 应用无声+ANR），
+#       此处仍保留 umount 一行作为兜底 —— 若卸载的是仍会 bind 它的旧版本，一并还原。
+for dc in /system_ext/bin/midasd /system_ext/bin/ostatsd /system_ext/bin/ostats_pullerd \
+          /system_ext/bin/ostats_tpd /system_ext/bin/criticallog \
+          /vendor/bin/subsystem_ramdump /system/bin/mediametrics; do
+    umount "$dc" 2>/dev/null
 done
 for apk_dir in /system/app/OTA /system/priv-app/OTA /system/app/OplusOTA /system/priv-app/OplusOTA; do
     umount "$apk_dir" 2>/dev/null
@@ -194,6 +214,12 @@ setprop persist.sys.lockscreen_magazine 1 2>/dev/null
 # 重启 logd（若有）
 start logd 2>/dev/null
 start update_engine 2>/dev/null
+# --- 【v2.3.8】重启 class main 采集服务（bind 已在第 2 节 umount）---
+start criticallog 2>/dev/null
+# mediametrics 自 v2.3.10 起不在禁用清单内，此处 start 仅作兜底（服务本就在跑时无副作用）
+start mediametrics 2>/dev/null
+# midasd/ostats* 是 disabled + on property:sys.boot_completed=1 属性触发，
+# 属性值未被本模块修改（B 方案不碰 persist.*），下次开机或属性变化时自动恢复。
 
 # ===================== 4. 恢复内核参数 =====================
 ui_print "- 恢复内核参数..."
@@ -209,6 +235,17 @@ echo 4 > /proc/sys/kernel/printk_console_loglevel 2>/dev/null
 echo always > /sys/kernel/mm/transparent_hugepage/enabled 2>/dev/null
 echo always > /sys/kernel/mm/transparent_hugepage/defrag 2>/dev/null
 echo always > /sys/kernel/mm/transparent_hugepage/khugepaged/defrag 2>/dev/null
+# --- 【v2.3.9】MGLRU：写回出厂值 0x0003（本模块已移除 MGLRU 开关，此行为升级兜底）---
+# 【背景】实测 /proc/config.gz: CONFIG_LRU_GEN=y + CONFIG_LRU_GEN_ENABLED=y
+#   → 该内核出厂 MGLRU 即为【开启】(0x0003)，post-fs-data.sh 基线日志也实测 =0x0003。
+# 【v2.3.8 的 bug】此处原本写 0x0000 并注释为「出厂值」——是错的，等于卸载时把出厂
+#   开着的特性关掉 = 反向降级，故已修正；v2.3.9 起 service.sh 完全不再写 lru_gen。
+# 【为什么保留这一行】从 v2.3.8 升级的用户，若当时开关处于「关闭」状态，lru_gen 已被写成
+#   0x0000（比出厂更激进），本行把它拉回出厂 0x0003。对从未受影响的机器，0x0003 = 出厂值，
+#   写入是幂等的 no-op，无副作用。
+# 【警告】仅写 sysfs，非法值内核返回 EINVAL 拒绝，不会 panic、不涉及 init/zygote。
+echo 0x0003 > /sys/kernel/mm/lru_gen/enabled 2>/dev/null
+log "[MGLRU] 卸载回滚：lru_gen.enabled=$(cat /sys/kernel/mm/lru_gen/enabled 2>/dev/null) (出厂值 0x0003)"
 
 # ===================== 5. 清理配置与日志 =====================
 ui_print "- 清理配置数据..."

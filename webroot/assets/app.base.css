@@ -1,0 +1,54 @@
+/* ============================================================
+ * app.base.css — 基础层
+ * 基础层：reset / body / 页面容器 / 顶栏 / 分组头 / 图标 / 底部导航 / 卡片 / 弹窗 / 全局按钮
+ * L2 拆分自 index.html <style>（原 21-42/69-74/93-101/188/394-398/417-421）
+ * 加载顺序：tokens → base → components → pages → theme
+ * ============================================================ */
+/* 少量页面布局补充样式（组件主题色由 mdui.css 提供） */
+[v-cloak]{display:none!important}
+body{background:rgb(var(--mdui-color-surface));color:rgb(var(--mdui-color-on-surface));margin:0;padding:0;font-family:var(--app-font-ui);padding-bottom:env(safe-area-inset-bottom)}
+.page{padding:16px 16px 72px;max-width:680px;margin:0 auto}
+/* ===== 顶栏 ===== */
+.app-logo{display:inline-flex;align-items:center;justify-content:center;width:36px;height:36px;border-radius:10px;background:rgba(var(--mdui-color-primary-container),.7);color:rgb(var(--mdui-color-on-primary-container));flex-shrink:0}
+.app-logo mdui-icon{font-size:22px}
+.app-sub{font-size:12px;color:rgb(var(--mdui-color-on-surface-variant));font-weight:400}
+/* ===== 分组卡片头 ===== */
+/* padding-left:12px 与 mdui-list-item container(0.75rem=12px) 左对齐，父项图标与子项图标同竖线 */
+.group-header{display:flex;align-items:center;gap:10px;padding:14px 12px 6px}
+/* 父项图标与子项 item-icon 同尺寸（36px/20px），保证视觉中心在一条线上 */
+.group-ico{display:inline-flex;align-items:center;justify-content:center;width:36px;height:36px;border-radius:10px;background:rgba(var(--mdui-color-secondary-container),.6);color:rgb(var(--mdui-color-on-secondary-container));flex-shrink:0}
+.group-ico mdui-icon{font-size:20px}
+.group-name{font-size:14px;font-weight:600;color:rgb(var(--mdui-color-primary));flex:1}
+.group-count{font-size:12px;color:rgb(var(--mdui-color-on-surface-variant));background:rgb(var(--mdui-color-surface-variant));padding:2px 10px;border-radius:100px}
+/* ===== 列表项左侧图标 ===== */
+.item-icon{display:inline-flex;align-items:center;justify-content:center;width:36px;height:36px;border-radius:10px;background:rgba(var(--mdui-color-surface-container-high),.8);color:rgb(var(--mdui-color-on-surface-variant));flex-shrink:0}
+.item-icon mdui-icon{font-size:20px}
+/* ===== 底部导航栏 ===== */
+.bottom-nav{position:fixed;left:0;right:0;bottom:0;z-index:200;--mdui-navigation-bar-container-shape:16px 16px 0 0}
+.bottom-nav mdui-navigation-bar-item{--mdui-navigation-bar-item-active-indicator-height:0px;--mdui-navigation-bar-item-active-indicator-width:0px;--mdui-navigation-bar-item-active-icon-size:24px}
+.card-gap{margin-bottom:16px;display:block;width:100%;box-sizing:border-box}
+/* mdui-card 默认 inline-block，强制占满容器宽度（与功能卡片保持一致） */
+mdui-card{width:100%}
+.info-row{display:flex;justify-content:space-between;align-items:center;padding:10px 16px;font-size:14px}
+.info-row .k{color:rgb(var(--mdui-color-on-surface-variant))}
+.info-row .v{font-weight:500}
+/* mdui-dialog 居中修复 */
+mdui-dialog{margin:0 auto !important}
+mdui-dialog::part(panel){
+  background-color:rgb(var(--mdui-color-surface-container-high)) !important;
+  box-shadow:0 8px 32px rgba(0,0,0,.35) !important;
+  border-radius:16px !important;
+}
+/* 对话框 slot=header 底部分割线 */
+mdui-dialog [slot=header]{border-bottom:1px dashed rgba(var(--mdui-color-outline-variant),.3);padding-bottom:12px}
+.footer{text-align:center;padding:20px 16px;font-size:12px;color:rgb(var(--mdui-color-on-surface-variant))}
+/* ===== 全局操作栏（一键优化/恢复） ===== */
+.global-actions{display:flex;gap:10px;padding:0 0 12px;flex-wrap:wrap}
+.global-actions mdui-button{flex:1;min-width:120px}
+/* ===== 非包类功能「重启后生效」标签 ===== */
+.reboot-hint{font-size:10px;color:rgb(var(--mdui-color-tertiary));background:rgba(var(--mdui-color-tertiary-container),.6);padding:1px 6px;border-radius:100px;white-space:nowrap;flex-shrink:0}
+
+/* ===== 全局按钮弧度统一（去掉过度圆角，匹配 CRT 棱角风） ===== */
+mdui-button{--mdui-shape-corner-small:8px;--mdui-shape-corner-medium:10px;--mdui-shape-corner-large:12px}
+mdui-button[variant="filled"],mdui-button[variant="tonal"]{border-radius:10px}
+mdui-list-item{--mdui-list-item-container-shape:12px}

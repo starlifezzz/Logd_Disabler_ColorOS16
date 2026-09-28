@@ -62,10 +62,11 @@ if [ ! -f "$CONFIG" ]; then
     log "[迁移] 未找到 config.json，尝试从旧 persist 属性迁移..."
     CONFIG_DIR="$(dirname "$CONFIG")"
     mkdir -p "$CONFIG_DIR"
-    # 全部 32 个开关 key（含 2 个总开关），与 WebUI FEATURES 一一对应
-    ALL_KEYS="disable_logd block_ota lock_developer_options block_ads_and_tracking kill_redundant_processes system_prop_toggles memory_io_optimization extra_kernel_optimization disable_health_services disable_network_monitoring disable_gamespace disable_wallet_services disable_backup_services disable_ai_assistants disable_voice_assistants disable_theme_services disable_network_optimization disable_security_services disable_media_services disable_system_tools disable_speedview disable_app_recover disable_double_tap disable_notification_mgr disable_device_link disable_device_connect disable_remote_control disable_travel_engine disable_settings_related disable_screen_services disable_wifi_log disable_bluetooth_log"
+    # 全部 34 个开关 key（含 2 个总开关），与 WebUI FEATURES 一一对应
+    # v2.3.8：新增数据回传/遥测等 3 项（32 → 35）；v2.3.9 移除其中的 MGLRU 开关（35 → 34），原因见下方 8b 说明
+    ALL_KEYS="disable_logd block_ota lock_developer_options block_ads_and_tracking kill_redundant_processes system_prop_toggles memory_io_optimization extra_kernel_optimization disable_health_services disable_network_monitoring disable_gamespace disable_wallet_services disable_backup_services disable_ai_assistants disable_voice_assistants disable_theme_services disable_network_optimization disable_security_services disable_media_services disable_system_tools disable_speedview disable_quick_search disable_app_recover disable_double_tap disable_notification_mgr disable_device_link disable_device_connect disable_remote_control disable_travel_engine disable_settings_related disable_screen_services disable_wifi_log disable_bluetooth_log disable_data_collection disable_telemetry_cloud"
     # keep 白名单 key（有子包的功能）
-    KEEP_KEYS="block_ota_keep block_ads_and_tracking_keep disable_health_services_keep disable_network_monitoring_keep disable_gamespace_keep disable_wallet_services_keep disable_backup_services_keep disable_ai_assistants_keep disable_voice_assistants_keep disable_theme_services_keep disable_network_optimization_keep disable_security_services_keep disable_media_services_keep disable_system_tools_keep disable_speedview_keep disable_app_recover_keep disable_double_tap_keep disable_notification_mgr_keep disable_device_link_keep disable_device_connect_keep disable_remote_control_keep disable_travel_engine_keep"
+    KEEP_KEYS="block_ota_keep block_ads_and_tracking_keep disable_health_services_keep disable_network_monitoring_keep disable_gamespace_keep disable_wallet_services_keep disable_backup_services_keep disable_ai_assistants_keep disable_voice_assistants_keep disable_theme_services_keep disable_network_optimization_keep disable_security_services_keep disable_media_services_keep disable_system_tools_keep disable_speedview_keep disable_quick_search_keep disable_app_recover_keep disable_double_tap_keep disable_notification_mgr_keep disable_device_link_keep disable_device_connect_keep disable_remote_control_keep disable_travel_engine_keep disable_telemetry_cloud_keep"
     {
         echo "{"
         echo "  \"version\": 2,"
@@ -97,7 +98,7 @@ if ! grep -q '"version"' "$CONFIG" 2>/dev/null; then
     {
         echo "{"
         echo "  \"version\": 2,"
-        ALL_KEYS="disable_logd block_ota lock_developer_options block_ads_and_tracking kill_redundant_processes system_prop_toggles memory_io_optimization extra_kernel_optimization disable_health_services disable_network_monitoring disable_gamespace disable_wallet_services disable_backup_services disable_ai_assistants disable_voice_assistants disable_theme_services disable_network_optimization disable_security_services disable_media_services disable_system_tools disable_speedview disable_app_recover disable_double_tap disable_notification_mgr disable_device_link disable_device_connect disable_remote_control disable_travel_engine disable_settings_related disable_screen_services disable_wifi_log disable_bluetooth_log"
+        ALL_KEYS="disable_logd block_ota lock_developer_options block_ads_and_tracking kill_redundant_processes system_prop_toggles memory_io_optimization extra_kernel_optimization disable_health_services disable_network_monitoring disable_gamespace disable_wallet_services disable_backup_services disable_ai_assistants disable_voice_assistants disable_theme_services disable_network_optimization disable_security_services disable_media_services disable_system_tools disable_speedview disable_quick_search disable_app_recover disable_double_tap disable_notification_mgr disable_device_link disable_device_connect disable_remote_control disable_travel_engine disable_settings_related disable_screen_services disable_wifi_log disable_bluetooth_log disable_data_collection disable_telemetry_cloud"
         first=1
         for key in $ALL_KEYS; do
             [ $first -eq 0 ] && echo ","
@@ -352,6 +353,7 @@ disable_security_services|com.oplus.securitykeyboard,com.coloros.securityguard
 disable_media_services|com.oplus.screenrecorder,com.coloros.karaoke,com.oplus.mediacontroller,com.oplus.mediaturbo
 disable_system_tools|com.oplus.powermonitor,com.oplus.audiomonitor,com.oplus.logkit,com.oplus.engineermode,com.oplus.crashbox,com.oplus.contentportal,com.oplus.postmanservice,com.oplus.subsys,com.oplus.engineernetwork
 disable_speedview|com.coloros.ocs.opencapabilityservice,com.coloros.assistantscreen
+disable_quick_search|com.heytap.quicksearchbox
 disable_app_recover|com.oplus.apprecover
 disable_double_tap|com.oplus.exsystemservice
 disable_notification_mgr|com.oplus.notificationmanager
@@ -359,6 +361,7 @@ disable_device_link|com.heytap.accessory
 disable_device_connect|com.oplus.linker
 disable_remote_control|com.oplus.remotecontrol
 disable_travel_engine|com.oplus.travelengine
+disable_telemetry_cloud|com.heytap.htms,com.heytap.mcs,com.heytap.mydevices,com.oplus.athena,com.oplus.pantanal.ums,com.oppo.ctautoregist,com.oplus.thirdkit,com.oplus.appplatform
 '
 
 # 通用循环：处理标准包禁用项
@@ -583,6 +586,49 @@ else
     log "[Kernel] 恢复完成"
 fi
 
+# ===================== 8b.（已移除）=====================
+# 【v2.3.9 移除 MGLRU 开关】实测 /proc/config.gz 带 CONFIG_LRU_GEN=y + CONFIG_LRU_GEN_ENABLED=y，
+#        即本内核【出厂 MGLRU 就是开着的】(0x0003)；post-fs-data.sh 基线日志在 service.sh 执行前实测 =0x0003。
+#        原开关"开"写 0x7 被内核裁到 0x0003（与出厂相同 = 无变化），"关"写 0x0000 却比出厂更激进 = 纯反向降级。
+#        且 config 缺 key 时 is_on 返回 false → 自动走关闭分支，全新安装首启必触发
+#        （v2.3.8 实测日志 02:11:02 已实际发生过一次降级）。
+#        故本模块【完全不再写入 /sys/kernel/mm/lru_gen/*】，保持出厂状态。
+#        uninstall.sh 保留一行 echo 0x0003 作为从 v2.3.8 升级的兜底（幂等 = 出厂值）。
+
+# ===================== 9. 数据回传与采集守护（v2.3.8 新增，v2.3.10 移除 mediametrics） =====================
+# 【分工】bind 空文件由 post-fs-data.sh 在开机早期完成；本段在 late_start
+#        负责杀掉【bind 之前就已启动】的残留进程，并复核最终状态。
+# 【为什么必须补杀】实测 KSU 执行 post-fs-data.sh 约在开机 +71 秒，
+#        criticallog 属 class main，此之前可能已经启动。
+#        bind 只挡【未来的】exec，挡不住【已经在跑】的进程。
+# 【警告】pkill -9 -x 是【精确名匹配】，不会误伤 system_server / surfaceflinger
+#        等前缀相同的关键进程；目标 6 个名字均不在本模块硬止损黑名单内。
+# 【v2.3.10 为什么不再杀 mediametrics】它是 AOSP media.metrics 服务的实现进程。
+#        杀掉 + bind 后服务永不回来 → Oboe/AAudio 应用（如节拍器）建流时
+#        libmediametrics::BaseItem::submitBuffer 会阻塞等服务 → 无声 + ANR。
+#        实证 /data/anr/anr_29538_2026-09-27-02-26-14-440，详见 post-fs-data.sh 注释。
+if is_on "disable_data_collection"; then
+    log "[DataCollection] 杀残留进程 + 复核..."
+    for dcproc in midasd ostatsd ostats_pullerd ostats_tpd criticallog subsystem_ramdump; do
+        if pidof "$dcproc" >/dev/null 2>&1; then
+            pkill -9 -x "$dcproc" 2>/dev/null
+            log "  🔪 已终止残留进程: $dcproc"
+        fi
+    done
+    log "[DataCollection] init.svc 复核 midasd=[$(getprop init.svc.midasd 2>/dev/null)] ostatsd=[$(getprop init.svc.ostatsd 2>/dev/null)] criticallog=[$(getprop init.svc.criticallog 2>/dev/null)] (期望 stopped 或空，绝不能 running)"
+    log "[DataCollection] 残留进程数=$(pidof midasd ostatsd ostats_pullerd ostats_tpd criticallog subsystem_ramdump 2>/dev/null | wc -w) (期望 0)"
+    log "[DataCollection] mediametrics 必须存活: init.svc=[$(getprop init.svc.mediametrics 2>/dev/null)] pid=$(pidof mediametrics 2>/dev/null || echo 无) (本模块【不禁用】此项，否则音频建流阻塞)"
+    log "[DataCollection] 完成"
+else
+    log "[DataCollection] 关闭：post-fs-data.sh 已 umount，二进制恢复原始；拉起 class main 服务..."
+    # criticallog 是 class main 自启服务，被本模块停过后重新拉起。
+    # mediametrics 不在禁用清单内（v2.3.10），此处仅做兜底拉起，失败无害。
+    # midasd/ostats* 是 disabled + 属性触发，下一次属性变化或重启时自动恢复。
+    start criticallog 2>/dev/null
+    start mediametrics 2>/dev/null
+    log "[DataCollection] 恢复完成"
+fi
+
 # ===================== 17. 主题（附加属性） =====================
 # 主题服务的包已在 PKG_TABLE 处理，这里仅处理关联系统属性
 if is_on "disable_theme_services"; then
@@ -653,6 +699,38 @@ log "[复核][WiFi] 属性观测 fulldump=$(getprop persist.sys.oplus.wifi.fulld
 log "[复核][BtLog] /proc/mounts 挂载数=$(grep -c 'bluetooth/logs' /proc/mounts 2>/dev/null || true) (期望 1)"
 log "[复核][BtLog] 目录上下文=$(ls -Zd /data/misc/bluetooth/logs 2>/dev/null || echo 读取失败) (期望 bluetooth_logs_data_file)"
 log "[复核][BtLog] tmpfs 内文件数=$(ls -A /data/misc/bluetooth/logs 2>/dev/null | wc -l) (>0 正常：BT 在 tmpfs 内新建，磁盘旧日志已被遮蔽)"
+log "[复核][DataCollection] bind 挂载数=$(grep -cE ' /(system_ext/bin/(midasd|ostatsd|ostats_pullerd|ostats_tpd|criticallog)|vendor/bin/subsystem_ramdump) ' /proc/mounts 2>/dev/null || true) (期望 6)"
+log "[复核][DataCollection] 被覆盖二进制尺寸=$(stat -c %s /system_ext/bin/midasd 2>/dev/null)/$(stat -c %s /system_ext/bin/criticallog 2>/dev/null) (bind 后应为 dummy 尺寸，非原始 2029056/81728)"
+log "[复核][DataCollection] mediametrics 未被覆盖: size=$(stat -c %s /system/bin/mediametrics 2>/dev/null) (期望 18568 = 原始值) init.svc=[$(getprop init.svc.mediametrics 2>/dev/null)] (期望 running，否则 AAudio/Oboe 应用会无声+ANR)"
+log "[复核][DataCollection] init.svc midasd=[$(getprop init.svc.midasd 2>/dev/null)] ostatsd=[$(getprop init.svc.ostatsd 2>/dev/null)] ostats_pullerd=[$(getprop init.svc.ostats_pullerd 2>/dev/null)] ostats_tpd=[$(getprop init.svc.ostats_tpd 2>/dev/null)] criticallog=[$(getprop init.svc.criticallog 2>/dev/null)] (期望 stopped 或空，绝不能 running)"
+log "[复核][DataCollection] 残留进程数=$(pidof midasd ostatsd ostats_pullerd ostats_tpd criticallog subsystem_ramdump 2>/dev/null | wc -w) (期望 0)"
+# 【v2.3.11】期望值随开关动态：以前这里写死"期望 8"，父开关关闭走"恢复"分支时
+# 日志会打成 "状态=0 (期望 8)"，看着像禁用失败，实际是按配置正常恢复 → 误报。
+_tel_on=0; is_on "disable_telemetry_cloud" && _tel_on=1
+_tel_pat='heytap.htms|heytap.mcs|heytap.mydevices|oplus.athena|pantanal.ums|ctautoregist|oplus.thirdkit|oplus.appplatform'
+_tel_now=$(pm list packages -d --user 0 2>/dev/null | grep -cE "$_tel_pat" || true)
+# 【v2.3.15】期望值还必须扣除 WebUI 白名单：用户在 WebUI 单独启用的子包
+# 本就不该被禁用。不扣的话，只要 _keep 非空，这行就永远打成
+# "状态=6 (期望 8)" —— 看着像禁用失败，实际完全正确 → 又是误报。
+_tel_total=$(pm list packages --user 0 2>/dev/null | grep -cE "$_tel_pat" || true)
+_tel_exp="$_tel_total"
+if [ "$_tel_on" = "1" ]; then
+    _tel_keep=$(get_keep "disable_telemetry_cloud")
+    if [ -n "$_tel_keep" ]; then
+        for _tk in $(echo "$_tel_keep" | tr ',' ' '); do
+            case " com.heytap.htms com.heytap.mcs com.heytap.mydevices com.oplus.athena com.oplus.pantanal.ums com.oppo.ctautoregist com.oplus.thirdkit com.oplus.appplatform " in
+                *" $_tk "*) _tel_exp=$((_tel_exp-1)) ;;
+            esac
+        done
+    fi
+    if [ -n "$_tel_keep" ]; then
+        log "[复核][Telemetry] disable_telemetry_cloud 关键包状态=$_tel_now (期望 $_tel_exp = 已安装 $_tel_total - WebUI白名单 $_tel_keep)"
+    else
+        log "[复核][Telemetry] disable_telemetry_cloud 关键包状态=$_tel_now (期望 $_tel_exp = 已安装 $_tel_total 全部禁用)"
+    fi
+else
+    log "[复核][Telemetry] disable_telemetry_cloud 关键包状态=$_tel_now (期望 0 = 父开关已关，按配置正常恢复)"
+fi
 
 # ===================== 写入状态 =====================
 # 【v2.1.2】写入完成标记：WebUI 检测前先读此文件判断 service.sh 是否已跑完。

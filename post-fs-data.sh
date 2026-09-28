@@ -46,6 +46,15 @@ if [ "$CURRENT_COUNT" -ge 3 ]; then
         umount "/system/bin/$bin" 2>/dev/null
         umount "/system/xbin/$bin" 2>/dev/null
     done
+    # 【v2.3.8】紧急恢复范围补全：数据回传二进制的 bind 也必须卸掉，
+    #   否则 bootloop 自动禁用模块后，挂载仍留在原地 → 表现为"模块没生效也没恢复"。
+    #   清单 = 现行 6 个 + mediametrics（v2.3.10 起不再禁用，但若设备还挂着旧版本
+    #   留下的 bind，这里必须兜底卸掉，否则 Oboe/AAudio 应用会持续无声+ANR）。
+    for dc in /system_ext/bin/midasd /system_ext/bin/ostatsd /system_ext/bin/ostats_pullerd \
+              /system_ext/bin/ostats_tpd /system_ext/bin/criticallog \
+              /vendor/bin/subsystem_ramdump /system/bin/mediametrics; do
+        umount "$dc" 2>/dev/null
+    done
     for apk_dir in /system/app/OTA /system/priv-app/OTA /system/app/OplusOTA /system/priv-app/OplusOTA; do
         umount "$apk_dir" 2>/dev/null
     done
@@ -365,6 +374,66 @@ else
     log "[BtLog] 未启用，跳过"
 fi
 
+# ===================== 数据回传与采集守护关闭（bind 空文件，B 方案） =====================
+# 【覆盖范围】v2.3.8 新增；v2.3.10 移除 mediametrics 后一次覆盖 6 个常驻采集进程：
+#   midasd / ostatsd / ostats_pullerd / ostats_tpd
+#       → ColorOS「实验室模式」数据采集链
+#         （/system_ext/etc/init/midasd.rc、ostatsd.rc、ostats_pullerd.rc、ostats_tpd.rc）
+#         实测 4 个进程全部 ppid=1 常驻，rc 中均为 disabled，
+#         由 on property:sys.boot_completed=1 && persist.sys.*.enable=1 拉起。
+#   criticallog          → ColorOS 关键日志守护（debuglog_common.rc:48, class main）
+#   subsystem_ramdump    → 真实服务名 vendor.ss_ramdump（init.qcom.rc:491, class main, disabled）
+#                          路径用 /vendor/bin（/system/vendor 是指向 /vendor 的软链）
+#
+# 【v2.3.10 移除 mediametrics】原清单第 7 个是 /system/bin/mediametrics（AOSP 媒体指标，
+#   /system/etc/init/mediametrics.rc, class main）。它【不是】ColorOS 数据采集组件，
+#   而是 AOSP 框架自带的 media.metrics 服务实现，禁用会造成实测故障：
+#     证据 /data/anr/anr_29538_2026-09-27-02-26-14-440（节拍器 de.moekadu.metronomenext）主线程栈：
+#       #02 libbinder.so        android::CppBackendShim::getService   ← 阻塞重试(usleep 循环)
+#       #03 libmediametrics.so  android::mediametrics::BaseItem::submitBuffer
+#       #05 libaaudio_internal.so aaudio::AudioStreamTrack::open      ← 音频流打不开
+#       #08 oboe::AudioStreamAAudio::open                             ← 应用走 Oboe/AAudio
+#   即：用 Oboe/AAudio 的应用（节拍器类低延迟应用）在建流时会同步 submitBuffer 到
+#   media.metrics，服务不存在 → 主线程无限阻塞 → 无声 + 5 秒后 Input dispatching ANR。
+#   用普通 MediaPlayer / Java AudioTrack 的应用不走这条路径，故只有「节拍器这类」中招。
+#   → 从 DC_BINS 移除，恢复 6 个。
+#
+# 【为什么不会变砖】已全量扫描 /system*/etc/init 与 /vendor/etc/init：
+#   上述 6 个服务【均未标记 critical】（critical 只出现在 hwservicemanager /
+#   zygote / keystore2 / lmkd / servicemanager / init.rc:2412）。
+#   Android init 对【非 critical】服务 exec 失败只做指数退避重试，不触发 reboot
+#   → 无 bootloop 风险。本模块现有 logd / update_engine 即同款 bind 空文件，
+#     已稳定复刷多轮，属实证过的手段。
+#
+# 【时序】midasd/ostats* 是 disabled + boot_completed 后属性拉起 → 本阶段 bind
+#   一定先到位，不会与 init 抢启动；criticallog 是 class main，
+#   可能已在运行 → 由 service.sh 第 9 节补杀（bind 只挡未来 exec，挡不住在跑进程）。
+#
+# 【回滚】uninstall.sh 与下方 else 分支均执行 umount，原始二进制重新可见。
+DC_BINS="/system_ext/bin/midasd /system_ext/bin/ostatsd /system_ext/bin/ostats_pullerd /system_ext/bin/ostats_tpd /system_ext/bin/criticallog /vendor/bin/subsystem_ramdump"
+if is_on "disable_data_collection"; then
+    log "[DataCollection] 开始 mount 覆盖 6 个采集二进制..."
+    DC_OK=0
+    for TARGET in $DC_BINS; do
+        if [ -f "$TARGET" ]; then
+            if mount -o bind "$DUMMY" "$TARGET" 2>/dev/null; then
+                log "  ✅ 覆盖成功: $TARGET"
+                DC_OK=$((DC_OK + 1))
+            else
+                log "  ❌ 覆盖失败: $TARGET"
+            fi
+        else
+            log "  ⚠️ 目标不存在，跳过: $TARGET"
+        fi
+    done
+    log "[DataCollection] 完成 $DC_OK/6"
+else
+    for TARGET in $DC_BINS; do
+        umount "$TARGET" 2>/dev/null
+    done
+    log "[DataCollection] 未启用，跳过"
+fi
+
 # ===================== 挂载自检（模块自己记录，不依赖外部手动验证） =====================
 # 说明：这些都是【只读】观察（grep /proc/mounts、读文件、ls -Z），
 #       不产生任何副作用。结果写入本日志 + service.sh 开机复核。
@@ -382,6 +451,10 @@ log "[自检][BtLog] /proc/mounts 中 bluetooth/logs 挂载数: $(grep -c 'bluet
 log "[自检][BtLog] 目录上下文: $(ls -Zd "$BTLOG" 2>/dev/null || echo 读取失败)"
 log "[自检][BtLog] 目录属主权限: $(stat -c '%a %u:%g' "$BTLOG" 2>/dev/null || echo 读取失败)"
 log "[自检][BtLog] tmpfs 内文件数: $(ls -A "$BTLOG" 2>/dev/null | wc -l) （>0 属正常：BT 在 tmpfs 内新建文件，磁盘旧日志已被遮蔽）"
+log "[自检][DataCollection] bind 挂载数=$(grep -cE ' /(system_ext/bin/(midasd|ostatsd|ostats_pullerd|ostats_tpd|criticallog)|vendor/bin/subsystem_ramdump) ' /proc/mounts 2>/dev/null || true) (期望 6；mediametrics 已于 v2.3.10 移出清单，绝不能被 bind)"
+log "[自检][DataCollection] 启动状态 midasd=[$(getprop init.svc.midasd 2>/dev/null)] ostatsd=[$(getprop init.svc.ostatsd 2>/dev/null)] criticallog=[$(getprop init.svc.criticallog 2>/dev/null)] (本阶段 midasd/ostats* 应为空；criticallog 可能仍 running，由 service.sh 补杀)"
+log "[自检][DataCollection] mediametrics 必须正常: init.svc=[$(getprop init.svc.mediametrics 2>/dev/null)] 挂载=$(grep -c ' /system/bin/mediametrics ' /proc/mounts 2>/dev/null || true) (期望 未被 bind，否则 AAudio/Oboe 应用会无声+ANR)"
+log "[自检][MGLRU] lru_gen.enabled=$(cat /sys/kernel/mm/lru_gen/enabled 2>/dev/null || echo 读不到) (本模块不写入；内核 CONFIG_LRU_GEN_ENABLED=y → 出厂 0x0003)"
 
 log "[Kernel] 内核参数已移至 service.sh 处理（受 WebUI 开关控制）"
 log "========== post-fs-data.sh 执行完毕 =========="
