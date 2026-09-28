@@ -42,7 +42,7 @@
        放行三重保障：① 检测正常完成 ② mounted 15s 超时兜底 ③ [SKIP] 按钮 -->
   <div class="crt-boot" v-if="!bootDone" role="status" aria-live="polite">
     <div class="crt-boot-screen">
-      <div class="crt-boot-logo neon-text">COLOROS 16 优化</div>
+      <div class="crt-boot-logo">COLOROS 16 优化</div>
       <div class="crt-boot-sub">KSU MODULE · POWER ON SELF TEST</div>
       <!-- POST 逐行自检：纯 CSS staggered 动画（文本始终在 DOM，无障碍友好，抄 CodeFronts MIT） -->
       <ol class="crt-boot-post">
@@ -52,10 +52,12 @@
         <li style="--boot-i:3">PACKAGE MANAGER ............ <b>OK</b></li>
         <li style="--boot-i:4">SCAN DISABLED PACKAGES ..... <b>{{ checking ? 'RUN' : 'OK' }}</b></li>
       </ol>
-      <!-- 真实进度（复用现有 progress 0→40→100，绑定字面量满足门禁 L291） -->
+      <!-- 真实进度（自绘 track/fill 以便完全掌控 Symbiote 配色；{{ progress }}% 与主界面断言兼容） -->
       <div class="crt-boot-progress">
-        <mdui-linear-progress :max="100" :value="progress" class="crt-boot-bar"></mdui-linear-progress>
-        <span class="crt-boot-pct neon-text">{{ progress }}%</span>
+        <div class="crt-boot-track" role="progressbar" :aria-valuenow="progress" aria-valuemin="0" aria-valuemax="100">
+          <div class="crt-boot-fill" :style="{ width: progress + '%' }"></div>
+        </div>
+        <span class="crt-boot-pct">{{ progress }}%</span>
       </div>
       <!-- 打字机状态行 + 闪烁光标 -->
       <div class="crt-boot-status"><span class="crt-boot-typed">{{ bootStatus }}</span><span class="crt-boot-caret" aria-hidden="true"></span></div>

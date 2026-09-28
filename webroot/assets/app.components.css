@@ -224,29 +224,36 @@ mdui-list-item::part(body){justify-content:center;gap:0}
    纯视觉层：不碰 exec/阻塞/渲染时序。fixed inset:0 + z-index:3500，
    高于 bottom-nav(200)/guide-overlay(3000)，盖住顶栏与全部内容；
    放行由 index.html 的 v-if="!bootDone" 控制（完成/15s超时/Skip 三重保障）。
-   配色固定 BIOS 绿，不随主题切换（开机画面本就是 CRT 原生风格）。 */
-.crt-boot{position:fixed;inset:0;z-index:3500;background:#050805;display:flex;align-items:center;justify-content:center;font-family:var(--app-font-mono,ui-monospace,monospace)}
-.crt-boot-screen{position:relative;width:100%;max-width:560px;height:100%;max-height:100vh;box-sizing:border-box;padding:32px 24px;color:#33ff66;display:flex;flex-direction:column;justify-content:center;gap:14px;text-shadow:0 0 6px rgba(51,255,102,.5);overflow:hidden}
+   配色 GMK Symbiote「共生体」（暖紫/淡藕/奇异粉/微粉白，pale & organic），
+   不随主题切换（开机画面本就是 CRT 原生风格）。 */
+.crt-boot{position:fixed;inset:0;z-index:3500;background:#0f0918;display:flex;align-items:center;justify-content:center;font-family:var(--app-font-mono,ui-monospace,monospace)}
+.crt-boot-screen{position:relative;width:100%;max-width:560px;height:100%;max-height:100vh;box-sizing:border-box;padding:32px 24px;color:#d0c0e6;display:flex;flex-direction:column;justify-content:center;gap:14px;text-shadow:0 0 6px rgba(168,130,220,.45);overflow:hidden}
 /* 扫描线：逐行下移动画，独立于主题 */
 .crt-boot-screen::after{content:"";position:absolute;inset:0;pointer-events:none;background:repeating-linear-gradient(0deg,rgba(0,0,0,.3) 0 1px,transparent 1px 3px);animation:crt-boot-scan .5s linear infinite}
 @keyframes crt-boot-scan{to{transform:translateY(3px)}}
-/* 暗角：CRT 荧光屏边缘衰减 */
-.crt-boot-screen::before{content:"";position:absolute;inset:0;pointer-events:none;background:radial-gradient(ellipse at center,transparent 50%,rgba(0,0,0,.7) 100%)}
-.crt-boot-logo{font-size:22px;font-weight:700;letter-spacing:2px;position:relative;z-index:1}
+/* 暗角：CRT 荧光屏边缘衰减（紫黑） */
+.crt-boot-screen::before{content:"";position:absolute;inset:0;pointer-events:none;background:radial-gradient(ellipse at center,transparent 50%,rgba(6,2,12,.72) 100%)}
+/* Nucleus White（微粉白）主标 */
+.crt-boot-logo{font-size:22px;font-weight:700;letter-spacing:2px;color:#f5edf3;position:relative;z-index:1}
 .crt-boot-sub{font-size:11px;letter-spacing:3px;opacity:.75;position:relative;z-index:1}
 /* POST 逐行自检：--boot-i 索引 × 0.45s 逐行出现（文本始终在 DOM，纯 CSS 动画，无障碍友好） */
 .crt-boot-post{list-style:none;margin:8px 0 0;padding:0;font-size:12px;line-height:1.9;position:relative;z-index:1}
 .crt-boot-post li{opacity:0;animation:crt-boot-in .3s ease-out forwards;animation-delay:calc(var(--boot-i,0) * .45s);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.crt-boot-post li b{color:#aaffcc;font-weight:700}
+/* Strange Pink：OK/RUN 结果行点缀 */
+.crt-boot-post li b{color:#ee8fc4;font-weight:700}
 @keyframes crt-boot-in{from{opacity:0;transform:translateX(-8px)}to{opacity:1;transform:none}}
 .crt-boot-progress{display:flex;align-items:center;gap:12px;position:relative;z-index:1}
-.crt-boot-bar{flex:1}
-.crt-boot-pct{font-size:14px;font-weight:700;min-width:44px;text-align:right}
+/* 自绘进度条：Protomodifier Purple 渐变填充 + 淡藕紫轨道 */
+.crt-boot-track{flex:1;height:8px;background:rgba(208,192,230,.14);border-radius:100px;overflow:hidden}
+.crt-boot-fill{height:100%;background:linear-gradient(90deg,#7c56a8,#9a6fd0);border-radius:100px;transition:width .25s ease;box-shadow:0 0 8px rgba(154,111,208,.55)}
+.crt-boot-pct{font-size:14px;font-weight:700;min-width:44px;text-align:right;color:#f5edf3}
 .crt-boot-status{font-size:12px;min-height:18px;position:relative;z-index:1;display:flex;align-items:center}
 /* 打字机：width 0→100% + steps，加载时跑一次 */
 .crt-boot-typed{display:inline-block;max-width:100%;overflow:hidden;white-space:nowrap;vertical-align:bottom;animation:crt-boot-type 1.2s steps(20,end) forwards}
 @keyframes crt-boot-type{from{width:0}to{width:100%}}
-.crt-boot-caret{display:inline-block;width:8px;height:13px;background:#33ff66;margin-left:4px;vertical-align:middle;animation:crt-boot-blink 1s steps(1) infinite}
+/* Strange Pink 光标 */
+.crt-boot-caret{display:inline-block;width:8px;height:13px;background:#ee8fc4;margin-left:4px;vertical-align:middle;animation:crt-boot-blink 1s steps(1) infinite}
 @keyframes crt-boot-blink{50%{opacity:0}}
-.crt-boot-skip{align-self:flex-start;margin-top:6px;background:none;border:1px solid rgba(51,255,102,.5);color:#33ff66;font:inherit;font-size:11px;letter-spacing:1px;padding:7px 14px;cursor:pointer;position:relative;z-index:1;border-radius:2px}
-.crt-boot-skip:active{background:rgba(51,255,102,.15)}
+/* Strange Pink SKIP 按钮 */
+.crt-boot-skip{align-self:flex-start;margin-top:6px;background:none;border:1px solid rgba(238,143,196,.55);color:#ee8fc4;font:inherit;font-size:11px;letter-spacing:1px;padding:7px 14px;cursor:pointer;position:relative;z-index:1;border-radius:2px}
+.crt-boot-skip:active{background:rgba(238,143,196,.15)}
