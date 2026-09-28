@@ -552,6 +552,28 @@ fi
 AWP=$(grep -c "✅" "$T/aw.out" || true)
 [ "$AWP" -ge 6 ] && ok "审查器自身跑出 $AWP 项 ✅（≥6，防止审查器被误删）" || no "审查器输出异常（$AWP 项）"
 
+echo "═══ F17. CRT 开机门禁（gate骨架/三重放行/层级/配色 防回归）═══"
+IDX5=$SRC/webroot/index.html
+CSSB=$SRC/webroot/assets/app.components.css
+# 1) gate 全屏层由 !bootDone 控制：丢了 → 主界面裸奔；失控 true → 永远进不去
+grep -q 'class="crt-boot" v-if="!bootDone"' $IDX5 && ok "gate 层存在且 v-if=!bootDone" || no "gate 层丢失或失控"
+# 2) z-index 须 ≥3000：guide-overlay=3000、bottom-nav=200，太小会被引导层/底栏盖穿
+ZI=$(grep -o 'crt-boot{[^}]*z-index:[0-9]*' $CSSB | grep -o '[0-9]*$' | head -1)
+if [ -n "$ZI" ] && [ "$ZI" -ge 3000 ]; then ok "gate z-index=$ZI ≥3000（盖住引导层/底栏）"; else no "gate z-index 不足或缺失 (=$ZI)"; fi
+# 3) 放行点 ≥4：正常完成/15s超时/.catch兜底/SKIP，少一个就存在卡死开机画面的路径
+NT=$(grep -c 'bootDone = true' $IDX5)
+[ "$NT" -ge 4 ] && ok "放行点 ≥4 处 (=$NT)" || no "放行点不足 (=$NT，期望≥4：完成/超时/catch/skip)"
+# 4) refreshAll 链尾 .catch 必须兜底放行（否则检测抛错 = 永久卡 gate）
+grep -A3 '})\.catch(function(e) {' $IDX5 | grep -q 'bootDone = true' && ok "检测链 .catch 异常兜底放行" || no "缺 .catch 放行兜底"
+# 5) 15s 超时强制放行（正常检测约 8s；慢机/卡死兜底）
+grep -B3 '}, 15000);' $IDX5 | grep -q 'bootDone = true' && ok "15s 超时强制放行" || no "缺 15s 超时兜底"
+# 6) SKIP 按钮与方法配对（防只删一半留下死按钮）
+grep -q '@click="skipBoot()"' $IDX5 && grep -q 'skipBoot: function' $IDX5 && ok "SKIP 按钮与 skipBoot 方法配对" || no "SKIP 按钮或方法缺失"
+# 7) gate 自绘进度条：mdui 内部色不可控，Symbiote 配色全靠 track/fill
+grep -Fq ':style="{ width: progress +' $IDX5 && grep -q 'crt-boot-fill' $CSSB && ok "gate 自绘进度条 track/fill 在位" || no "gate 自绘进度条丢失"
+# 8) Symbiote 关键色防回退（屏底紫黑 #0f0918 + Strange Pink #ee8fc4）
+grep -q '#0f0918' $CSSB && grep -q '#ee8fc4' $CSSB && ok "Symbiote 紫黑底/Strange Pink 在位" || no "Symbiote 配色被回退"
+
 echo "════════ 结果：$P 通过 / $F 失败 ════════"
 [ "$F" = "0" ] && echo "🎉 全部通过" || echo "⚠️ 有失败项"
 exit $F
