@@ -153,6 +153,10 @@ mdui-list-item::part(body){justify-content:center;gap:0}
 .agg-collapse{width:100%;padding:0 0 8px;box-sizing:border-box}
 .agg-collapse mdui-collapse-item{display:block;border-radius:12px;overflow:hidden;margin-bottom:4px}
 .agg-collapse mdui-collapse-item:hover{background:rgba(var(--mdui-color-on-surface),.04)}
+/* A/B 统一为 C 聚合头视觉：每项独立圆角块（与 .agg-collapse mdui-collapse-item 同款间距/圆角/hover） */
+.agg-list-plain{width:100%;padding:0 0 8px;box-sizing:border-box}
+.agg-list-plain .agg-header{border-radius:12px;margin-bottom:4px}
+.agg-list-plain .agg-header:hover{background:rgba(var(--mdui-color-on-surface),.04)}
 /* header padding 与 mdui-list-item 完全对齐：
    switch 高 2.5rem(40px) + 垂直 padding 4px*2 = 48px = list-item height:3rem
    左侧标题与未折叠 list-item 的标题同基线（padding 统一 2px 上下） */
@@ -257,3 +261,14 @@ mdui-list-item::part(body){justify-content:center;gap:0}
 /* Strange Pink SKIP 按钮 */
 .crt-boot-skip{align-self:flex-start;margin-top:6px;background:none;border:1px solid rgba(238,143,196,.55);color:#ee8fc4;font:inherit;font-size:11px;letter-spacing:1px;padding:7px 14px;cursor:pointer;position:relative;z-index:1;border-radius:2px}
 .crt-boot-skip:active{background:rgba(238,143,196,.15)}
+
+/* ===== 功能详情弹窗（ITEM.INFO）内容区整体小 3 号：14→11px =====
+   覆盖 base 层 .info-row 的 14px；行内不再写死字号，统一由本节控制。 */
+.item-info-body .info-row{font-size:11px}
+.item-info-body .info-row .k{font-size:11px;font-weight:700}
+.item-info-body .info-row .v{font-size:11px}
+/* 原理段块级堆叠：段名小标签在上、正文整宽左对齐（正常段落换行，无右对齐锯齿） */
+.item-info-body .seg-block{padding:8px 16px}
+.item-info-body .seg-block .k{display:block;font-size:11px;font-weight:700;color:rgb(var(--mdui-color-on-surface-variant));margin-bottom:2px}
+.item-info-body .seg-block .v{display:block;font-size:11px;line-height:1.75;text-align:left;white-space:pre-line;word-break:break-word}
+.item-info-body .seg-note{padding:10px 16px;font-size:11px;line-height:1.7;color:rgb(var(--mdui-color-on-surface-variant))}

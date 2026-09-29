@@ -113,47 +113,37 @@
           <span class="group-count group-count-retro">{{ groupOptimizedCount(group) }}/{{ group.items.length }}</span>
         </div>
 
-        <!-- 单项功能列表 -->
-        <mdui-list v-if="groupSingle(group).length">
-          <mdui-list-item
-            v-for="item in groupSingle(group)"
-            :key="'single-' + item.key + '-' + String(state[item.key].enabled)"
-            @click="toggleItem(item)"
-          >
-            <span slot="icon" class="item-icon"><mdui-icon :name="item.icon"></mdui-icon></span>
-            <!-- 【守护进程/性能优化】大字显示多字白话说明、小字显示 ≤6 字标签（与其他分组位置相反） -->
-            <div slot="headline">{{ labelSwap(group) ? item.desc : item.title }}</div>
-            <div slot="description">{{ labelSwap(group) ? item.title : item.desc }}</div>
-            <span slot="end-icon" style="display:flex;align-items:center;gap:8px">
+        <!-- 单项功能列表：统一为 C 聚合头视觉（方块图标 + 15px 单行标题；不可折叠故无 chevron） -->
+        <div class="agg-list-plain" v-if="groupSingle(group).length">
+          <div class="agg-header" v-for="item in groupSingle(group)" :key="'single-' + item.key + '-' + String(state[item.key].enabled)" @click="toggleItem(item)">
+            <div class="agg-title">
+              <div class="agg-title-main"><span class="agg-item-icon"><mdui-icon :name="item.icon"></mdui-icon></span>{{ item.title }}</div>
+            </div>
+            <span class="agg-control">
               <mdui-button-icon v-if="item.detail" class="pkg-info-btn" icon="info--outlined" @click.stop="showItemDetail(item)"></mdui-button-icon>
-              <span v-if="!item.pkgs" class="reboot-hint">重启后生效</span>
               <span class="switch-wrap">
                 <mdui-switch :checked="state[item.key].enabled" :disabled="state[item.key].loading" @click.stop @change="onSwitchChange(item, $event)"></mdui-switch>
                 <span class="opt-hint" :class="itemHintCls(item)">{{itemHint(item)}}</span>
               </span>
             </span>
-          </mdui-list-item>
-        </mdui-list>
+          </div>
+        </div>
 
-        <!-- 单包聚合项：无需折叠，直接渲染为独立行（标题+状态+开关） -->
-        <mdui-list v-if="groupSinglePkg(group).length">
-          <mdui-list-item
-            v-for="item in groupSinglePkg(group)"
-            :key="'pkg-' + item.key + '-' + String(state[item.key].enabled)"
-            @click="toggleItem(item)"
-          >
-            <span slot="icon" class="item-icon"><mdui-icon :name="item.icon"></mdui-icon></span>
-            <div slot="headline">{{ item.title }}</div>
-            <div slot="description">{{ item.subNames && item.subNames[0] ? item.subNames[0] : item.desc }}</div>
-            <span slot="end-icon" style="display:flex;align-items:center;gap:8px">
+        <!-- 单包聚合项：统一为 C 聚合头视觉（方块图标 + 15px 单行标题，独立行不可折叠） -->
+        <div class="agg-list-plain" v-if="groupSinglePkg(group).length">
+          <div class="agg-header" v-for="item in groupSinglePkg(group)" :key="'pkg-' + item.key + '-' + String(state[item.key].enabled)" @click="toggleItem(item)">
+            <div class="agg-title">
+              <div class="agg-title-main"><span class="agg-item-icon"><mdui-icon :name="item.icon"></mdui-icon></span>{{ item.title }}</div>
+            </div>
+            <span class="agg-control">
               <mdui-button-icon class="pkg-info-btn" icon="info--outlined" @click.stop="showPkgDetail(item, item.pkgs[0], 0)"></mdui-button-icon>
               <span class="switch-wrap">
                 <mdui-switch :checked="state[item.key].enabled" :disabled="state[item.key].loading" @click.stop @change="onSwitchChange(item, $event)"></mdui-switch>
                 <span class="opt-hint" :class="itemHintCls(item)">{{itemHint(item)}}</span>
               </span>
             </span>
-          </mdui-list-item>
-        </mdui-list>
+          </div>
+        </div>
 
         <!-- 聚合功能（多个包）：mdui-collapse accordion 可折叠展开子包清单 -->
         <mdui-collapse accordion v-if="groupAgg(group).length" class="agg-collapse" @change="onCollapseChange">
@@ -166,10 +156,10 @@
             <!-- header：标题 + 图标 + 箭头 + 开关 -->
             <div slot="header" class="agg-header" :class="{opened: isOpen(item.key)}">
               <div class="agg-title">
-                <div class="agg-title-main"><span class="agg-item-icon"><mdui-icon :name="item.icon"></mdui-icon></span>{{ labelSwap(group) ? item.desc : item.title }}<span class="agg-chevron" :class="{open: isOpen(item.key)}"><mdui-icon name="chevron_right--outlined"></mdui-icon></span></div>
+                <div class="agg-title-main"><span class="agg-item-icon"><mdui-icon :name="item.icon"></mdui-icon></span>{{ item.title }}<span class="agg-chevron" :class="{open: isOpen(item.key)}"><mdui-icon name="chevron_right--outlined"></mdui-icon></span></div>
               </div>
               <span class="agg-control">
-                <mdui-button-icon v-if="item.detail" class="pkg-info-btn" icon="info--outlined" @click.stop="showItemDetail(item)"></mdui-button-icon>
+                <!-- 有子项的一级项不设详情按钮（子行各有 ℹ），符合「一级项除非没有子项才有详情」 -->
                 <span class="switch-wrap">
                   <mdui-switch :checked="state[item.key].enabled" :disabled="state[item.key].loading" @click.stop @change="onSwitchChange(item, $event)"></mdui-switch>
                   <span class="opt-hint" :class="itemHintCls(item)">{{itemHint(item)}}</span>
@@ -249,7 +239,7 @@
                     <div slot="headline">{{ item.title }}</div>
                     <div slot="description">{{ item.subNames && item.subNames[0] ? item.subNames[0] : item.desc }}</div>
                     <span slot="end-icon" style="display:flex;align-items:center;gap:8px">
-                      <mdui-button-icon v-if="item.pkgs" class="pkg-info-btn" icon="info--outlined" @click.stop="showPkgDetail(item, item.pkgs[0], 0)"></mdui-button-icon>
+                      <!-- 有子行的一级项不设详情按钮（子行各有 ℹ） -->
                       <mdui-button-icon class="pkg-info-btn sub-expand-btn" :icon="isSubItemOpen(item.key) ? 'expand_less--outlined' : 'expand_more--outlined'" @click.stop="toggleSubItem(item.key)"></mdui-button-icon>
                       <span class="switch-wrap">
                         <mdui-switch :checked="state[item.key].enabled" :disabled="state[item.key].loading" @click.stop @change="onSwitchChange(item, $event)"></mdui-switch>
@@ -508,51 +498,27 @@
     <mdui-button slot="action" variant="text" @click="debugOpen=false">关闭</mdui-button>
   </mdui-dialog>
 
-  <!-- 包详情对话框 -->
-  <mdui-dialog :open="pkgDetailOpen" @closed="pkgDetailOpen=false" close-on-esc close-on-overlay-click style="width:min(92vw,480px)">
+  <!-- 【统一弹窗模板】优化项页所有弹框（功能详情/包详情/二次确认）同一套：
+       LED 红绿灯 header + 11px 小字号 + rows 数据驱动（kv 行 / seg 段 / note 文本 / divider） -->
+  <mdui-dialog :open="detailOpen" @closed="detailOpen=false" close-on-esc close-on-overlay-click style="width:min(92vw,480px)">
     <div slot="header" style="display:flex;align-items:center;gap:10px">
       <div class="gh-crt-lights">
         <span class="gh-led gh-led-r"></span>
         <span class="gh-led gh-led-y"></span>
         <span class="gh-led gh-led-g led-breath"></span>
       </div>
-      <span style="font-family:var(--app-font-mono);font-size:13px;font-weight:500">PKG.INFO</span>
-      <span style="margin-left:auto;font-family:var(--app-font-mono);font-size:10px;letter-spacing:1.5px;opacity:.5">{{ pkgDetailGroup }}</span>
+      <span style="font-family:var(--app-font-mono);font-size:13px;font-weight:500">{{ detailTitle }}</span>
+      <span style="margin-left:auto;font-family:var(--app-font-mono);font-size:10px;letter-spacing:1.5px;opacity:.5">{{ detailTag }}</span>
     </div>
-    <div style="max-height:55vh;overflow-y:auto">
-      <div class="info-row"><span class="k">中文名</span><span class="v">{{ pkgDetailName }}</span></div>
-      <mdui-divider></mdui-divider>
-      <div class="info-row"><span class="k">包名</span><span class="v" style="font-family:var(--app-font-mono);font-size:12px;word-break:break-all">{{ pkgDetailPkg }}</span></div>
-      <mdui-divider></mdui-divider>
-      <div class="info-row"><span class="k">当前状态</span><span class="v">{{ pkgDetailState }}</span></div>
-      <mdui-divider v-if="pkgDetailSize"></mdui-divider>
-      <div class="info-row" v-if="pkgDetailSize"><span class="k">APK 大小</span><span class="v">{{ pkgDetailSize }}</span></div>
-      <div class="info-row" v-if="pkgDetailPath"><span class="k">安装路径</span><span class="v" style="font-family:var(--app-font-mono);font-size:11px;word-break:break-all">{{ pkgDetailPath }}</span></div>
+    <div class="item-info-body" style="max-height:55vh;overflow-y:auto">
+      <template v-for="(row, ri) in detailRows" :key="ri">
+        <mdui-divider v-if="row.type === 'divider'"></mdui-divider>
+        <div class="info-row" v-else-if="row.type === 'kv' && row.v"><span class="k">{{ row.k }}</span><span class="v" :style="row.accent ? 'color:rgb(var(--mdui-color-primary));font-weight:600' : (row.mono ? 'font-family:var(--app-font-mono);word-break:break-all' : '')">{{ row.v }}</span></div>
+        <div class="seg-block" v-else-if="row.type === 'seg'"><span class="k">{{ row.k }}</span><span class="v">{{ row.v }}</span></div>
+        <div class="seg-note" v-else-if="row.type === 'note'">{{ row.v }}</div>
+      </template>
     </div>
-    <mdui-button slot="action" variant="tonal" @click="togglePkgDetail">切换该包</mdui-button>
-    <mdui-button slot="action" variant="text" @click="pkgDetailOpen=false">关闭</mdui-button>
-  </mdui-dialog>
-
-  <!-- 功能详情对话框（普通说明收在按钮后，与包详情同一套视觉） -->
-  <mdui-dialog :open="itemInfoOpen" @closed="itemInfoOpen=false" close-on-esc close-on-overlay-click style="width:min(92vw,480px)">
-    <div slot="header" style="display:flex;align-items:center;gap:10px">
-      <mdui-icon name="info--outlined"></mdui-icon>
-      <span style="font-size:13px;font-weight:500">{{ itemInfoTitle }}</span>
-      <span style="margin-left:auto;font-family:var(--app-font-mono);font-size:10px;letter-spacing:1.5px;opacity:.5">DETAIL</span>
-    </div>
-    <div style="max-height:55vh;overflow-y:auto;font-size:14px;line-height:1.75;white-space:pre-line">{{ itemInfoBody }}</div>
-    <mdui-button slot="action" variant="text" @click="itemInfoOpen=false">关闭</mdui-button>
-  </mdui-dialog>
-
-  <!-- 二次确认弹窗 -->
-  <mdui-dialog :open="confirmOpen" @closed="confirmOpen=false" close-on-esc close-on-overlay-click style="width:min(90vw,400px)">
-    <div slot="header" style="display:flex;align-items:center;gap:10px">
-      <mdui-icon name="warning--outlined" style="color:rgb(var(--mdui-color-error))"></mdui-icon>
-      <span style="font-family:var(--app-font-mono);font-size:13px;font-weight:500">{{ confirmTitle }}</span>
-    </div>
-    <div style="padding:8px 0;font-size:14px;line-height:1.6">{{ confirmMsg }}</div>
-    <mdui-button slot="action" variant="tonal" @click="confirmOk()">确认</mdui-button>
-    <mdui-button slot="action" variant="text" @click="confirmOpen=false">取消</mdui-button>
+    <mdui-button slot="action" v-for="(act, ai) in detailActions" :key="ai" :variant="act.variant" @click="runDetailAction(act.fn)">{{ act.text }}</mdui-button>
   </mdui-dialog>
 
   <!-- 操作提示 Toast（顶部悬浮卡片，随操作类型变色，与整体设计统一） -->
@@ -615,7 +581,7 @@ var FEATURES = [
   },
   { key: 'kill_redundant_processes', icon: 'memory--outlined', title: '后台进程',
     desc: '清理无用进程',
-    detail: '对象：smartscene、sysmonitor、hotstart、preload。\n\n这些是 ColorOS 的场景识别、系统监控、热启动与预加载服务，常驻后台但对日常使用帮助有限。\n\n效果：省下它们占用的内存与 CPU。\n\n代价：依赖智能场景识别的功能（如自动切换情景模式）可能不再生效。\n\n回滚：关闭本项后重启即可恢复。',
+    detail: '原理：清理 smartscene、sysmonitor、hotstart、preload 四个后台服务（ColorOS 的场景识别、系统监控、热启动与预加载），它们常驻后台但对日常使用帮助有限。\n\n效果：省下它们占用的内存与 CPU。\n\n代价：依赖智能场景识别的功能（如自动切换情景模式）可能不再生效。\n\n回滚：关闭本项后重启即可恢复。',
     checkCmd: 'r="ok"; pgrep -x smartscene >/dev/null 2>&1 && r="running"; pgrep -x sysmonitor >/dev/null 2>&1 && r="running"; pgrep -x hotstart >/dev/null 2>&1 && r="running"; echo "$r"',
     verifyCmd: 'echo "smartscene:"; pgrep -x smartscene 2>/dev/null || echo stopped; echo "preload:"; pgrep -x preload 2>/dev/null || echo stopped; echo "sysmonitor:"; pgrep -x sysmonitor 2>/dev/null || echo stopped; echo "hotstart:"; pgrep -x hotstart 2>/dev/null || echo stopped'
   },
@@ -633,7 +599,7 @@ var FEATURES = [
   },
   { key: 'disable_bluetooth_log', icon: 'bluetooth--outlined', title: '蓝牙日志',
     desc: '只存内存',
-    detail: '原理：把 /data/misc/bluetooth/logs 挂成 tmpfs 内存盘，遮住磁盘上的原目录。\n\n效果：蓝牙栈写日志不会报错，但完全不落盘，重启后旧日志重新可见、新日志消失。\n\n实测：原来日志约 50MB / 3 个文件，以约 16MB 每小时持续增长。\n\n回滚：关闭本项后重启，或卸载模块即可恢复。',
+    detail: '原理：把 /data/misc/bluetooth/logs 挂成 tmpfs 内存盘，遮住磁盘上的原目录。\n\n效果：蓝牙栈写日志不会报错，但完全不落盘，重启后旧日志重新可见、新日志消失。\n\n代价：蓝牙出问题时缺少驱动日志，排障会困难一些。\n\n实测：原来日志约 50MB / 3 个文件，以约 16MB 每小时持续增长。\n\n回滚：关闭本项后重启，或卸载模块即可恢复。',
     checkCmd: 'if grep -q " /data/misc/bluetooth/logs " /proc/mounts 2>/dev/null; then echo tmpfs_mounted; else echo disk; fi',
     verifyCmd: 'echo "== 挂载（期望 1 条 tmpfs）=="; grep "bluetooth/logs" /proc/mounts 2>/dev/null || echo "(未 overlay)"; echo "== 目录上下文（期望 bluetooth_logs_data_file）=="; ls -Zd /data/misc/bluetooth/logs 2>/dev/null; echo "== 属主权限（期望 770 1002:1002）=="; stat -c "%a %u:%g" /data/misc/bluetooth/logs 2>/dev/null; echo "== 当前内容（应是本次开机在 tmpfs 内新建；磁盘旧日志已被遮蔽）=="; ls -la /data/misc/bluetooth/logs 2>/dev/null | tail -n +2; echo "== tmpfs 内占用（不落盘，重启清零）=="; du -sh /data/misc/bluetooth/logs 2>/dev/null; echo "== 写入进程 =="; pid=$(pidof com.android.bluetooth 2>/dev/null); echo "com.android.bluetooth: ${pid:-stopped}"'
   },
@@ -649,6 +615,7 @@ var FEATURES = [
     desc: '关闭个性化广告、用户体验计划、数据统计',
     pkgs: ['com.oplus.statistics.rom', 'com.coloros.sceneservice'],
     subNames: ['系统数据统计', '用户体验计划'],
+    detail: '原理：禁用 2 个统计包（系统数据统计、用户体验计划），并把广告与统计相关属性（ad_enable、personalized_ad、track 等）置 0。\n\n效果：个性化广告、用户体验计划与后台数据统计停止，不再上报使用数据。\n\n代价：广告不再个性化（仍会显示通用广告），系统失去使用情况统计。\n\n回滚：关闭本项后重启，或卸载模块即可恢复。',
     checkCmd: 'test "$(getprop persist.sys.oplus.ad_enable 2>/dev/null)" = "0" && echo disabled || echo enabled',
     verifyCmd: 'echo "包:"; for p in com.oplus.statistics.rom com.coloros.sceneservice; do if pm list packages -d --user 0 2>/dev/null | grep -qF "package:$p"; then echo "$p:disabled"; elif ! pm list packages --user 0 2>/dev/null | grep -qF "package:$p"; then echo "$p:missing"; else echo "$p:enabled"; fi; done; echo "属性:"; echo "ad=$(getprop persist.sys.oplus.ad_enable 2>/dev/null)"; echo "pad=$(getprop persist.sys.oplus.personalized_ad 2>/dev/null)"; echo "track=$(getprop persist.ad.track 2>/dev/null)"; echo "usage=$(getprop persist.sys.usage_stat_enable 2>/dev/null)"; echo "collect=$(getprop persist.oppo.collect 2>/dev/null)"'
   },
@@ -657,18 +624,19 @@ var FEATURES = [
     deps: '⚠️ 连带影响：com.heytap.htms 是 HeyTap 消息/推送通道，禁用后可能收不到欢太与部分系统消息通知；com.heytap.mcs 为消息云服务，与之相关联。其余 6 项（mydevices/athena/pantanal.ums/ctautoregist/thirdkit/appplatform）为设备云、智能推荐、泛在服务、运营商自动注册，对日常使用基本无感。注：com.oplus.athena 是 persistent 应用，禁用后其进程会存活到下次重启（属已知限制，不影响开机；重启后不再拉起）。本组【不】包含 com.oplus.location（定位，核心功能）与便签/时钟/模糊/手势等用户可见功能。',
     pkgs: ['com.heytap.htms', 'com.heytap.mcs', 'com.heytap.mydevices', 'com.oplus.athena', 'com.oplus.pantanal.ums', 'com.oppo.ctautoregist', 'com.oplus.thirdkit', 'com.oplus.appplatform'],
     subNames: ['HeyTap 消息推送', 'HeyTap 消息云服务', 'HeyTap 设备互联云', '智能推荐 Athena', '灵犀泛在服务', '运营商自动注册', '三方能力服务', '应用平台服务'],
+    detail: '原理：禁用 8 个常驻回传包——HeyTap 消息推送/消息云、设备互联云、智能推荐 Athena、灵犀泛在、运营商自动注册、三方能力与应用平台服务。\n\n效果：这些通道的云回传与自动注册停止，减少后台流量与无谓唤醒。\n\n代价：欢太与部分系统消息通知可能收不到，智能推荐等功能失效（连带影响详见卡片警告）。\n\n回滚：关闭本项后重启，或卸载模块即可恢复。',
     checkCmd: 'pm list packages -d --user 0 2>/dev/null | grep -qF "package:com.heytap.htms" && echo disabled || echo enabled',
     verifyCmd: 'for p in com.heytap.htms com.heytap.mcs com.heytap.mydevices com.oplus.athena com.oplus.pantanal.ums com.oppo.ctautoregist com.oplus.thirdkit com.oplus.appplatform; do if pm list packages -d --user 0 2>/dev/null | grep -qF "package:$p"; then echo "$p:disabled"; elif ! pm list packages --user 0 2>/dev/null | grep -qF "package:$p"; then echo "$p:missing"; else echo "$p:enabled"; fi; done; echo "== persistent 标记（persistent=1 的禁用后进程存活到重启，属正常）=="; for p in com.heytap.htms com.oplus.athena; do echo "  $p: $(dumpsys package $p 2>/dev/null | grep -m1 "flags=" | grep -o PERSISTENT || echo 非persistent)"; done; echo "== 残留进程（athena 可能仍存活，重启后消失）=="; ps -A -o PID,NAME 2>/dev/null | grep -E "heytap.htms|heytap.mcs|heytap.mydevices|oplus.athena|pantanal.ums|ctautoregist|oplus.thirdkit|oplus.appplatform" || echo "  (无残留)"'
   }
  ]},
 { group: '性能优化', groupIcon: 'rocket_launch--outlined', items: [
-  { key: 'memory_io_optimization', icon: 'speed--outlined', title: '内存IO优化',
+  { key: 'memory_io_optimization', icon: 'speed--outlined', title: '内存优化',
     desc: '调整内存参数，减少后台写入',
     detail: '原理：一次调整 7 项内核参数 —— 关闭调度统计(sched_schedstats)、Binder 调试(debug_mask)、不可回收内存压缩(compact_unevictable_allowed)，并把 swappiness 100→30、dirty_ratio 20→10、dirty_background_ratio 10→5、vfs_cache_pressure 100→50。\n\n效果：后台写盘与内存回收更克制，可用内存更宽裕，减少周期性卡顿。\n\n代价：调度统计归零后，性能分析类工具读不到数据；swap 不再积极，极端内存压力下后台应用可能被更早回收。\n\n回滚：WebUI 关闭本项后重启，service.sh 会写回恢复值（1 / 255 / 1 / 100 / 20 / 10 / 100）。',
     checkCmd: 'v=$(cat /proc/sys/kernel/sched_schedstats 2>/dev/null); test "$v" = "0" && echo ok || echo "fail($v)"',
     verifyCmd: 'echo "schedstats=$(cat /proc/sys/kernel/sched_schedstats 2>/dev/null)"; echo "binder=$(cat /sys/module/binder/parameters/debug_mask 2>/dev/null)"; echo "compact=$(cat /proc/sys/vm/compact_unevictable_allowed 2>/dev/null)"; echo "swappiness=$(cat /proc/sys/vm/swappiness 2>/dev/null)"; echo "dirty_ratio=$(cat /proc/sys/vm/dirty_ratio 2>/dev/null)"; echo "dirty_bg_ratio=$(cat /proc/sys/vm/dirty_background_ratio 2>/dev/null)"; echo "vfs_cache_pressure=$(cat /proc/sys/vm/vfs_cache_pressure 2>/dev/null)"'
   },
-  { key: 'extra_kernel_optimization', icon: 'bolt--outlined', title: '内核深度优化',
+  { key: 'extra_kernel_optimization', icon: 'bolt--outlined', title: '内核优化',
     desc: '降低内核日志噪音，关闭透明大页',
     detail: '原理：把内核日志级别 printk 由 "4 4 1 7" 降到 "3 3 3 3"（console_loglevel 同步设为 3），并把透明大页(THP)的 enabled / defrag / khugepaged/defrag 全部设为 never。\n\n效果：减少内核日志刷屏与大页合并带来的 CPU 开销，内存分配更平稳。\n\n代价：内核 WARNING / OOPS 不再打印到控制台，排障需要改看 dmesg 或 pstore；个别超大内存应用的分配可能略慢。\n\n回滚：WebUI 关闭本项后重启，service.sh 会写回恢复值（printk "4 4 1 7"、THP 设为 always）。',
     checkCmd: 'p=$(cat /proc/sys/kernel/printk 2>/dev/null); echo "$p"',
@@ -680,6 +648,7 @@ var FEATURES = [
     desc: '关闭健康监测服务',
     pkgs: ['com.oplus.healthservice'],
     subNames: ['健康服务'],
+    detail: '原理：禁用「健康」应用（com.oplus.healthservice）。\n\n效果：健康数据的后台统计与常驻服务停止。\n\n代价：健康 App 及其自动记录功能不可用，不使用则无感。\n\n回滚：关闭本项后重启，或卸载模块即可恢复。',
     checkCmd: 'pm list packages -d --user 0 2>/dev/null | grep -qF "package:com.oplus.healthservice" && echo disabled || echo enabled',
     verifyCmd: 'for p in com.oplus.healthservice; do if pm list packages -d --user 0 2>/dev/null | grep -qF "package:$p"; then echo "$p:disabled"; elif ! pm list packages --user 0 2>/dev/null | grep -qF "package:$p"; then echo "$p:missing"; else echo "$p:enabled"; fi; done'
   },
@@ -687,6 +656,7 @@ var FEATURES = [
     desc: '关闭流量统计与数据上报',
     pkgs: ['com.oplus.trafficmonitor', 'com.oplus.dmp'],
     subNames: ['流量监控', '数据管理平台 DMP'],
+    detail: '原理：禁用流量监控与数据管理 2 个系统包（trafficmonitor、dmp）。\n\n效果：流量统计与后台流量管理停止。\n\n代价：流量统计与套餐提醒类功能不可用。\n\n回滚：关闭本项后重启，或卸载模块即可恢复。',
     checkCmd: 'pm list packages -d --user 0 2>/dev/null | grep -qF "package:com.oplus.trafficmonitor" && echo disabled || echo enabled',
     verifyCmd: 'for p in com.oplus.trafficmonitor com.oplus.dmp; do if pm list packages -d --user 0 2>/dev/null | grep -qF "package:$p"; then echo "$p:disabled"; elif ! pm list packages --user 0 2>/dev/null | grep -qF "package:$p"; then echo "$p:missing"; else echo "$p:enabled"; fi; done'
   },
@@ -694,6 +664,7 @@ var FEATURES = [
     desc: '关闭游戏空间与应用增强服务',
     pkgs: ['com.oplus.games', 'com.oplus.cosa'],
     subNames: ['游戏空间', '应用增强/游戏中心'],
+    detail: '原理：禁用游戏空间与游戏中心辅助 2 个包（games、cosa）。\n\n效果：游戏空间入口与游戏工具后台停止。\n\n代价：游戏模式、游戏内工具等辅助功能不可用。\n\n回滚：关闭本项后重启，或卸载模块即可恢复。',
     checkCmd: 'pm list packages -d --user 0 2>/dev/null | grep -qF "package:com.oplus.games" && echo disabled || echo enabled',
     verifyCmd: 'for p in com.oplus.games com.oplus.cosa; do if pm list packages -d --user 0 2>/dev/null | grep -qF "package:$p"; then echo "$p:disabled"; elif ! pm list packages --user 0 2>/dev/null | grep -qF "package:$p"; then echo "$p:missing"; else echo "$p:enabled"; fi; done'
   },
@@ -701,6 +672,7 @@ var FEATURES = [
     desc: '关闭钱包与安全支付',
     pkgs: ['com.oplus.pay', 'com.coloros.securepay'],
     subNames: ['安全支付', '支付安全组件'],
+    detail: '原理：禁用钱包与安全支付 2 个系统包（pay、securepay）。\n\n效果：钱包相关后台服务停止。\n\n代价：钱包及其关联服务不可用，不使用钱包则无感。\n\n回滚：关闭本项后重启，或卸载模块即可恢复。',
     checkCmd: 'pm list packages -d --user 0 2>/dev/null | grep -qF "package:com.oplus.pay" && echo disabled || echo enabled',
     verifyCmd: 'for p in com.oplus.pay com.coloros.securepay; do if pm list packages -d --user 0 2>/dev/null | grep -qF "package:$p"; then echo "$p:disabled"; elif ! pm list packages --user 0 2>/dev/null | grep -qF "package:$p"; then echo "$p:missing"; else echo "$p:enabled"; fi; done'
   },
@@ -708,6 +680,7 @@ var FEATURES = [
     desc: '关闭备份与云同步',
     pkgs: ['com.oplus.wifibackuprestore', 'com.heytap.cloud'],
     subNames: ['WiFi 备份恢复', '云服务'],
+    detail: '原理：禁用 WiFi 备份恢复与 HeyTap 云备份 2 个包。\n\n效果：云备份与换机备份通道停止。\n\n代价：云端备份/恢复功能不可用。\n\n回滚：关闭本项后重启，或卸载模块即可恢复。',
     checkCmd: 'pm list packages -d --user 0 2>/dev/null | grep -qF "package:com.heytap.cloud" && echo disabled || echo enabled',
     verifyCmd: 'for p in com.oplus.wifibackuprestore com.heytap.cloud; do if pm list packages -d --user 0 2>/dev/null | grep -qF "package:$p"; then echo "$p:disabled"; elif ! pm list packages --user 0 2>/dev/null | grep -qF "package:$p"; then echo "$p:missing"; else echo "$p:enabled"; fi; done'
   },
@@ -717,6 +690,7 @@ var FEATURES = [
     depsKeep: { engine: ['com.oplus.obrain', 'com.oplus.deepthinker'], hint: '⚠️ 连带警示：你在 AI 智能助手中保留了部分前端组件（如 AI 记忆/小组件），但 O Brain 与智慧能力引擎已被禁用，保留的 AI 功能实际不可用。建议一并恢复引擎，或干脆整组禁用。' },
     pkgs: ['com.oplus.aimemory', 'com.oplus.aiunit', 'com.oplus.aiwidgets', 'com.oplus.aiwriter', 'com.oplus.metis', 'com.oplus.obrain', 'com.oplus.deepthinker', 'com.coloros.colordirectservice'],
     subNames: ['AI 记忆', 'AI 能力', 'AI 小组件', 'AI 写作', '用户行为记录', 'O Brain', '智慧能力服务', '小布识屏相关组件'],
+    detail: '原理：禁用 O Brain、智慧能力引擎等 8 个 AI 后端包（记忆、AI 单元、小组件、写作等）。\n\n效果：AI 记忆与 AI 生成类后台能力停止。\n\n代价：AI 前端入口依赖这些引擎，相关功能将不可用（连带影响详见卡片警告）。\n\n回滚：关闭本项后重启，或卸载模块即可恢复。',
     checkCmd: 'pm list packages -d --user 0 2>/dev/null | grep -qF "package:com.oplus.aimemory" && echo disabled || echo enabled',
     verifyCmd: 'for p in com.oplus.aimemory com.oplus.aiunit com.oplus.aiwidgets com.oplus.aiwriter com.oplus.metis com.oplus.obrain com.oplus.deepthinker com.coloros.colordirectservice; do if pm list packages -d --user 0 2>/dev/null | grep -qF "package:$p"; then echo "$p:disabled"; elif ! pm list packages --user 0 2>/dev/null | grep -qF "package:$p"; then echo "$p:missing"; else echo "$p:enabled"; fi; done'
   },
@@ -725,6 +699,7 @@ var FEATURES = [
     deps: '⚠️ 连带影响：TTS 无障碍引擎被禁用后，系统朗读/无障碍播报功能将失效；语音唤醒组件被禁用后，小布语音助手只能手动打开使用。',
     pkgs: ['com.oplus.ovoicemanager', 'com.oplus.ovoicemanager.wakeup', 'com.heytap.speechassist', 'com.oplus.ttsaccessibilityengine'],
     subNames: ['语音助手支持组件', '语音助手支持组件', '小布语音助手', 'TTS 无障碍引擎'],
+    detail: '原理：禁用小布语音管理、唤醒组件、语音识别与 TTS 引擎等 4 个包。\n\n效果：小布语音助手与语音唤醒停止。\n\n代价：语音唤醒不可用，TTS 朗读/无障碍播报失效（连带影响详见卡片警告）。\n\n回滚：关闭本项后重启，或卸载模块即可恢复。',
     checkCmd: 'pm list packages -d --user 0 2>/dev/null | grep -qF "package:com.oplus.ovoicemanager" && echo disabled || echo enabled',
     verifyCmd: 'for p in com.oplus.ovoicemanager com.oplus.ovoicemanager.wakeup com.heytap.speechassist com.oplus.ttsaccessibilityengine; do if pm list packages -d --user 0 2>/dev/null | grep -qF "package:$p"; then echo "$p:disabled"; elif ! pm list packages --user 0 2>/dev/null | grep -qF "package:$p"; then echo "$p:missing"; else echo "$p:enabled"; fi; done'
   },
@@ -733,6 +708,7 @@ var FEATURES = [
     deps: '⚠️ 连带影响：锁屏时钟/个性化时钟组件与"锁屏样式小组件"相互依赖，只保留其中部分可能导致锁屏界面异常（时钟不显示等）；壁纸服务被禁用后静态壁纸仍可用，但动态壁纸与锁屏画报失效。注：锁屏助手(com.coloros.lockassistant)为 persistent 系统保护应用，pm 无法禁用，已从本组移除。',
     pkgs: ['com.oplus.themestore', 'com.heytap.themestore', 'com.oplus.keyguard.clock.magazine', 'com.oplus.keyguard.clock.gallery', 'com.oplus.keyguard.clock.graffiti', 'com.oplus.keyguard.personality.clocks', 'com.oplus.keyguard.style.widgets', 'com.heytap.pictorial', 'com.oplus.wallpapers', 'com.android.wallpaper.livepicker'],
     subNames: ['主题商店', '主题商店(欢太)', '锁屏杂志时钟', '锁屏图库时钟', '锁屏涂鸦时钟', '个性化时钟', '锁屏样式小组件', '乐划锁屏', '壁纸服务', '动态壁纸选择器'],
+    detail: '原理：禁用主题商店与锁屏时钟杂志等 10 个主题/个性化包。\n\n效果：主题下载与杂志锁屏更新停止。\n\n代价：锁屏时钟与主题组件相互依赖，可能出现锁屏样式异常（连带影响详见卡片警告）。\n\n回滚：关闭本项后重启，或卸载模块即可恢复。',
     checkCmd: 'pm list packages -d --user 0 2>/dev/null | grep -qF "package:com.oplus.themestore" && echo disabled || echo enabled',
     verifyCmd: 'for p in com.oplus.themestore com.heytap.themestore com.oplus.keyguard.clock.magazine com.oplus.keyguard.clock.gallery com.oplus.keyguard.clock.graffiti com.oplus.keyguard.personality.clocks com.oplus.keyguard.style.widgets com.heytap.pictorial com.oplus.wallpapers com.android.wallpaper.livepicker; do if pm list packages -d --user 0 2>/dev/null | grep -qF "package:$p"; then echo "$p:disabled"; elif ! pm list packages --user 0 2>/dev/null | grep -qF "package:$p"; then echo "$p:missing"; else echo "$p:enabled"; fi; done; echo "属性:"; echo "mag=$(getprop persist.sys.lockscreen_magazine 2>/dev/null)"'
   },
@@ -741,6 +717,7 @@ var FEATURES = [
     deps: '⚠️ 连带影响：网络感知/蜂窝网络质量被禁用后，网络信号优化与智能切换功能失效（基础上网不受影响）；WiFi 质量组件被禁用后，WiFi 弱信号自动优化不可用。',
     pkgs: ['com.oplus.networksense', 'com.oplus.cellularqoe', 'com.oplus.tai.wifiqoe', 'com.oplus.tai.borderpresearch', 'com.oplus.nearcomm'],
     subNames: ['网络感知', '蜂窝网络质量', 'WiFi 质量', '边界预搜索', '近场通信'],
+    detail: '原理：禁用网络感知、蜂窝与 WiFi 质量评估等 5 个网络优化包。\n\n效果：信号优化与智能切换策略停止。\n\n代价：网络质量优化失效，基础上网不受影响（连带影响详见卡片警告）。\n\n回滚：关闭本项后重启，或卸载模块即可恢复。',
     checkCmd: 'pm list packages -d --user 0 2>/dev/null | grep -qF "package:com.oplus.networksense" && echo disabled || echo enabled',
     verifyCmd: 'for p in com.oplus.networksense com.oplus.cellularqoe com.oplus.tai.wifiqoe com.oplus.tai.borderpresearch com.oplus.nearcomm; do if pm list packages -d --user 0 2>/dev/null | grep -qF "package:$p"; then echo "$p:disabled"; elif ! pm list packages --user 0 2>/dev/null | grep -qF "package:$p"; then echo "$p:missing"; else echo "$p:enabled"; fi; done'
   },
@@ -749,6 +726,7 @@ var FEATURES = [
     deps: '⚠️ 连带影响：安全键盘被禁用后，支付/密码输入使用系统默认键盘（安全性降低）；安全中心被禁用后，骚扰拦截、权限管理等功能入口失效。建议保留本项不优化。',
     pkgs: ['com.oplus.securitykeyboard', 'com.coloros.securityguard'],
     subNames: ['安全键盘', '安全事件'],
+    detail: '原理：禁用安全键盘与安全中心 2 个包。\n\n效果：安全键盘与安全中心后台停止。\n\n代价：密码输入改用默认键盘，骚扰拦截与权限管理等安全功能不可用（连带影响详见卡片警告）。\n\n回滚：关闭本项后重启，或卸载模块即可恢复。',
     checkCmd: 'pm list packages -d --user 0 2>/dev/null | grep -qF "package:com.oplus.securitykeyboard" && echo disabled || echo enabled',
     verifyCmd: 'for p in com.oplus.securitykeyboard com.coloros.securityguard; do if pm list packages -d --user 0 2>/dev/null | grep -qF "package:$p"; then echo "$p:disabled"; elif ! pm list packages --user 0 2>/dev/null | grep -qF "package:$p"; then echo "$p:missing"; else echo "$p:enabled"; fi; done'
   },
@@ -757,6 +735,7 @@ var FEATURES = [
     deps: '⚠️ 连带影响：录屏组件被禁用后系统录屏入口失效（第三方录屏 app 不受影响）；媒体控制被禁用后，通知栏媒体卡片/快捷控制不可用。',
     pkgs: ['com.oplus.screenrecorder', 'com.coloros.karaoke', 'com.oplus.mediacontroller', 'com.oplus.mediaturbo'],
     subNames: ['录屏', '耳机返听', '媒体控制', '媒体加速'],
+    detail: '原理：禁用系统录屏、K 歌、媒体控制等 4 个包。\n\n效果：系统录屏入口与通知栏媒体卡片停止。\n\n代价：系统录屏不可用（第三方录屏不受影响），媒体快捷控制失效（连带影响详见卡片警告）。\n\n回滚：关闭本项后重启，或卸载模块即可恢复。',
     checkCmd: 'pm list packages -d --user 0 2>/dev/null | grep -qF "package:com.oplus.screenrecorder" && echo disabled || echo enabled',
     verifyCmd: 'for p in com.oplus.screenrecorder com.coloros.karaoke com.oplus.mediacontroller com.oplus.mediaturbo; do if pm list packages -d --user 0 2>/dev/null | grep -qF "package:$p"; then echo "$p:disabled"; elif ! pm list packages --user 0 2>/dev/null | grep -qF "package:$p"; then echo "$p:missing"; else echo "$p:enabled"; fi; done'
   },
@@ -765,6 +744,7 @@ var FEATURES = [
     deps: '⚠️ 连带影响：日志工具(日志服务)被禁用后 logcat 输出受限，后续排查问题将缺乏日志依据；崩溃盒被禁用后，app 崩溃记录不会上报（对普通使用无感）。',
     pkgs: ['com.oplus.powermonitor', 'com.oplus.audiomonitor', 'com.oplus.logkit', 'com.oplus.engineermode', 'com.oplus.crashbox', 'com.oplus.contentportal', 'com.oplus.postmanservice', 'com.oplus.subsys', 'com.oplus.engineernetwork'],
     subNames: ['电源监控', '音频监控', '日志工具', '工程模式', '崩溃盒', '内容门户', 'Postman 服务', '子系统服务', '工程网络'],
+    detail: '原理：禁用功耗/音频监控、日志工具、崩溃盒等 9 个监控与工具包（含 logkit）。\n\n效果：后台监控与日志采集停止，省内存省 CPU。\n\n代价：logcat 输出受限、崩溃记录缺失，排障缺少日志依据（连带影响详见卡片警告）。\n\n回滚：关闭本项后重启，或卸载模块即可恢复。',
     checkCmd: 'pm list packages -d --user 0 2>/dev/null | grep -qF "package:com.oplus.powermonitor" && echo disabled || echo enabled',
     verifyCmd: 'for p in com.oplus.powermonitor com.oplus.audiomonitor com.oplus.logkit com.oplus.engineermode com.oplus.crashbox com.oplus.contentportal com.oplus.postmanservice com.oplus.subsys com.oplus.engineernetwork; do if pm list packages -d --user 0 2>/dev/null | grep -qF "package:$p"; then echo "$p:disabled"; elif ! pm list packages --user 0 2>/dev/null | grep -qF "package:$p"; then echo "$p:missing"; else echo "$p:enabled"; fi; done'
   },
@@ -773,6 +753,7 @@ var FEATURES = [
     pkgs: ['com.oplus.apprecover'],
     subNames: ['找回已卸载的系统应用'],
     subGroup: '设置相关', subGroupIcon: 'settings--outlined', subGroupKey: 'disable_settings_related',
+    detail: '原理：禁用「找回已卸载应用」服务包（apprecover）。\n\n效果：应用商店内找回卸载应用的后台服务停止。\n\n代价：无法通过该入口找回误卸载的应用。\n\n回滚：关闭本项后重启，或卸载模块即可恢复。',
     checkCmd: 'pm list packages -d --user 0 2>/dev/null | grep -qF "package:com.oplus.apprecover" && echo disabled || echo enabled',
     verifyCmd: 'if pm list packages -d --user 0 2>/dev/null | grep -qF "package:com.oplus.apprecover"; then echo "com.oplus.apprecover:disabled"; elif ! pm list packages --user 0 2>/dev/null | grep -qF "package:com.oplus.apprecover"; then echo "com.oplus.apprecover:missing"; else echo "com.oplus.apprecover:enabled"; fi'
   },
@@ -781,6 +762,7 @@ var FEATURES = [
     pkgs: ['com.oplus.notificationmanager'],
     subNames: ['通知管理'],
     subGroup: '设置相关', subGroupKey: "disable_settings_related",
+    detail: '原理：禁用通知管理服务包（notificationmanager）。\n\n效果：通知分类与智能整理后台停止。\n\n代价：通知智能管理功能不可用。\n\n回滚：关闭本项后重启，或卸载模块即可恢复。',
     checkCmd: 'pm list packages -d --user 0 2>/dev/null | grep -qF "package:com.oplus.notificationmanager" && echo disabled || echo enabled',
     verifyCmd: 'if pm list packages -d --user 0 2>/dev/null | grep -qF "package:com.oplus.notificationmanager"; then echo "com.oplus.notificationmanager:disabled"; elif ! pm list packages --user 0 2>/dev/null | grep -qF "package:com.oplus.notificationmanager"; then echo "com.oplus.notificationmanager:missing"; else echo "com.oplus.notificationmanager:enabled"; fi'
   },
@@ -789,6 +771,7 @@ var FEATURES = [
     pkgs: ['com.oplus.remotecontrol'],
     subNames: ['远程控制'],
     subGroup: '设置相关', subGroupKey: "disable_settings_related",
+    detail: '原理：禁用远程控制服务包（remotecontrol）。\n\n效果：远程协助与控制通道停止。\n\n代价：远程控制功能不可用。\n\n回滚：关闭本项后重启，或卸载模块即可恢复。',
     checkCmd: 'pm list packages -d --user 0 2>/dev/null | grep -qF "package:com.oplus.remotecontrol" && echo disabled || echo enabled',
     verifyCmd: 'if pm list packages -d --user 0 2>/dev/null | grep -qF "package:com.oplus.remotecontrol"; then echo "com.oplus.remotecontrol:disabled"; elif ! pm list packages --user 0 2>/dev/null | grep -qF "package:com.oplus.remotecontrol"; then echo "com.oplus.remotecontrol:missing"; else echo "com.oplus.remotecontrol:enabled"; fi'
   },
@@ -797,6 +780,7 @@ var FEATURES = [
     pkgs: ['com.oplus.travelengine'],
     subNames: ['出行引擎'],
     subGroup: '设置相关', subGroupKey: "disable_settings_related",
+    detail: '原理：禁用出行引擎服务包（travelengine）。\n\n效果：出行卡片与行程后台服务停止。\n\n代价：智能出行提醒与行程卡片不可用。\n\n回滚：关闭本项后重启，或卸载模块即可恢复。',
     checkCmd: 'pm list packages -d --user 0 2>/dev/null | grep -qF "package:com.oplus.travelengine" && echo disabled || echo enabled',
     verifyCmd: 'if pm list packages -d --user 0 2>/dev/null | grep -qF "package:com.oplus.travelengine"; then echo "com.oplus.travelengine:disabled"; elif ! pm list packages --user 0 2>/dev/null | grep -qF "package:com.oplus.travelengine"; then echo "com.oplus.travelengine:missing"; else echo "com.oplus.travelengine:enabled"; fi'
   },
@@ -805,6 +789,7 @@ var FEATURES = [
     pkgs: ['com.heytap.accessory'],
     subNames: ['设备快连'],
     subGroup: '设置相关', subGroupKey: "disable_settings_related",
+    detail: '原理：禁用 HeyTap 配件快连服务包（accessory）。\n\n效果：新设备快连弹窗与配件管理后台停止。\n\n代价：新配件的快连配对引导不可用。\n\n回滚：关闭本项后重启，或卸载模块即可恢复。',
     checkCmd: 'pm list packages -d --user 0 2>/dev/null | grep -qF "package:com.heytap.accessory" && echo disabled || echo enabled',
     verifyCmd: 'if pm list packages -d --user 0 2>/dev/null | grep -qF "package:com.heytap.accessory"; then echo "com.heytap.accessory:disabled"; elif ! pm list packages --user 0 2>/dev/null | grep -qF "package:com.heytap.accessory"; then echo "com.heytap.accessory:missing"; else echo "com.heytap.accessory:enabled"; fi'
   },
@@ -813,6 +798,7 @@ var FEATURES = [
     pkgs: ['com.oplus.linker'],
     subNames: ['设备互联'],
     subGroup: '设置相关', subGroupKey: "disable_settings_related",
+    detail: '原理：禁用设备互联（跨端协同）服务包（linker）。\n\n效果：跨端互联通道停止。\n\n代价：跨屏互联、通知共享等功能不可用。\n\n回滚：关闭本项后重启，或卸载模块即可恢复。',
     checkCmd: 'pm list packages -d --user 0 2>/dev/null | grep -qF "package:com.oplus.linker" && echo disabled || echo enabled',
     verifyCmd: 'if pm list packages -d --user 0 2>/dev/null | grep -qF "package:com.oplus.linker"; then echo "com.oplus.linker:disabled"; elif ! pm list packages --user 0 2>/dev/null | grep -qF "package:com.oplus.linker"; then echo "com.oplus.linker:missing"; else echo "com.oplus.linker:enabled"; fi'
   },
@@ -821,6 +807,7 @@ var FEATURES = [
     pkgs: ['com.oplus.exsystemservice'],
     subNames: ['截屏'],
     subGroup: '屏幕服务', subGroupIcon: 'smartphone--outlined', subGroupKey: 'disable_screen_services',
+    detail: '原理：禁用截屏辅助服务包（exsystemservice）。\n\n效果：截屏相关的辅助后台停止。\n\n代价：滚动截屏等增强能力可能受限，基础截屏不受影响。\n\n回滚：关闭本项后重启，或卸载模块即可恢复。',
     checkCmd: 'pm list packages -d --user 0 2>/dev/null | grep -qF "package:com.oplus.exsystemservice" && echo disabled || echo enabled',
     verifyCmd: 'if pm list packages -d --user 0 2>/dev/null | grep -qF "package:com.oplus.exsystemservice"; then echo "com.oplus.exsystemservice:disabled"; elif ! pm list packages --user 0 2>/dev/null | grep -qF "package:com.oplus.exsystemservice"; then echo "com.oplus.exsystemservice:missing"; else echo "com.oplus.exsystemservice:enabled"; fi'
   },
@@ -829,6 +816,7 @@ var FEATURES = [
     pkgs: ['com.coloros.ocs.opencapabilityservice', 'com.coloros.assistantscreen'],
     subNames: ['速览的支持组件', '速览/负一屏'],
     subGroup: '屏幕服务', subGroupKey: "disable_screen_services",
+    detail: '原理：禁用负一屏（速览）的 2 个支撑包（opencapabilityservice、assistantscreen）。\n\n效果：负一屏卡片服务停止。\n\n代价：左滑负一屏不可用或显示空白。\n\n回滚：关闭本项后重启，或卸载模块即可恢复。',
     checkCmd: 'pm list packages -d --user 0 2>/dev/null | grep -qF "package:com.coloros.ocs.opencapabilityservice" && echo disabled || echo enabled',
     verifyCmd: 'for p in com.coloros.ocs.opencapabilityservice com.coloros.assistantscreen; do if pm list packages -d --user 0 2>/dev/null | grep -qF "package:$p"; then echo "$p:disabled"; elif ! pm list packages --user 0 2>/dev/null | grep -qF "package:$p"; then echo "$p:missing"; else echo "$p:enabled"; fi; done'
   },
@@ -839,6 +827,7 @@ var FEATURES = [
     pkgs: ['com.heytap.quicksearchbox'],
     subNames: ['全局搜索'],
     subGroup: '屏幕服务', subGroupIcon: "smartphone--outlined", subGroupKey: "disable_screen_services",
+    detail: '原理：禁用全局搜索包（quicksearchbox）。\n\n效果：桌面下拉全局搜索的后台服务停止。\n\n代价：全局搜索入口不可用。\n\n回滚：关闭本项后重启，或卸载模块即可恢复。',
     checkCmd: 'pm list packages -d --user 0 2>/dev/null | grep -qF "package:com.heytap.quicksearchbox" && echo disabled || echo enabled',
     verifyCmd: 'if pm list packages -d --user 0 2>/dev/null | grep -qF "package:com.heytap.quicksearchbox"; then echo "com.heytap.quicksearchbox:disabled"; elif ! pm list packages --user 0 2>/dev/null | grep -qF "package:com.heytap.quicksearchbox"; then echo "com.heytap.quicksearchbox:missing"; else echo "com.heytap.quicksearchbox:enabled"; fi'
   }
@@ -928,21 +917,16 @@ var app = Vue.createApp({
       logLines: [],
       warnLogs: [],
       debugOpen: false,
-      debugHtml: '',
-      serviceLogTail: '',
-      pkgDetailOpen: false,
-      pkgDetailKey: '',
-      pkgDetailName: '',
-      pkgDetailPkg: '',
-      pkgDetailGroup: '',
-      pkgDetailState: '',
-        pkgDetailSize: '',
-        pkgDetailPath: '',
-        // 功能详情弹窗（item.detail → 由 info 按钮打开）
-        itemInfoOpen: false,
-        itemInfoTitle: '',
-        itemInfoBody: '',
-        openItem: '',
+        debugHtml: '',
+        serviceLogTail: '',
+        // 【统一弹窗】模板由 rows/actions 驱动；confirmCb 是确认回调
+        detailOpen: false,
+        detailTitle: '',
+        detailTag: '',
+        detailRows: [],
+        detailActions: [],
+        detailSeq: 0,   // 弹窗代数：异步回填只允许写入本代 rows，防串数据
+          openItem: '',
       openSubGroup: '',
       openSubItem: '',      // 二级分组内多包子项的折叠展开状态（如 屏幕服务→速览）
       checking: false,
@@ -960,11 +944,8 @@ var app = Vue.createApp({
       perfCapturing: false,
       // ===== 配置管理 =====
       cfgOpBusy: false,
-      // ===== 二次确认弹窗 =====
-      confirmOpen: false,
-      confirmTitle: '',
-      confirmMsg: '',
-      confirmCb: null,
+        // ===== 二次确认回调（弹窗本体已并入 detailOpen 统一模板） =====
+        confirmCb: null,
       // ===== 首次使用引导 =====
       showGuide: false,
       // ===== OPT-8: 操作历史撤销栈 =====
@@ -1277,17 +1258,32 @@ var app = Vue.createApp({
         });
       });
     },
-    // ---------- 二次确认弹窗 ----------
+    // ---------- 二次确认（并入统一弹窗模板） ----------
     showConfirm: function(title, msg, cb) {
-      this.confirmTitle = title;
-      this.confirmMsg = msg;
       this.confirmCb = cb;
-      this.confirmOpen = true;
+      this._openDetail(title, 'CONFIRM', [
+        { type: 'note', v: msg }
+      ], [
+        { text: '确认', variant: 'tonal', fn: 'confirm' },
+        { text: '取消', variant: 'text', fn: 'close' }
+      ]);
     },
-    confirmOk: function() {
-      this.confirmOpen = false;
-      if (typeof this.confirmCb === 'function') this.confirmCb();
-      this.confirmCb = null;
+    // ---------- 统一弹窗打开器（功能详情/包详情/二次确认的唯一入口） ----------
+    _openDetail: function(title, tag, rows, actions) {
+      this.detailTitle = title;
+      this.detailTag = tag;
+      this.detailRows = rows;
+      this.detailActions = actions;
+      this.detailSeq = (this.detailSeq || 0) + 1;
+      this.detailOpen = true;
+    },
+    // 按钮分发：close 关闭 / confirm 执行确认回调（原包级快捷操作已按统一规范移除）
+    runDetailAction: function(fn) {
+      this.detailOpen = false;
+      if (fn === 'confirm') {
+        if (typeof this.confirmCb === 'function') this.confirmCb();
+        this.confirmCb = null;
+      }
     },
     // 恢复默认：全部开关置 false，写回并刷新（含 pm 恢复）
     restoreDefault: function() {
@@ -1387,12 +1383,6 @@ var app = Vue.createApp({
         if (s && s.status === 'enabled' && !s.loading) n++;
       });
       return n;
-    },
-    // 【显示互换】守护进程 / 性能优化：大字(slot=headline)显示 desc（多字白话说明），
-    // 小字(slot=description)显示 title（≤6 字名词标签），与其余分组位置相反。
-    // 只在模板层做显示互换，不动数据层 —— title 会被日志/弹窗复用，数据层交换会污染其他 UI。
-    labelSwap: function(group) {
-      return group.group === '守护进程' || group.group === '性能优化';
     },
     groupSingle: function(group) {
       return (group.items || []).filter(function(i) { return !i.pkgs && !i.subGroup; });
@@ -1768,49 +1758,64 @@ var app = Vue.createApp({
         });
       });
     },
-    // ---------- 包详情对话框 ----------
-    // 打开「功能详情」弹窗（展示 item.detail，普通用户看简短说明，点 i 看原理/代价/回滚）
-    showItemDetail: function(item) {
-      this.itemInfoTitle = item.title;
-      this.itemInfoBody = item.detail || item.desc || '';
-      this.itemInfoOpen = true;
+    // ---------- 详情弹窗（统一模板：rows 数据驱动，两类详情内容互相补全） ----------
+    // 项所属分组反查（两种详情的 header tag 统一显示分组名）
+    _groupOf: function(key) {
+      var gname = '';
+      FEATURES.forEach(function(g) { g.items.forEach(function(i) { if (i.key === key) gname = g.group; }); });
+      return gname;
     },
+    // item.detail → 只输出「原理」与「代价」两段（代价显示名统一为「风险」），其余段不进弹窗
+    _detailSegs: function(item) {
+      var rows = [];
+      String(item.detail || '').split(/\n\n+/).forEach(function(s) {
+        var m = s.trim().match(/^([^：:]{1,8})[：:]\s*([\s\S]+)$/);
+        if (!m) return;
+        var k = m[1].trim();
+        if (k === '原理') rows.push({ type: 'seg', k: '原理', v: m[2].trim() });
+        else if (k === '代价') rows.push({ type: 'seg', k: '风险', v: m[2].trim() });
+      });
+      return rows;
+    },
+    // 功能详情（无子项一级项）：说明 / 状态 / 原理 / 风险（统一清单；该项无包，包名大小自然缺席）
+    showItemDetail: function(item) {
+      var st = this.state && this.state[item.key];
+      var rows = [
+        { type: 'kv', k: '说明', v: item.desc || '' },
+        { type: 'kv', k: '状态', v: st ? (st.enabled ? '已启用' : '已禁用') : '检测中…', accent: true },
+        { type: 'divider' }
+      ];
+      this._detailSegs(item).forEach(function(r) { rows.push(r); });
+      this._openDetail(item.title, this._groupOf(item.key), rows, [{ text: '关闭', variant: 'text', fn: 'close' }]);
+    },
+    // 包详情：说明 / 包名 / 状态 / 大小（异步）/ 原理 / 风险 —— 与功能详情同一清单，仅多包级两行
     showPkgDetail: function(item, pkg, idx) {
       var self = this;
-      this.pkgDetailKey = item.key;
-      this.pkgDetailPkg = pkg;
-      this.pkgDetailName = (item.subNames && item.subNames[idx]) || pkg;
-      this.pkgDetailGroup = item.title;
-      this.pkgDetailState = this.pkgStateText(item.key, pkg);
-      this.pkgDetailSize = '';
-      this.pkgDetailPath = '';
-      this.pkgDetailOpen = true;
-      // 【v2.3.1】异步获取 APK 大小和安装路径
+      var rows = [
+        { type: 'kv', k: '说明', v: item.desc || '' },
+        { type: 'kv', k: '包名', v: pkg, mono: true },
+        { type: 'kv', k: '状态', v: this.pkgStateText(item.key, pkg), accent: true },
+        { type: 'kv', k: 'APK 大小', v: '' },
+        { type: 'divider' }
+      ];
+      this._detailSegs(item).forEach(function(r) { rows.push(r); });
+      this._openDetail(item.title, this._groupOf(item.key), rows, [
+        { text: '关闭', variant: 'text', fn: 'close' }
+      ]);
+      var seq = this.detailSeq;   // 本代弹窗：回填前核对，防旧请求写进新弹窗
+      // 异步取 APK 大小（安装路径已按统一清单移除）
       sh('pm path ' + pkg + ' 2>/dev/null | head -1 | sed "s/package://"').then(function(r) {
+        if (seq !== self.detailSeq) return;
         var apkPath = String(r.stdout || '').trim();
-        if (apkPath) {
-          self.pkgDetailPath = apkPath;
-          sh('ls -lh "' + apkPath + '" 2>/dev/null | awk \'{print $5}\'').then(function(r2) {
-            var sz = String(r2.stdout || '').trim();
-            if (sz) self.pkgDetailSize = sz;
-          });
-        }
+        if (!apkPath || !self.detailOpen) return;
+        sh('ls -lh "' + apkPath + '" 2>/dev/null | awk \'{print $5}\'').then(function(r2) {
+          if (seq !== self.detailSeq) return;
+          var sz = String(r2.stdout || '').trim();
+          if (!sz || !self.detailOpen) return;
+          var sr = self.detailRows.find(function(x) { return x.k === 'APK 大小'; });
+          if (sr) sr.v = sz;
+        });
       });
-    },
-    togglePkgDetail: function() {
-      // 在详情对话框里一键切换该包：根据当前状态取反
-      var self = this;
-      var key = this.pkgDetailKey, pkg = this.pkgDetailPkg;
-      if (!key || !pkg) return;
-      var s = this.pkgStates[key] && this.pkgStates[key][pkg];
-      var wantDisabled = !(s === 'disabled');
-      var item = null;
-      FEATURES.forEach(function(g) {
-        g.items.forEach(function(i) { if (i.key === key) item = i; });
-      });
-      if (!item) return;
-      this.pkgDetailOpen = false;
-      this.onPkgSwitch(item, pkg, { target: { checked: wantDisabled } });
     },
     // ---------- 解析 verifyCmd 输出中的每个包状态 ----------
     // 【方案 A】精确状态机：verifyCmd 输出形如
