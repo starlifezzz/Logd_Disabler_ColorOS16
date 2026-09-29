@@ -4,7 +4,7 @@
 
 ![KernelSU](https://img.shields.io/badge/KernelSU-Compatible-green?logo=android)
 ![ColorOS 16](https://img.shields.io/badge/ColorOS-16-blue)
-![License](https://img.shields.io/badge/license-CC%20BY%204.0-blue)
+![License](https://img.shields.io/badge/license-CC%20BY--NC--ND%204.0-blue)
 
 ## 这是什么
 
@@ -73,11 +73,12 @@
 
 ## 许可
 
-本项目采用 **CC BY 4.0**（署名 4.0 国际协议，全文见 [LICENSE](LICENSE)）：
+本项目采用 **CC BY-NC-ND 4.0**（署名-非商业-禁止演绎 4.0 国际协议，全文见 [LICENSE](LICENSE)），CC 家族最严格的一档：
 
-- ✅ 自由使用、修改、分发（包括商用），衍生作品不必开源
-- ⚠️ **二次修改必须声明**：注明原作者与协议链接，并标明"已修改"（协议 §3(a)(1)）
-- ❌ 不得移除原作者署名与协议声明，不得附加额外限制
+- ❌ **禁止二次修改**：任何魔改、衍生、改造都需事先获得作者授权（获准时也必须署名并声明改动）
+- ❌ **禁止商业化**：不得用于任何商业用途
+- ✅ 允许非商业目的的原样分享与个人使用：转发须署名原作者并附协议链接
+- ❌ 不得移除、隐藏原有版权与协议声明
 
 Copyright © 2026 zhangchongjie
 
