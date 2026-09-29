@@ -42,7 +42,7 @@ grep -n 'echo 0x' $SRC/service.sh $SRC/post-fs-data.sh $SRC/customize.sh $SRC/bo
 echo "═══ C. 开关数量与同步 ═══"
 AK=$(grep -m1 'ALL_KEYS="' $SRC/service.sh | sed 's/.*ALL_KEYS="//;s/".*//')
 N=$(echo $AK | wc -w)
-[ "$N" = "35" ] && ok "ALL_KEYS 数量 = 35" || no "ALL_KEYS = $N (期望 35)"
+[ "$N" = "34" ] && ok "ALL_KEYS 数量 = 34" || no "ALL_KEYS = $N (期望 34)"
 AK2=$(grep -m1 -A0 'ALL_KEYS="' $SRC/service.sh | head -1)
 C1=$(grep -c 'ALL_KEYS="' $SRC/service.sh); [ "$C1" = "2" ] && ok "ALL_KEYS 出现 2 处" || no "ALL_KEYS 出现 $C1 处"
 grep -m1 'ALL_KEYS="' $SRC/service.sh | grep -q enable_mglru && no "ALL_KEYS 仍含 enable_mglru" || ok "ALL_KEYS 已无 enable_mglru"
@@ -55,7 +55,7 @@ src,tmp=sys.argv[1],sys.argv[2]
 s=open(f'{src}/webroot/index.html',encoding='utf-8').read()
 i=s.find('var FEATURES'); j=s.find('\n];',i)
 blk=s[i:j]
-feats=re.findall(r"key: '([a-z_0-9]+)'",blk)+re.findall(r"subGroupKey: '([a-z_0-9]+)'",blk)
+feats=re.findall(r"key: '([a-z_0-9]+)'",blk)+re.findall(r"subGroupKey: ['\"]([a-z_0-9]+)['\"]",blk)
 feats=list(dict.fromkeys(feats))
 svc=open(f'{src}/service.sh',encoding='utf-8').read()
 ak=re.search(r'ALL_KEYS="([^"]+)"',svc).group(1).split()
@@ -63,13 +63,13 @@ extra=[k for k in feats if k not in ak]
 missing=[k for k in ak if k not in feats]
 open(f'{tmp}/feat.txt','w').write("%d\n%s\n%s\n" % (len(feats), ','.join(extra), ','.join(missing)))
 print(f"  FEATURES keys = {len(feats)}")
-if not extra and not missing and len(feats)==35:
-    print("  ✅ FEATURES == ALL_KEYS == 35，无缺无多")
+if not extra and not missing and len(feats)==34:
+    print(f"  ✅ FEATURES == ALL_KEYS == 34，无缺无多")
 else:
     print(f"  ❌ extra={extra} missing={missing}")
 PY
-[ "$(sed -n 1p $T/feat.txt)" = "35" ] && [ -z "$(sed -n 2p $T/feat.txt)" ] && [ -z "$(sed -n 3p $T/feat.txt)" ] \
-  && ok "FEATURES ↔ ALL_KEYS 一致(35)" || no "FEATURES ↔ ALL_KEYS 不一致"
+[ "$(sed -n 1p $T/feat.txt)" = "34" ] && [ -z "$(sed -n 2p $T/feat.txt)" ] && [ -z "$(sed -n 3p $T/feat.txt)" ] \
+  && ok "FEATURES ↔ ALL_KEYS 一致(34)" || no "FEATURES ↔ ALL_KEYS 不一致"
 
 echo "═══ E. 核心功能仍完整 ═══"
 BINS="midasd ostatsd ostats_pullerd ostats_tpd criticallog subsystem_ramdump"
@@ -91,7 +91,7 @@ grep -q 'for dcproc in midasd ostatsd ostats_pullerd ostats_tpd criticallog subs
 grep -q 'mediametrics 必须存活' $SRC/service.sh && ok "service.sh 增加 mediametrics 存活复核" || no "缺 mediametrics 存活复核"
 grep -q 'mediametrics 必须正常' $SRC/post-fs-data.sh && ok "post-fs-data 增加 mediametrics 正常复核" || no "缺 mediametrics 正常复核"
 grep -q 'mediametrics 必须' $SRC/webroot/index.html && ok "WebUI verifyCmd 含 mediametrics 回归项" || no "WebUI 缺 mediametrics 回归项"
-PKGS="com.heytap.htms com.heytap.mcs com.heytap.mydevices com.oplus.athena com.oplus.pantanal.ums com.oppo.ctautoregist com.oplus.thirdkit com.oplus.appplatform"
+PKGS="com.heytap.htms com.heytap.mcs com.heytap.mydevices com.oplus.pantanal.ums com.oppo.ctautoregist com.oplus.thirdkit"
 T9=$(grep -c 'disable_telemetry_cloud|' $SRC/service.sh)
 [ "$T9" = "1" ] && ok "PKG_TABLE 含 disable_telemetry_cloud" || no "PKG_TABLE 缺失"
 for p in $PKGS; do
@@ -106,7 +106,7 @@ echo "═══ F. checkCmd P1-B 修复 ═══"
 NOLD=$(grep -c "checkCmd: 'pm list packages --user 0 2>/dev/null" $SRC/webroot/index.html)
 [ "$NOLD" = "0" ] && ok "旧写法残留 = 0" || no "旧写法残留 = $NOLD"
 NNEW=$(grep -c "checkCmd: 'pm list packages -d --user 0 2>/dev/null | grep -qF \"package:" $SRC/webroot/index.html)
-[ "$NNEW" = "22" ] && ok "新写法 = 22" || no "新写法 = $NNEW (期望 22)"
+[ "$NNEW" = "21" ] && ok "新写法 = 21" || no "新写法 = $NNEW (期望 21)"
 NJS=$(grep -c "pm list packages -d --user 0 2>/dev/null | grep -qF \"package:\\\$p\"" $SRC/webroot/index.html)
 [ "$NJS" -ge 1 ] && ok "动态生成器仍用 -d (=$NJS)" || no "动态生成器丢失"
 
@@ -182,7 +182,7 @@ JVC=$(python3 -c "import json;print(json.load(open('$SRC/update.json'))['version
 
 echo
 echo "═══ F6. 二级开关 → 一级实时联动（v2.3.15 实测 bug 回归）═══"
-# 实测：打开「屏幕」一级 → 关「截屏」二级 → 一级仍显示开；直到关「速览」的三级才掉。
+# 实测：打开「屏幕」一级 → 关「全局搜索」二级 → 一级仍显示开；直到关「速览」的三级才掉。
 # 病因：onPkgSwitch(三级) 会调 syncSubGroupSwitch，onSwitchChange(二级) 从不调。
 ON2=$(sed -n "$(grep -n 'onSwitchChange: function' $SRC/webroot/index.html|head -1|cut -d: -f1),+60p" $SRC/webroot/index.html)
 echo "$ON2" | grep -q 'this\.syncSubGroupSwitch(item\.key);' && ok "onSwitchChange 会重算一级" || no "onSwitchChange 没调 syncSubGroupSwitch（旧 bug）"
@@ -201,7 +201,7 @@ F.forEach(gr=>(gr.items||[]).forEach(i=>{ if(!i.subGroup)return; g++;
   if(!i.subGroupKey)m++;
   if(i.subGroup==='屏幕服务'){scr++; (i.pkgs||[]).forEach(p=>union.add(p));}
   if(i.key==='disable_speedview')sp+=(i.pkgs||[]).length; }));
-process.exit(g>0&&m===0&&scr===3&&sp===2&&union.size===4?0:1);" && ok "所有带 subGroup 的 item 均有 subGroupKey；屏幕服务=3 项/4 包" || no "结构与实测不符"
+process.exit(g>0&&m===0&&scr===2&&sp===2&&union.size===3?0:1);" && ok "所有带 subGroup 的 item 均有 subGroupKey；屏幕服务=2 项/3 包" || no "结构与实测不符"
 
 echo "═══ F7. 命令 ↔ WebUI 全量对拍（脚本 xmap2 / xmap3）═══"
 node "$CI/xmap2.js" >/dev/null 2>&1 && ok "PKG_TABLE+特殊块 23 个键逐包一致、keep 传参齐全" || { no "xmap2 对拍失败"; node "$CI/xmap2.js" 2>&1 | grep '❌' | sed 's/^/       /'; }
@@ -573,6 +573,15 @@ grep -q '@click="skipBoot()"' $IDX5 && grep -q 'skipBoot: function' $IDX5 && ok 
 grep -Fq ':style="{ width: progress +' $IDX5 && grep -q 'crt-boot-fill' $CSSB && ok "gate 自绘进度条 track/fill 在位" || no "gate 自绘进度条丢失"
 # 8) Symbiote 关键色防回退（屏底紫黑 #0f0918 + Strange Pink #ee8fc4）
 grep -q '#0f0918' $CSSB && grep -q '#ee8fc4' $CSSB && ok "Symbiote 紫黑底/Strange Pink 在位" || no "Symbiote 配色被回退"
+
+echo "═══ F18. 三种列表渲染统一为聚合头视觉 + 重启标签不回加 ═══"
+IDX6=$SRC/webroot/index.html
+# 1) A 单项功能 / B 单包聚合已改用 C 聚合头结构：两容器必须都在（改回 mdui-list-item 必先删容器）
+AGPL=$(grep -c 'class="agg-list-plain"' $IDX6)
+[ "$AGPL" -ge 2 ] && ok "A/B 聚合头容器 agg-list-plain ×$AGPL" || no "agg-list-plain 丢失 (=$AGPL，疑似改回 list-item)"
+# 2) 「重启后生效」标签已删：模板/组件CSS/分层基线三处均不得回加（基线漏改会假红）
+RH=$(grep -l 'reboot-hint' $IDX6 $SRC/webroot/assets/app.base.css $SRC/.ci/prev_index.html 2>/dev/null | wc -l)
+[ "$RH" -eq 0 ] && ok "reboot-hint 三处均为 0（标签已删不回加）" || no "reboot-hint 回加到 $RH 个文件"
 
 echo "════════ 结果：$P 通过 / $F 失败 ════════"
 [ "$F" = "0" ] && echo "🎉 全部通过" || echo "⚠️ 有失败项"

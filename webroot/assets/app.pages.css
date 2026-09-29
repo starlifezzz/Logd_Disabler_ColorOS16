@@ -28,6 +28,9 @@
 .about-crt-header .crt-tag,
 .perf-crt-header .crt-tag{margin-left:auto;font-size:10px;letter-spacing:1.5px;flex-shrink:0}
 /* ===== 关于页 ===== */
+/* SYSTEM CONFIG 值列不换行：KERNEL 已精简到 22 字符左右，nowrap 保证单行不堆叠
+   （只限 about 卡片 —— item-info-body 的 info-row 需要长文本换行，不可全局） */
+.about-info-retro .info-row .v{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .about-tips{padding:8px 20px 16px;display:flex;flex-direction:column;gap:10px}
 /* min-width:0 允许 flex 子项收缩 + overflow-wrap 强制断词 —— 同 .agg-dep-warn 的双保险，
    否则长路径 /storage/.../coloros16_config.json 会被 min-width:auto 撑出屏幕 */

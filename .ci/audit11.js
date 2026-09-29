@@ -67,19 +67,24 @@ console.log('═══ 3. 屏幕服务（你复现的场景）语义核对 ═�
 const g=(k)=>cfg[k];
 const sp=(k)=>Object.keys(ps[k]||{});
 console.log('     config: disable_screen_services='+g('disable_screen_services')
-  +'  截屏(disable_double_tap)='+g('disable_double_tap')
+  +'  全局搜索(disable_quick_search)='+g('disable_quick_search')
   +'  速览(disable_speedview)='+g('disable_speedview'));
-const scrOk = ps.disable_screen_services && ps.disable_speedview && ps.disable_double_tap;
+const scrOk = ps.disable_screen_services && ps.disable_speedview && ps.disable_quick_search;
 if(scrOk){
   const parentAll = Object.values(ps.disable_screen_services).every(v=>v==='disabled');
-  const dj = ps.disable_double_tap['com.oplus.exsystemservice']==='disabled';
+  const dj = ps.disable_quick_search['com.heytap.quicksearchbox']==='disabled';
   const sv = Object.values(ps.disable_speedview).every(v=>v==='disabled');
   const expectParent = g('disable_screen_services')===true && parentAll;
   console.log('     一级「屏幕服务」显示 = '+(parentAll?'开':'关')+'  ← '+(parentAll?'全禁才开':'有包未禁 → 必须显示关'));
-  console.log('     二级「截屏」显示 = '+(dj?'开':'关')+'   二级「速览」显示 = '+(sv?'开':'关'));
-  const cond = !parentAll && !dj && sv;   // 规格3：下层任一不符 → 一级必须关
-  cond? ok('规格3 成立：截屏未禁 → 一级显示关；速览仍禁 → 二级开（编组只显示不改意图）')
-      : no('规格3 不成立: parentAll='+parentAll+' 截屏禁='+dj+' 速览禁='+sv);
+  console.log('     二级「全局搜索」显示 = '+(dj?'开':'关')+'   二级「速览」显示 = '+(sv?'开':'关'));
+  // 规格3 双合法场景（设备态会迁移，断言须场景无关）：
+  //   A 全禁态：所有子包已禁 + config 开 → 一级应显示开
+  //   B 部分态：任一子项未禁 → 一级必须显示关（本模块防的回归 bug）
+  const sceneA = parentAll && dj && sv && g('disable_screen_services')===true;
+  const sceneB = !parentAll && !dj && sv;
+  const cond = sceneA || sceneB;
+  cond? ok('规格3 成立：'+(sceneA?'全禁态 → 一级显示开':'全局搜索未禁 → 一级显示关；速览仍禁 → 二级开')+'（编组只显示不改意图）')
+      : no('规格3 不成立: parentAll='+parentAll+' 全局搜索禁='+dj+' 速览禁='+sv);
 }
 
 console.log('═══ 4. 脏数据 / 孤儿键检查 ═══');

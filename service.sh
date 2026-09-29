@@ -64,9 +64,9 @@ if [ ! -f "$CONFIG" ]; then
     mkdir -p "$CONFIG_DIR"
     # 全部 34 个开关 key（含 2 个总开关），与 WebUI FEATURES 一一对应
     # v2.3.8：新增数据回传/遥测等 3 项（32 → 35）；v2.3.9 移除其中的 MGLRU 开关（35 → 34），原因见下方 8b 说明
-    ALL_KEYS="disable_logd block_ota lock_developer_options block_ads_and_tracking kill_redundant_processes system_prop_toggles memory_io_optimization extra_kernel_optimization disable_health_services disable_network_monitoring disable_gamespace disable_wallet_services disable_backup_services disable_ai_assistants disable_voice_assistants disable_theme_services disable_network_optimization disable_security_services disable_media_services disable_system_tools disable_speedview disable_quick_search disable_app_recover disable_double_tap disable_notification_mgr disable_device_link disable_device_connect disable_remote_control disable_travel_engine disable_settings_related disable_screen_services disable_wifi_log disable_bluetooth_log disable_data_collection disable_telemetry_cloud"
+    ALL_KEYS="disable_logd block_ota lock_developer_options block_ads_and_tracking kill_redundant_processes system_prop_toggles memory_io_optimization extra_kernel_optimization disable_health_services disable_network_monitoring disable_gamespace disable_wallet_services disable_backup_services disable_ai_assistants disable_voice_assistants disable_theme_services disable_network_optimization disable_security_services disable_media_services disable_system_tools disable_speedview disable_quick_search disable_app_recover disable_notification_mgr disable_device_link disable_device_connect disable_remote_control disable_travel_engine disable_settings_related disable_screen_services disable_wifi_log disable_bluetooth_log disable_data_collection disable_telemetry_cloud"
     # keep 白名单 key（有子包的功能）
-    KEEP_KEYS="block_ota_keep block_ads_and_tracking_keep disable_health_services_keep disable_network_monitoring_keep disable_gamespace_keep disable_wallet_services_keep disable_backup_services_keep disable_ai_assistants_keep disable_voice_assistants_keep disable_theme_services_keep disable_network_optimization_keep disable_security_services_keep disable_media_services_keep disable_system_tools_keep disable_speedview_keep disable_quick_search_keep disable_app_recover_keep disable_double_tap_keep disable_notification_mgr_keep disable_device_link_keep disable_device_connect_keep disable_remote_control_keep disable_travel_engine_keep disable_telemetry_cloud_keep"
+    KEEP_KEYS="block_ota_keep block_ads_and_tracking_keep disable_health_services_keep disable_network_monitoring_keep disable_gamespace_keep disable_wallet_services_keep disable_backup_services_keep disable_ai_assistants_keep disable_voice_assistants_keep disable_theme_services_keep disable_network_optimization_keep disable_security_services_keep disable_media_services_keep disable_system_tools_keep disable_speedview_keep disable_quick_search_keep disable_app_recover_keep disable_notification_mgr_keep disable_device_link_keep disable_device_connect_keep disable_remote_control_keep disable_travel_engine_keep disable_telemetry_cloud_keep"
     {
         echo "{"
         echo "  \"version\": 2,"
@@ -98,7 +98,7 @@ if ! grep -q '"version"' "$CONFIG" 2>/dev/null; then
     {
         echo "{"
         echo "  \"version\": 2,"
-        ALL_KEYS="disable_logd block_ota lock_developer_options block_ads_and_tracking kill_redundant_processes system_prop_toggles memory_io_optimization extra_kernel_optimization disable_health_services disable_network_monitoring disable_gamespace disable_wallet_services disable_backup_services disable_ai_assistants disable_voice_assistants disable_theme_services disable_network_optimization disable_security_services disable_media_services disable_system_tools disable_speedview disable_quick_search disable_app_recover disable_double_tap disable_notification_mgr disable_device_link disable_device_connect disable_remote_control disable_travel_engine disable_settings_related disable_screen_services disable_wifi_log disable_bluetooth_log disable_data_collection disable_telemetry_cloud"
+        ALL_KEYS="disable_logd block_ota lock_developer_options block_ads_and_tracking kill_redundant_processes system_prop_toggles memory_io_optimization extra_kernel_optimization disable_health_services disable_network_monitoring disable_gamespace disable_wallet_services disable_backup_services disable_ai_assistants disable_voice_assistants disable_theme_services disable_network_optimization disable_security_services disable_media_services disable_system_tools disable_speedview disable_quick_search disable_app_recover disable_notification_mgr disable_device_link disable_device_connect disable_remote_control disable_travel_engine disable_settings_related disable_screen_services disable_wifi_log disable_bluetooth_log disable_data_collection disable_telemetry_cloud"
         first=1
         for key in $ALL_KEYS; do
             [ $first -eq 0 ] && echo ","
@@ -347,7 +347,7 @@ disable_wallet_services|com.oplus.pay,com.coloros.securepay
 disable_backup_services|com.oplus.wifibackuprestore,com.heytap.cloud
 disable_ai_assistants|com.oplus.aimemory,com.oplus.aiunit,com.oplus.aiwidgets,com.oplus.aiwriter,com.oplus.metis,com.oplus.obrain,com.oplus.deepthinker,com.coloros.colordirectservice
 disable_voice_assistants|com.oplus.ovoicemanager,com.oplus.ovoicemanager.wakeup,com.heytap.speechassist,com.oplus.ttsaccessibilityengine
-disable_theme_services|com.oplus.themestore,com.heytap.themestore,com.oplus.keyguard.clock.magazine,com.oplus.keyguard.clock.gallery,com.oplus.keyguard.clock.graffiti,com.oplus.keyguard.personality.clocks,com.oplus.keyguard.style.widgets,com.heytap.pictorial,com.oplus.wallpapers,com.android.wallpaper.livepicker
+disable_theme_services|com.oplus.themestore,com.heytap.themestore,com.oplus.keyguard.clock.magazine,com.oplus.keyguard.clock.gallery,com.oplus.keyguard.clock.graffiti,com.oplus.keyguard.personality.clocks,com.oplus.keyguard.style.widgets,com.heytap.pictorial,com.android.wallpaper.livepicker
 disable_network_optimization|com.oplus.networksense,com.oplus.cellularqoe,com.oplus.tai.wifiqoe,com.oplus.tai.borderpresearch,com.oplus.nearcomm
 disable_security_services|com.oplus.securitykeyboard,com.coloros.securityguard
 disable_media_services|com.oplus.screenrecorder,com.coloros.karaoke,com.oplus.mediacontroller,com.oplus.mediaturbo
@@ -355,13 +355,12 @@ disable_system_tools|com.oplus.powermonitor,com.oplus.audiomonitor,com.oplus.log
 disable_speedview|com.coloros.ocs.opencapabilityservice,com.coloros.assistantscreen
 disable_quick_search|com.heytap.quicksearchbox
 disable_app_recover|com.oplus.apprecover
-disable_double_tap|com.oplus.exsystemservice
 disable_notification_mgr|com.oplus.notificationmanager
 disable_device_link|com.heytap.accessory
 disable_device_connect|com.oplus.linker
 disable_remote_control|com.oplus.remotecontrol
 disable_travel_engine|com.oplus.travelengine
-disable_telemetry_cloud|com.heytap.htms,com.heytap.mcs,com.heytap.mydevices,com.oplus.athena,com.oplus.pantanal.ums,com.oppo.ctautoregist,com.oplus.thirdkit,com.oplus.appplatform
+disable_telemetry_cloud|com.heytap.htms,com.heytap.mcs,com.heytap.mydevices,com.oplus.pantanal.ums,com.oppo.ctautoregist,com.oplus.thirdkit
 '
 
 # 通用循环：处理标准包禁用项
@@ -668,11 +667,9 @@ fi
 # 屏幕服务（组内 2 个子项）
 if is_on "disable_screen_services"; then
     log "[ScreenServices] 禁用..."
-    is_on "disable_double_tap" && disable_pkg "com.oplus.exsystemservice" "disable_double_tap"
     is_on "disable_speedview" && disable_pkg "com.coloros.ocs.opencapabilityservice" "disable_speedview"
 else
     log "[ScreenServices] 恢复..."
-    ! is_on "disable_double_tap" && enable_pkg "com.oplus.exsystemservice"
     ! is_on "disable_speedview" && enable_pkg "com.coloros.ocs.opencapabilityservice"
 fi
 
@@ -707,7 +704,7 @@ log "[复核][DataCollection] 残留进程数=$(pidof midasd ostatsd ostats_pull
 # 【v2.3.11】期望值随开关动态：以前这里写死"期望 8"，父开关关闭走"恢复"分支时
 # 日志会打成 "状态=0 (期望 8)"，看着像禁用失败，实际是按配置正常恢复 → 误报。
 _tel_on=0; is_on "disable_telemetry_cloud" && _tel_on=1
-_tel_pat='heytap.htms|heytap.mcs|heytap.mydevices|oplus.athena|pantanal.ums|ctautoregist|oplus.thirdkit|oplus.appplatform'
+_tel_pat='heytap.htms|heytap.mcs|heytap.mydevices|pantanal.ums|ctautoregist|oplus.thirdkit'
 _tel_now=$(pm list packages -d --user 0 2>/dev/null | grep -cE "$_tel_pat" || true)
 # 【v2.3.15】期望值还必须扣除 WebUI 白名单：用户在 WebUI 单独启用的子包
 # 本就不该被禁用。不扣的话，只要 _keep 非空，这行就永远打成
@@ -718,7 +715,7 @@ if [ "$_tel_on" = "1" ]; then
     _tel_keep=$(get_keep "disable_telemetry_cloud")
     if [ -n "$_tel_keep" ]; then
         for _tk in $(echo "$_tel_keep" | tr ',' ' '); do
-            case " com.heytap.htms com.heytap.mcs com.heytap.mydevices com.oplus.athena com.oplus.pantanal.ums com.oppo.ctautoregist com.oplus.thirdkit com.oplus.appplatform " in
+                case " com.heytap.htms com.heytap.mcs com.heytap.mydevices com.oplus.pantanal.ums com.oppo.ctautoregist com.oplus.thirdkit " in
                 *" $_tk "*) _tel_exp=$((_tel_exp-1)) ;;
             esac
         done

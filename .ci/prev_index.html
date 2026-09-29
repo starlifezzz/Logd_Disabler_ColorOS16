@@ -558,7 +558,6 @@ mdui-list-item::part(body){justify-content:center;gap:0}
             <div slot="description">{{ labelSwap(group) ? item.title : item.desc }}</div>
             <span slot="end-icon" style="display:flex;align-items:center;gap:8px">
               <mdui-button-icon v-if="item.detail" class="pkg-info-btn" icon="info--outlined" @click.stop="showItemDetail(item)"></mdui-button-icon>
-              <span v-if="!item.pkgs" class="reboot-hint">重启后生效</span>
               <span class="switch-wrap">
                 <mdui-switch :checked="state[item.key].enabled" :disabled="state[item.key].loading" @click.stop @change="onSwitchChange(item, $event)"></mdui-switch>
                 <span class="opt-hint" :class="itemHintCls(item)">{{itemHint(item)}}</span>

@@ -329,17 +329,23 @@
         <span>SYSTEM CONFIG</span>
         <span class="crt-tag">SYS.INFO</span>
       </div>
-      <mdui-list class="about-info-retro">
-        <div class="info-row"><span class="k">MODULE</span><span class="v">{{ moduleVersion }}</span></div>
-        <mdui-divider></mdui-divider>
-        <div class="info-row"><span class="k">KERNELSU</span><span class="v">{{ ksuVersion }}</span></div>
-        <mdui-divider></mdui-divider>
-        <div class="info-row"><span class="k">SELINUX</span><span class="v">{{ selinuxStatus }}</span></div>
-        <mdui-divider></mdui-divider>
-        <div class="info-row"><span class="k">DEVICE</span><span class="v">OnePlus Ace5</span></div>
-        <mdui-divider></mdui-divider>
-        <div class="info-row"><span class="k">SYSTEM</span><span class="v">ColorOS 16</span></div>
-      </mdui-list>
+        <mdui-list class="about-info-retro">
+          <div class="info-row"><span class="k">MODULE</span><span class="v">{{ moduleVersion }}</span></div>
+          <mdui-divider></mdui-divider>
+          <div class="info-row"><span class="k">KERNELSU</span><span class="v">{{ ksuVersion }}</span></div>
+          <mdui-divider></mdui-divider>
+          <div class="info-row"><span class="k">SELINUX</span><span class="v">{{ selinuxStatus }}</span></div>
+          <mdui-divider></mdui-divider>
+          <div class="info-row"><span class="k">DEVICE</span><span class="v">{{ devName }}</span></div>
+          <mdui-divider></mdui-divider>
+          <div class="info-row"><span class="k">MODEL</span><span class="v">{{ devModel }}</span></div>
+          <mdui-divider></mdui-divider>
+          <div class="info-row"><span class="k">SYSTEM</span><span class="v">{{ devSystem }}</span></div>
+          <mdui-divider></mdui-divider>
+          <div class="info-row"><span class="k">SOC</span><span class="v">{{ devSoc }}</span></div>
+          <mdui-divider></mdui-divider>
+          <div class="info-row"><span class="k">KERNEL</span><span class="v">{{ devKernel }}</span></div>
+        </mdui-list>
     </mdui-card>
 
     <mdui-card class="card-gap" variant="elevated">
@@ -620,13 +626,13 @@ var FEATURES = [
     verifyCmd: 'echo "包:"; for p in com.oplus.statistics.rom com.coloros.sceneservice; do if pm list packages -d --user 0 2>/dev/null | grep -qF "package:$p"; then echo "$p:disabled"; elif ! pm list packages --user 0 2>/dev/null | grep -qF "package:$p"; then echo "$p:missing"; else echo "$p:enabled"; fi; done; echo "属性:"; echo "ad=$(getprop persist.sys.oplus.ad_enable 2>/dev/null)"; echo "pad=$(getprop persist.sys.oplus.personalized_ad 2>/dev/null)"; echo "track=$(getprop persist.ad.track 2>/dev/null)"; echo "usage=$(getprop persist.sys.usage_stat_enable 2>/dev/null)"; echo "collect=$(getprop persist.oppo.collect 2>/dev/null)"'
   },
   { key: 'disable_telemetry_cloud', icon: 'cloud_sync--outlined', title: '遥测与云回传服务',
-    desc: '禁用 HeyTap 消息/云、智能推荐、灵犀泛在、运营商自动注册等 8 个常驻数据回传包',
-    deps: '⚠️ 连带影响：com.heytap.htms 是 HeyTap 消息/推送通道，禁用后可能收不到欢太与部分系统消息通知；com.heytap.mcs 为消息云服务，与之相关联。其余 6 项（mydevices/athena/pantanal.ums/ctautoregist/thirdkit/appplatform）为设备云、智能推荐、泛在服务、运营商自动注册，对日常使用基本无感。注：com.oplus.athena 是 persistent 应用，禁用后其进程会存活到下次重启（属已知限制，不影响开机；重启后不再拉起）。本组【不】包含 com.oplus.location（定位，核心功能）与便签/时钟/模糊/手势等用户可见功能。',
-    pkgs: ['com.heytap.htms', 'com.heytap.mcs', 'com.heytap.mydevices', 'com.oplus.athena', 'com.oplus.pantanal.ums', 'com.oppo.ctautoregist', 'com.oplus.thirdkit', 'com.oplus.appplatform'],
-    subNames: ['HeyTap 消息推送', 'HeyTap 消息云服务', 'HeyTap 设备互联云', '智能推荐 Athena', '灵犀泛在服务', '运营商自动注册', '三方能力服务', '应用平台服务'],
-    detail: '原理：禁用 8 个常驻回传包——HeyTap 消息推送/消息云、设备互联云、智能推荐 Athena、灵犀泛在、运营商自动注册、三方能力与应用平台服务。\n\n效果：这些通道的云回传与自动注册停止，减少后台流量与无谓唤醒。\n\n代价：欢太与部分系统消息通知可能收不到，智能推荐等功能失效（连带影响详见卡片警告）。\n\n回滚：关闭本项后重启，或卸载模块即可恢复。',
+    desc: '禁用 HeyTap 消息/云、灵犀泛在、运营商自动注册等 6 个常驻数据回传包',
+    deps: '⚠️ 连带影响：com.heytap.htms 是 HeyTap 消息/推送通道，禁用后可能收不到欢太与部分系统消息通知；com.heytap.mcs 为消息云服务，与之相关联。其余 4 项（mydevices/pantanal.ums/ctautoregist/thirdkit）为设备互联云、泛在服务、运营商自动注册、三方能力服务，对日常使用基本无感。本组【不】包含 com.oplus.location（定位，核心功能）与便签/时钟/模糊/手势等用户可见功能。',
+    pkgs: ['com.heytap.htms', 'com.heytap.mcs', 'com.heytap.mydevices', 'com.oplus.pantanal.ums', 'com.oppo.ctautoregist', 'com.oplus.thirdkit'],
+    subNames: ['HeyTap 消息推送', 'HeyTap 消息云服务', 'HeyTap 设备互联云', '灵犀泛在服务', '运营商自动注册', '三方能力服务'],
+    detail: '原理：禁用 6 个常驻回传包——HeyTap 消息推送/消息云、设备互联云、灵犀泛在、运营商自动注册、三方能力服务。\n\n效果：这些通道的云回传与自动注册停止，减少后台流量与无谓唤醒。\n\n代价：欢太与部分系统消息通知可能收不到（连带影响详见卡片警告）。\n\n回滚：关闭本项后重启，或卸载模块即可恢复。',
     checkCmd: 'pm list packages -d --user 0 2>/dev/null | grep -qF "package:com.heytap.htms" && echo disabled || echo enabled',
-    verifyCmd: 'for p in com.heytap.htms com.heytap.mcs com.heytap.mydevices com.oplus.athena com.oplus.pantanal.ums com.oppo.ctautoregist com.oplus.thirdkit com.oplus.appplatform; do if pm list packages -d --user 0 2>/dev/null | grep -qF "package:$p"; then echo "$p:disabled"; elif ! pm list packages --user 0 2>/dev/null | grep -qF "package:$p"; then echo "$p:missing"; else echo "$p:enabled"; fi; done; echo "== persistent 标记（persistent=1 的禁用后进程存活到重启，属正常）=="; for p in com.heytap.htms com.oplus.athena; do echo "  $p: $(dumpsys package $p 2>/dev/null | grep -m1 "flags=" | grep -o PERSISTENT || echo 非persistent)"; done; echo "== 残留进程（athena 可能仍存活，重启后消失）=="; ps -A -o PID,NAME 2>/dev/null | grep -E "heytap.htms|heytap.mcs|heytap.mydevices|oplus.athena|pantanal.ums|ctautoregist|oplus.thirdkit|oplus.appplatform" || echo "  (无残留)"'
+    verifyCmd: 'for p in com.heytap.htms com.heytap.mcs com.heytap.mydevices com.oplus.pantanal.ums com.oppo.ctautoregist com.oplus.thirdkit; do if pm list packages -d --user 0 2>/dev/null | grep -qF "package:$p"; then echo "$p:disabled"; elif ! pm list packages --user 0 2>/dev/null | grep -qF "package:$p"; then echo "$p:missing"; else echo "$p:enabled"; fi; done; echo "== persistent 标记（persistent=1 的禁用后进程存活到重启，属正常）=="; for p in com.heytap.htms; do echo "  $p: $(dumpsys package $p 2>/dev/null | grep -m1 "flags=" | grep -o PERSISTENT || echo 非persistent)"; done; echo "== 残留进程 =="; ps -A -o PID,NAME 2>/dev/null | grep -E "heytap.htms|heytap.mcs|heytap.mydevices|pantanal.ums|ctautoregist|oplus.thirdkit" || echo "  (无残留)"'
   }
  ]},
 { group: '性能优化', groupIcon: 'rocket_launch--outlined', items: [
@@ -704,13 +710,13 @@ var FEATURES = [
     verifyCmd: 'for p in com.oplus.ovoicemanager com.oplus.ovoicemanager.wakeup com.heytap.speechassist com.oplus.ttsaccessibilityengine; do if pm list packages -d --user 0 2>/dev/null | grep -qF "package:$p"; then echo "$p:disabled"; elif ! pm list packages --user 0 2>/dev/null | grep -qF "package:$p"; then echo "$p:missing"; else echo "$p:enabled"; fi; done'
   },
   { key: 'disable_theme_services', icon: 'palette--outlined', title: '主题和个性化服务',
-    desc: '关闭主题商店/锁屏时钟组件/乐划锁屏/壁纸服务',
-    deps: '⚠️ 连带影响：锁屏时钟/个性化时钟组件与"锁屏样式小组件"相互依赖，只保留其中部分可能导致锁屏界面异常（时钟不显示等）；壁纸服务被禁用后静态壁纸仍可用，但动态壁纸与锁屏画报失效。注：锁屏助手(com.coloros.lockassistant)为 persistent 系统保护应用，pm 无法禁用，已从本组移除。',
-    pkgs: ['com.oplus.themestore', 'com.heytap.themestore', 'com.oplus.keyguard.clock.magazine', 'com.oplus.keyguard.clock.gallery', 'com.oplus.keyguard.clock.graffiti', 'com.oplus.keyguard.personality.clocks', 'com.oplus.keyguard.style.widgets', 'com.heytap.pictorial', 'com.oplus.wallpapers', 'com.android.wallpaper.livepicker'],
-    subNames: ['主题商店', '主题商店(欢太)', '锁屏杂志时钟', '锁屏图库时钟', '锁屏涂鸦时钟', '个性化时钟', '锁屏样式小组件', '乐划锁屏', '壁纸服务', '动态壁纸选择器'],
-    detail: '原理：禁用主题商店与锁屏时钟杂志等 10 个主题/个性化包。\n\n效果：主题下载与杂志锁屏更新停止。\n\n代价：锁屏时钟与主题组件相互依赖，可能出现锁屏样式异常（连带影响详见卡片警告）。\n\n回滚：关闭本项后重启，或卸载模块即可恢复。',
+    desc: '关闭主题商店/锁屏时钟组件/乐划锁屏',
+    deps: '⚠️ 连带影响：锁屏时钟/个性化时钟组件与"锁屏样式小组件"相互依赖，只保留其中部分可能导致锁屏界面异常（时钟不显示等）。注：锁屏助手(com.coloros.lockassistant)为 persistent 系统保护应用，pm 无法禁用，已从本组移除。',
+    pkgs: ['com.oplus.themestore', 'com.heytap.themestore', 'com.oplus.keyguard.clock.magazine', 'com.oplus.keyguard.clock.gallery', 'com.oplus.keyguard.clock.graffiti', 'com.oplus.keyguard.personality.clocks', 'com.oplus.keyguard.style.widgets', 'com.heytap.pictorial', 'com.android.wallpaper.livepicker'],
+    subNames: ['主题商店', '主题商店(欢太)', '锁屏杂志时钟', '锁屏图库时钟', '锁屏涂鸦时钟', '个性化时钟', '锁屏样式小组件', '乐划锁屏', '动态壁纸选择器'],
+    detail: '原理：禁用主题商店与锁屏时钟杂志等 9 个主题/个性化包。\n\n效果：主题下载与杂志锁屏更新停止。\n\n代价：锁屏时钟与主题组件相互依赖，可能出现锁屏样式异常（连带影响详见卡片警告）。\n\n回滚：关闭本项后重启，或卸载模块即可恢复。',
     checkCmd: 'pm list packages -d --user 0 2>/dev/null | grep -qF "package:com.oplus.themestore" && echo disabled || echo enabled',
-    verifyCmd: 'for p in com.oplus.themestore com.heytap.themestore com.oplus.keyguard.clock.magazine com.oplus.keyguard.clock.gallery com.oplus.keyguard.clock.graffiti com.oplus.keyguard.personality.clocks com.oplus.keyguard.style.widgets com.heytap.pictorial com.oplus.wallpapers com.android.wallpaper.livepicker; do if pm list packages -d --user 0 2>/dev/null | grep -qF "package:$p"; then echo "$p:disabled"; elif ! pm list packages --user 0 2>/dev/null | grep -qF "package:$p"; then echo "$p:missing"; else echo "$p:enabled"; fi; done; echo "属性:"; echo "mag=$(getprop persist.sys.lockscreen_magazine 2>/dev/null)"'
+    verifyCmd: 'for p in com.oplus.themestore com.heytap.themestore com.oplus.keyguard.clock.magazine com.oplus.keyguard.clock.gallery com.oplus.keyguard.clock.graffiti com.oplus.keyguard.personality.clocks com.oplus.keyguard.style.widgets com.heytap.pictorial com.android.wallpaper.livepicker; do if pm list packages -d --user 0 2>/dev/null | grep -qF "package:$p"; then echo "$p:disabled"; elif ! pm list packages --user 0 2>/dev/null | grep -qF "package:$p"; then echo "$p:missing"; else echo "$p:enabled"; fi; done; echo "属性:"; echo "mag=$(getprop persist.sys.lockscreen_magazine 2>/dev/null)"'
   },
   { key: 'disable_network_optimization', icon: 'wifi_tethering--outlined', title: '网络优化服务',
     desc: '关闭网络质量优化服务',
@@ -801,15 +807,6 @@ var FEATURES = [
     detail: '原理：禁用设备互联（跨端协同）服务包（linker）。\n\n效果：跨端互联通道停止。\n\n代价：跨屏互联、通知共享等功能不可用。\n\n回滚：关闭本项后重启，或卸载模块即可恢复。',
     checkCmd: 'pm list packages -d --user 0 2>/dev/null | grep -qF "package:com.oplus.linker" && echo disabled || echo enabled',
     verifyCmd: 'if pm list packages -d --user 0 2>/dev/null | grep -qF "package:com.oplus.linker"; then echo "com.oplus.linker:disabled"; elif ! pm list packages --user 0 2>/dev/null | grep -qF "package:com.oplus.linker"; then echo "com.oplus.linker:missing"; else echo "com.oplus.linker:enabled"; fi'
-  },
-  { key: 'disable_double_tap', icon: 'touch_app--outlined', title: '截屏支持组件',
-    desc: '关闭截屏支持组件',
-    pkgs: ['com.oplus.exsystemservice'],
-    subNames: ['截屏'],
-    subGroup: '屏幕服务', subGroupIcon: 'smartphone--outlined', subGroupKey: 'disable_screen_services',
-    detail: '原理：禁用截屏辅助服务包（exsystemservice）。\n\n效果：截屏相关的辅助后台停止。\n\n代价：滚动截屏等增强能力可能受限，基础截屏不受影响。\n\n回滚：关闭本项后重启，或卸载模块即可恢复。',
-    checkCmd: 'pm list packages -d --user 0 2>/dev/null | grep -qF "package:com.oplus.exsystemservice" && echo disabled || echo enabled',
-    verifyCmd: 'if pm list packages -d --user 0 2>/dev/null | grep -qF "package:com.oplus.exsystemservice"; then echo "com.oplus.exsystemservice:disabled"; elif ! pm list packages --user 0 2>/dev/null | grep -qF "package:com.oplus.exsystemservice"; then echo "com.oplus.exsystemservice:missing"; else echo "com.oplus.exsystemservice:enabled"; fi'
   },
   { key: 'disable_speedview', icon: 'auto_awesome--outlined', title: '速览（负一屏）支持组件',
     desc: '关闭速览（负一屏）及支持组件',
@@ -937,6 +934,12 @@ var app = Vue.createApp({
       moduleVersion: 'v1.4',
       ksuVersion: 'KernelSU',
       selinuxStatus: '检测中...',
+      // 【SYSTEM CONFIG】真机信息：mounted 内 loadDeviceInfo 以 getprop 动态读取
+      devName: '读取中…',
+      devModel: '读取中…',
+      devSystem: '读取中…',
+      devSoc: '读取中…',
+      devKernel: '读取中…',
       serviceReady: false,
       currentPage: 'home',
       // ===== 性能对比（A/B 基准） =====
@@ -1966,7 +1969,7 @@ var app = Vue.createApp({
       this.config[item.key] = wantOn;
       // 【v2.3.14 规格3 · 修复实测 bug】二级开关变化必须【立刻】重算所属一级(分组总开关)的显示。
       // 旧版只有 onPkgSwitch(三级) 会调 syncSubGroupSwitch，onSwitchChange(二级) 从不调 →
-      // 实测复现：打开「屏幕」一级 → 关掉「截屏」二级，一级仍显示开；
+      // 实测复现：打开「屏幕」一级 → 关掉「全局搜索」二级，一级仍显示开；
       //            直到去关「速览」下的一个三级才把一级带下来。
       // （item 若是合成一级自身，syncSubGroupSwitch 匹配不到任何 item → 天然 no-op）
       this.syncSubGroupSwitch(item.key);
@@ -2612,6 +2615,30 @@ var app = Vue.createApp({
     sh('cat /data/adb/ksu/version 2>/dev/null || cat /data/adb/ksu/ksud_version 2>/dev/null || echo "KernelSU"').then(function(r) {
       var v = r.stdout.trim();
       self.ksuVersion = v || 'KernelSU';
+    });
+    // 【SYSTEM CONFIG】读取真机型号/系统版本（每行 key=value，空值也出行，防行错位）
+    // 已知可刷 KSU 机型列表：命中时 DEVICE 行显示徽标；未命中型号回落到 brand+model
+    sh('echo "model=$(getprop ro.product.model)"; echo "brand=$(getprop ro.product.brand)"; echo "market=$(getprop ro.product.marketname)"; echo "market2=$(getprop ro.oplus.marketname)"; echo "coloros=$(getprop ro.oplus.version)"; echo "display=$(getprop ro.build.display.id)"; echo "android=$(getprop ro.build.version.release)"; echo "soc=$(getprop ro.soc.model)"; echo "kernel=$(uname -r)"').then(function(r) {
+      var kv = {};
+      String(r.stdout || '').split('\n').forEach(function(ln) {
+        var i = ln.indexOf('=');
+        if (i > 0) kv[ln.slice(0, i)] = ln.slice(i + 1).trim();
+      });
+      var MARKET = { PLJ110: 'OPPO Find X9', PKH110: 'OPPO Find N5', PLK110: '一加 15', PJZ110: '一加 13', PLQ110: '一加 Ace 6', PKG110: '一加 Ace 5', RMX6699: '真我 GT8', RMX5200: '真我 GT8 Pro', RMX5010: '真我 GT7 Pro', RMX6688: '真我 GT7' };
+      var model = kv.model || '';
+      // ColorOS 版本：ro.oplus.version 为易失 prop（实测会读空），回落 build.id 中的 16.0.3.500 段
+      var coloros = kv.coloros || '';
+      if (!coloros && kv.display) {
+        var md = kv.display.match(/_(\d+(?:\.\d+){1,3})\(/);
+        if (md) coloros = md[1];
+      }
+      self.devModel = model || '未知';
+      // MARKET 映射表仅用于兜底市场名（型号在表内时显示"一加 Ace 5"这类人话名）
+      self.devName = kv.market || kv.market2 || MARKET[model] || ((kv.brand || '') + ' ' + model).trim();
+      self.devSystem = (coloros ? 'ColorOS ' + coloros.replace(/^V/i, '') : '');
+      self.devSoc = kv.soc || '—';
+      // KERNEL 精简：去掉 -g<hash> 构建后缀（如 -g64180ab070e5），保留 主版本+android 分支
+      self.devKernel = String(kv.kernel || '—').replace(/-g[0-9a-f]{7,}$/i, '') || '—';
     });
     this.readConfig().then(function() {
       self.refreshAll();

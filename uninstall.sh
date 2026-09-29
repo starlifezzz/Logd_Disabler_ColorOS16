@@ -64,7 +64,6 @@ com.oplus.keyguard.clock.graffiti
 com.oplus.keyguard.personality.clocks
 com.oplus.keyguard.style.widgets
 com.heytap.pictorial
-com.oplus.wallpapers
 com.android.wallpaper.livepicker
 com.oplus.networksense
 com.oplus.cellularqoe
@@ -88,7 +87,6 @@ com.oplus.subsys
 com.oplus.engineernetwork
 com.coloros.ocs.opencapabilityservice
 com.oplus.apprecover
-com.oplus.exsystemservice
 com.oplus.notificationmanager
 com.heytap.accessory
 com.oplus.linker
@@ -111,11 +109,9 @@ com.coloros.sceneservice
 com.heytap.htms
 com.heytap.mcs
 com.heytap.mydevices
-com.oplus.athena
 com.oplus.pantanal.ums
 com.oppo.ctautoregist
 com.oplus.thirdkit
-com.oplus.appplatform
 "
 RESTORED=0
 SKIPPED=0
