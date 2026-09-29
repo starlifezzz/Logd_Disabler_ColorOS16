@@ -65,26 +65,62 @@ uiM.length? uiM.forEach(m=>no(m)) : ok(`UI ${uiN} 条子包状态与真机完全
 
 console.log('═══ 3. 屏幕服务（你复现的场景）语义核对 ═══');
 const g=(k)=>cfg[k];
-const sp=(k)=>Object.keys(ps[k]||{});
 console.log('     config: disable_screen_services='+g('disable_screen_services')
   +'  全局搜索(disable_quick_search)='+g('disable_quick_search')
   +'  速览(disable_speedview)='+g('disable_speedview'));
 const scrOk = ps.disable_screen_services && ps.disable_speedview && ps.disable_quick_search;
-if(scrOk){
-  const parentAll = Object.values(ps.disable_screen_services).every(v=>v==='disabled');
-  const dj = ps.disable_quick_search['com.heytap.quicksearchbox']==='disabled';
-  const sv = Object.values(ps.disable_speedview).every(v=>v==='disabled');
-  const expectParent = g('disable_screen_services')===true && parentAll;
-  console.log('     一级「屏幕服务」显示 = '+(parentAll?'开':'关')+'  ← '+(parentAll?'全禁才开':'有包未禁 → 必须显示关'));
+// 【场景无关】旧版枚举 sceneA/sceneB 两场景，设备处于【全恢复态】必假红；
+// 且 sceneA 强绑 config[父]=true，而代码自证"用户从未单独开过总开关时该值恒 false"
+// （index.html refreshAll 合成 item 注释）→ 子项单独开时同样假红。
+// 规格3 真语义（任何设备态都必须成立）：
+//   一级「全禁才开」= 父级记录 == 两子项并集 == 真机 pm（missing 按期望判）。
+// 三条独立牙齿：①组结构（段2 只遍历存在的条目，缺键静默漏过 → 这里补盲区）
+//   ②父/子是两次独立 verifyCmd shell 采集 → 独立证据对拍
+//   ③UI 推导显示 vs 真机 pm 对拍（用户复现 bug 的直接核对）。
+if(!scrOk){
+  no('规格3 无法核对: pkgStates 缺 '
+    +['disable_screen_services','disable_speedview','disable_quick_search'].filter(k=>!ps[k]).join(',')
+    +' 记录 —— WebUI 未跑检测/state.json 残缺（静默跳过=假通过，故必须红）');
+}else{
+  // ① 组结构完整性：父级记录包集 === 两子项包集并集（结构契约）
+  const parentKeys=Object.keys(ps.disable_screen_services);
+  const unionKeys=[...new Set([...Object.keys(ps.disable_speedview),...Object.keys(ps.disable_quick_search)])];
+  const c1=[];
+  if(!parentKeys.length) c1.push('父级记录为空');
+  if(!unionKeys.length) c1.push('子项并集为空');
+  unionKeys.forEach(p=>{ if(!ps.disable_screen_services[p]) c1.push(p+' 父级缺记录'); });
+  parentKeys.forEach(p=>{ if(unionKeys.indexOf(p)<0) c1.push(p+' 父级多出（子项无此包）'); });
+  c1.length? no('规格3① 组结构不完整: '+c1.join('; '))
+           : ok('规格3① 组结构完整：父级记录包集 === 两子项并集（'+parentKeys.length+' 包）');
+  // ② 跨源逐包一致：父/子各自独立跑 verifyCmd（两次独立 shell 采集），同包必须同判
+  //    （不一致 → syncParentSwitch(父) 与 syncSubGroupSwitch(子聚合) 结论打架 → 一级/二级显示互撕）
+  const c2=[];
+  unionKeys.forEach(p=>{
+    const cv = p in ps.disable_quick_search ? ps.disable_quick_search[p] : ps.disable_speedview[p];
+    const pv = ps.disable_screen_services[p];
+    if(pv!==undefined && cv!==undefined && pv!==cv) c2.push(p+': 父级='+pv+' 子项='+cv);
+  });
+  c2.length? no('规格3② 父/子跨源不一致（一级与二级会对同一包得出不同结论）: '+c2.join('; '))
+           : ok('规格3② 父/子跨源逐包一致（独立 verifyCmd 采集同判）');
+  // ③ 显示契约：UI 推导的一级显示 与 真机 pm 必须同判（missing 按【期望】判，
+  //    与 syncParentSwitch 的 synthetic 分支同源：期望禁用且已卸载 → 达标）
+  const ownerOf=p=> p==='com.heytap.quicksearchbox' ? 'disable_quick_search' : 'disable_speedview';
+  const expectOff=p=> cfg[ownerOf(p)]===true && String(cfg[ownerOf(p)+'_keep']||'').split(',').filter(Boolean).indexOf(p)<0;
+  const uiAllOk=parentKeys.length>0 && parentKeys.every(p=>{
+    const v=ps.disable_screen_services[p];
+    return v==='disabled' || (v==='missing' && expectOff(p));
+  });
+  const realAllOk=parentKeys.length>0 && parentKeys.every(p=>{
+    if(disabled.has(p)) return true;
+    if(!all.has(p)) return expectOff(p);
+    return false;
+  });
+  const dj=ps.disable_quick_search['com.heytap.quicksearchbox']==='disabled';
+  const sv=Object.values(ps.disable_speedview).every(v=>v==='disabled');
+  console.log('     一级「屏幕服务」显示 = '+(uiAllOk?'开':'关')+'  ← '+(uiAllOk?'全禁态':'任一子项未禁 → 必须显示关（编组只显示、不改意图）'));
   console.log('     二级「全局搜索」显示 = '+(dj?'开':'关')+'   二级「速览」显示 = '+(sv?'开':'关'));
-  // 规格3 双合法场景（设备态会迁移，断言须场景无关）：
-  //   A 全禁态：所有子包已禁 + config 开 → 一级应显示开
-  //   B 部分态：任一子项未禁 → 一级必须显示关（本模块防的回归 bug）
-  const sceneA = parentAll && dj && sv && g('disable_screen_services')===true;
-  const sceneB = !parentAll && !dj && sv;
-  const cond = sceneA || sceneB;
-  cond? ok('规格3 成立：'+(sceneA?'全禁态 → 一级显示开':'全局搜索未禁 → 一级显示关；速览仍禁 → 二级开')+'（编组只显示不改意图）')
-      : no('规格3 不成立: parentAll='+parentAll+' 全局搜索禁='+dj+' 速览禁='+sv);
+  uiAllOk===realAllOk ? ok('规格3③ 显示契约成立：一级显示="'+(uiAllOk?'开':'关')+'" 与真机 pm 同判（全禁才开，场景无关）')
+                      : no('规格3③ 显示契约破坏: UI推导='+(uiAllOk?'开':'关')+' 真机pm='+(realAllOk?'开':'关')+' —— 一级开关会对真机状态撒谎');
 }
 
 console.log('═══ 4. 脏数据 / 孤儿键检查 ═══');

@@ -75,7 +75,9 @@ console.log('═══ F6. 特殊块动作 ↔ WebUI 声明 ═══');
 sh.includes('is_on "block_ota"')&&sh.includes('setprop persist.sys.ota.disabled')
   ?ok('block_ota: 禁包 + 停 update_engine + 3 个 OTA 属性'):no('block_ota 实现不全');
 sh.includes('is_on "block_ads_and_tracking"')&&sh.includes('setprop persist.sys.oplus.ad_enable 0')
-  ?ok('block_ads: 禁 2 包 + ad_enable=0 等 8 属性'):no('block_ads 实现不全');
+  &&sh.includes('disable_pkg "com.oplus.qualityprotect" "block_ads_and_tracking"')
+  &&sh.includes('enable_pkg "com.oplus.qualityprotect"')
+  ?ok('block_ads: 禁 5 包（含 qualityprotect/midas 宿主，disable/enable 对称）+ ad_enable=0 等 8 属性'):no('block_ads 实现不全');
 
 console.log(`\n═══ 汇总: ${P} 通过 / ${Fa.length} 失败 ═══`);
 process.exit(Fa.length?1:0);

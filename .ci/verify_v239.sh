@@ -583,6 +583,15 @@ AGPL=$(grep -c 'class="agg-list-plain"' $IDX6)
 RH=$(grep -l 'reboot-hint' $IDX6 $SRC/webroot/assets/app.base.css $SRC/.ci/prev_index.html 2>/dev/null | wc -l)
 [ "$RH" -eq 0 ] && ok "reboot-hint 三处均为 0（标签已删不回加）" || no "reboot-hint 回加到 $RH 个文件"
 
+echo "═══ F19. SYSTEM CONFIG 真机信息动态读取（防写死回退）═══"
+IDXS=$SRC/webroot/index.html
+# 1) 动态绑定在位：模板读 {{ devName }}/{{ devSystem }}，丢了就退回静态显示
+grep -q '{{ devName }}' $IDXS && grep -q '{{ devSystem }}' $IDXS && ok "DEVICE/SYSTEM 动态绑定在位" || no "动态绑定丢失（回退静态？）"
+# 2) 历史写死值不得回潮（改码时若图省事写回常量即红）
+grep -qE '>OnePlus Ace5<|>ColorOS 16<' $IDXS && no "SYSTEM CONFIG 出现写死设备值" || ok "无写死设备值"
+# 3) getprop 读取链 + 10 机型映射表（映射被清则未知型号显示成 brand+model）
+grep -q 'echo "model=\$(getprop ro.product.model)"' $IDXS && grep -q 'PKG110' $IDXS && ok "getprop 读取链 + 机型映射表在位" || no "读取链或映射表丢失"
+
 echo "════════ 结果：$P 通过 / $F 失败 ════════"
 [ "$F" = "0" ] && echo "🎉 全部通过" || echo "⚠️ 有失败项"
 exit $F

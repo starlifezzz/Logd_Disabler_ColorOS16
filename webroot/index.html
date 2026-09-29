@@ -619,11 +619,11 @@ var FEATURES = [
 { group: '隐私与广告', groupIcon: 'visibility_off--outlined', items: [
   { key: 'block_ads_and_tracking', icon: 'block--outlined', title: '广告与数据收集',
     desc: '关闭个性化广告、用户体验计划、数据统计',
-    pkgs: ['com.oplus.statistics.rom', 'com.coloros.sceneservice'],
-    subNames: ['系统数据统计', '用户体验计划'],
-    detail: '原理：禁用 2 个统计包（系统数据统计、用户体验计划），并把广告与统计相关属性（ad_enable、personalized_ad、track 等）置 0。\n\n效果：个性化广告、用户体验计划与后台数据统计停止，不再上报使用数据。\n\n代价：广告不再个性化（仍会显示通用广告），系统失去使用情况统计。\n\n回滚：关闭本项后重启，或卸载模块即可恢复。',
-    checkCmd: 'test "$(getprop persist.sys.oplus.ad_enable 2>/dev/null)" = "0" && echo disabled || echo enabled',
-    verifyCmd: 'echo "包:"; for p in com.oplus.statistics.rom com.coloros.sceneservice; do if pm list packages -d --user 0 2>/dev/null | grep -qF "package:$p"; then echo "$p:disabled"; elif ! pm list packages --user 0 2>/dev/null | grep -qF "package:$p"; then echo "$p:missing"; else echo "$p:enabled"; fi; done; echo "属性:"; echo "ad=$(getprop persist.sys.oplus.ad_enable 2>/dev/null)"; echo "pad=$(getprop persist.sys.oplus.personalized_ad 2>/dev/null)"; echo "track=$(getprop persist.ad.track 2>/dev/null)"; echo "usage=$(getprop persist.sys.usage_stat_enable 2>/dev/null)"; echo "collect=$(getprop persist.oppo.collect 2>/dev/null)"'
+      pkgs: ['com.oplus.statistics.rom', 'com.coloros.sceneservice', 'com.oplus.onetrace', 'com.oplus.midas', 'com.oplus.qualityprotect'],
+      subNames: ['系统数据统计', '用户体验计划', 'OneTrace 追踪服务', 'Midas 数据服务', '质量保护服务'],
+      detail: '原理：禁用 5 个统计包（系统数据统计、用户体验计划、OneTrace 追踪、Midas 数据服务、质量保护服务），并把广告与统计相关属性（ad_enable、personalized_ad、track 等）置 0。其中 com.oplus.midas 本身不是可禁用的包，而是共享进程名（onetrace/obrain/qualityprotect 三个包共用）；质量保护服务是其唯一剩余宿主，禁用宿主即可让该 140MB 统计进程无处可依（真机试测 0 崩溃、0 外部绑定）。\n\n效果：个性化广告、用户体验计划与后台数据统计停止，不再上报使用数据。\n\n代价：广告不再个性化（仍会显示通用广告），系统失去使用情况统计。\n\n回滚：关闭本项后重启，或卸载模块即可恢复。',
+      checkCmd: 'test "$(getprop persist.sys.oplus.ad_enable 2>/dev/null)" = "0" && echo disabled || echo enabled',
+      verifyCmd: 'echo "包:"; for p in com.oplus.statistics.rom com.coloros.sceneservice com.oplus.onetrace com.oplus.midas com.oplus.qualityprotect; do if pm list packages -d --user 0 2>/dev/null | grep -qF "package:$p"; then echo "$p:disabled"; elif ! pm list packages --user 0 2>/dev/null | grep -qF "package:$p"; then echo "$p:missing"; else echo "$p:enabled"; fi; done; echo "属性:"; echo "ad=$(getprop persist.sys.oplus.ad_enable 2>/dev/null)"; echo "pad=$(getprop persist.sys.oplus.personalized_ad 2>/dev/null)"; echo "track=$(getprop persist.ad.track 2>/dev/null)"; echo "usage=$(getprop persist.sys.usage_stat_enable 2>/dev/null)"; echo "collect=$(getprop persist.oppo.collect 2>/dev/null)"'
   },
   { key: 'disable_telemetry_cloud', icon: 'cloud_sync--outlined', title: '遥测与云回传服务',
     desc: '禁用 HeyTap 消息/云、灵犀泛在、运营商自动注册等 6 个常驻数据回传包',
@@ -712,11 +712,11 @@ var FEATURES = [
   { key: 'disable_theme_services', icon: 'palette--outlined', title: '主题和个性化服务',
     desc: '关闭主题商店/锁屏时钟组件/乐划锁屏',
     deps: '⚠️ 连带影响：锁屏时钟/个性化时钟组件与"锁屏样式小组件"相互依赖，只保留其中部分可能导致锁屏界面异常（时钟不显示等）。注：锁屏助手(com.coloros.lockassistant)为 persistent 系统保护应用，pm 无法禁用，已从本组移除。',
-    pkgs: ['com.oplus.themestore', 'com.heytap.themestore', 'com.oplus.keyguard.clock.magazine', 'com.oplus.keyguard.clock.gallery', 'com.oplus.keyguard.clock.graffiti', 'com.oplus.keyguard.personality.clocks', 'com.oplus.keyguard.style.widgets', 'com.heytap.pictorial', 'com.android.wallpaper.livepicker'],
+    pkgs: ['com.oplus.themestore', 'com.heytap.themestore', 'com.oplus.keyguard.clock.magazine', 'com.oplus.keyguard.clock.gallery', 'com.oplus.keyguard.clock.graffiti', 'com.oplus.keyguard.personality.clocks', 'com.oplus.keyguard.style.widgets', 'com.heytap.pictorial'],
     subNames: ['主题商店', '主题商店(欢太)', '锁屏杂志时钟', '锁屏图库时钟', '锁屏涂鸦时钟', '个性化时钟', '锁屏样式小组件', '乐划锁屏', '动态壁纸选择器'],
     detail: '原理：禁用主题商店与锁屏时钟杂志等 9 个主题/个性化包。\n\n效果：主题下载与杂志锁屏更新停止。\n\n代价：锁屏时钟与主题组件相互依赖，可能出现锁屏样式异常（连带影响详见卡片警告）。\n\n回滚：关闭本项后重启，或卸载模块即可恢复。',
     checkCmd: 'pm list packages -d --user 0 2>/dev/null | grep -qF "package:com.oplus.themestore" && echo disabled || echo enabled',
-    verifyCmd: 'for p in com.oplus.themestore com.heytap.themestore com.oplus.keyguard.clock.magazine com.oplus.keyguard.clock.gallery com.oplus.keyguard.clock.graffiti com.oplus.keyguard.personality.clocks com.oplus.keyguard.style.widgets com.heytap.pictorial com.android.wallpaper.livepicker; do if pm list packages -d --user 0 2>/dev/null | grep -qF "package:$p"; then echo "$p:disabled"; elif ! pm list packages --user 0 2>/dev/null | grep -qF "package:$p"; then echo "$p:missing"; else echo "$p:enabled"; fi; done; echo "属性:"; echo "mag=$(getprop persist.sys.lockscreen_magazine 2>/dev/null)"'
+    verifyCmd: 'for p in com.oplus.themestore com.heytap.themestore com.oplus.keyguard.clock.magazine com.oplus.keyguard.clock.gallery com.oplus.keyguard.clock.graffiti com.oplus.keyguard.personality.clocks com.oplus.keyguard.style.widgets com.heytap.pictorial; do if pm list packages -d --user 0 2>/dev/null | grep -qF "package:$p"; then echo "$p:disabled"; elif ! pm list packages --user 0 2>/dev/null | grep -qF "package:$p"; then echo "$p:missing"; else echo "$p:enabled"; fi; done; echo "属性:"; echo "mag=$(getprop persist.sys.lockscreen_magazine 2>/dev/null)"'
   },
   { key: 'disable_network_optimization', icon: 'wifi_tethering--outlined', title: '网络优化服务',
     desc: '关闭网络质量优化服务',

@@ -63,9 +63,11 @@ com.oplus.keyguard.clock.gallery
 com.oplus.keyguard.clock.graffiti
 com.oplus.keyguard.personality.clocks
 com.oplus.keyguard.style.widgets
-com.heytap.pictorial
-com.android.wallpaper.livepicker
-com.oplus.networksense
+  com.heytap.pictorial
+  # 恢复清单为超集：livepicker 曾被旧版本禁用，新版虽不再主动禁，
+  # 但卸载时仍须确保启用（升级过的设备否则永久禁着）——保留无害
+  com.android.wallpaper.livepicker
+  com.oplus.networksense
 com.oplus.cellularqoe
 com.oplus.tai.wifiqoe
 com.oplus.tai.borderpresearch
@@ -102,10 +104,13 @@ com.oplus.sau
 com.oplus.cota
 com.oplus.romupdate
 com.oplus.upgradeguide
-com.oplus.statistics.rom
-com.coloros.assistantscreen
-com.heytap.quicksearchbox
-com.coloros.sceneservice
+  com.oplus.statistics.rom
+  com.coloros.assistantscreen
+  com.heytap.quicksearchbox
+  com.coloros.sceneservice
+  com.oplus.onetrace
+  com.oplus.midas
+  com.oplus.qualityprotect
 com.heytap.htms
 com.heytap.mcs
 com.heytap.mydevices

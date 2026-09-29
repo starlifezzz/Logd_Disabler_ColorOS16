@@ -347,7 +347,7 @@ disable_wallet_services|com.oplus.pay,com.coloros.securepay
 disable_backup_services|com.oplus.wifibackuprestore,com.heytap.cloud
 disable_ai_assistants|com.oplus.aimemory,com.oplus.aiunit,com.oplus.aiwidgets,com.oplus.aiwriter,com.oplus.metis,com.oplus.obrain,com.oplus.deepthinker,com.coloros.colordirectservice
 disable_voice_assistants|com.oplus.ovoicemanager,com.oplus.ovoicemanager.wakeup,com.heytap.speechassist,com.oplus.ttsaccessibilityengine
-disable_theme_services|com.oplus.themestore,com.heytap.themestore,com.oplus.keyguard.clock.magazine,com.oplus.keyguard.clock.gallery,com.oplus.keyguard.clock.graffiti,com.oplus.keyguard.personality.clocks,com.oplus.keyguard.style.widgets,com.heytap.pictorial,com.android.wallpaper.livepicker
+disable_theme_services|com.oplus.themestore,com.heytap.themestore,com.oplus.keyguard.clock.magazine,com.oplus.keyguard.clock.gallery,com.oplus.keyguard.clock.graffiti,com.oplus.keyguard.personality.clocks,com.oplus.keyguard.style.widgets,com.heytap.pictorial
 disable_network_optimization|com.oplus.networksense,com.oplus.cellularqoe,com.oplus.tai.wifiqoe,com.oplus.tai.borderpresearch,com.oplus.nearcomm
 disable_security_services|com.oplus.securitykeyboard,com.coloros.securityguard
 disable_media_services|com.oplus.screenrecorder,com.coloros.karaoke,com.oplus.mediacontroller,com.oplus.mediaturbo
@@ -475,9 +475,16 @@ if is_on "block_ads_and_tracking"; then
     setprop persist.ad.track 0
     setprop persist.sys.usage_stat_enable 0
     setprop persist.oppo.collect 0
-    disable_pkg "com.oplus.statistics.rom" "block_ads_and_tracking"
-    disable_pkg "com.coloros.sceneservice" "block_ads_and_tracking"
-    log "[Ads] 完成"
+      disable_pkg "com.oplus.statistics.rom" "block_ads_and_tracking"
+      disable_pkg "com.coloros.sceneservice" "block_ads_and_tracking"
+      disable_pkg "com.oplus.onetrace" "block_ads_and_tracking"
+      disable_pkg "com.oplus.midas" "block_ads_and_tracking"
+      # 警告：质量保护服务（disabletable §10「卸载后暂无影响，但需谨慎处理」类）
+      # 是共享进程 com.oplus.midas 的唯一有效宿主（obrain/onetrace 均为同进程声明方），
+      # 禁后该 140MB 统计进程无处可依；真机试测 0 崩溃、0 外部绑定、无 PERSISTENT 标志
+      # 可还原：uninstall.sh 已收录，卸载模块 pm enable 即恢复；不涉及 onservices 保留清单
+      disable_pkg "com.oplus.qualityprotect" "block_ads_and_tracking"
+      log "[Ads] 完成"
 else
     log "[Ads] 关闭：恢复广告与数据收集..."
     settings put global oppo_ad_enabled 1 2>/dev/null
@@ -490,9 +497,12 @@ else
     setprop persist.ad.track 1
     setprop persist.sys.usage_stat_enable 1
     setprop persist.oppo.collect 1
-    enable_pkg "com.oplus.statistics.rom"
-    enable_pkg "com.coloros.sceneservice"
-    log "[Ads] 恢复完成"
+      enable_pkg "com.oplus.statistics.rom"
+      enable_pkg "com.coloros.sceneservice"
+      enable_pkg "com.oplus.onetrace"
+      enable_pkg "com.oplus.midas"
+      enable_pkg "com.oplus.qualityprotect"
+      log "[Ads] 恢复完成"
 fi
 
 # ===================== 5. 进程查杀 =====================
