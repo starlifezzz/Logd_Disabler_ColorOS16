@@ -28,9 +28,10 @@
 /* ===== 操作提示 Toast（顶部悬浮卡片，与整体 Material 3 卡片风格统一） ===== */
 .toast{
   /* 垂直位置：20% 视口基础上再上移 100px（纯百分比+calc，不写死像素）
-     max(72px, ...) 保护：小屏/短视口时最低不低于 72px（64px 顶栏 + 8px 间距），
+     max(...) 保护：小屏/短视口时最低不低于 状态栏inset + 72px
+     （64px 顶栏 + 8px 间距；e2e 时顶栏整体坐在状态栏下方，须连 inset 一起上抬），
      既不会被顶栏遮挡，也不会顶出屏幕 */
-  position:fixed;top:max(72px, calc(20% - 100px));left:50%;transform:translateX(-50%);
+  position:fixed;top:max(calc(var(--safe-area-inset-top,0px) + 72px), calc(20% - 100px));left:50%;transform:translateX(-50%);
   z-index:2001;display:flex;align-items:center;gap:10px;
   /* 【v2.2.8 修复】显式固定宽度，彻底告别 width:fit-content：
      之前 fit-content + flex-basis:0 + min-width:0 + overflow:hidden 组合下，

@@ -6,7 +6,23 @@
  * ============================================================ */
 /* 少量页面布局补充样式（组件主题色由 mdui.css 提供） */
 [v-cloak]{display:none!important}
-body{background:rgb(var(--mdui-color-surface));color:rgb(var(--mdui-color-on-surface));margin:0;padding:0;font-family:var(--app-font-ui);padding-bottom:env(safe-area-inset-bottom)}
+/* 状态栏同色·顶栏延伸进条带区：bar 顶到 0、height/padding 吃掉 inset → 条带区
+   永远是 bar 自己的 surface 底色（与页面同色），滚动内容只能从 bar 下方穿过，
+   不会再从 bar 与状态栏之间钻过去；title/按钮从 inset 下方起排，不撞状态图标。
+   inset 缺省 0 时与 mdui 默认逐像素一致（非 KSU 容器零回归）。
+   流动内容避让 = mdui 内联 body.paddingTop=bar.offsetHeight（自动量到 4rem+inset），
+   html 不再垫高否则双重计算；:not(medium/large) 防未来 variant 栏高被压回 4rem */
+mdui-top-app-bar:not([variant=medium]):not([variant=large]){
+  height:calc(4rem + max(var(--safe-area-inset-top,0px),env(safe-area-inset-top,0px)));
+  padding:calc(.75rem + max(var(--safe-area-inset-top,0px),env(safe-area-inset-top,0px))) .5rem .75rem .5rem;
+}
+/* 收起态镜像：shadow :host([hide]){top:-4.625rem} 只基于 4rem 栏高留 10px 余量，
+   我们栏高多了 inset → 文档层再补 -inset（10px 余量恒在，任意 inset 整根滑出屏幕）。
+   文档规则恒胜 :host，不同名镜像收起动效会被压死；transition:top/时长仍走 shadow */
+mdui-top-app-bar:not([variant=medium]):not([variant=large])[hide]:not([hide=false i]){
+  top:calc(-4.625rem - max(var(--safe-area-inset-top,0px),env(safe-area-inset-top,0px)));
+}
+body{background:rgb(var(--mdui-color-surface));color:rgb(var(--mdui-color-on-surface));margin:0;padding:0;font-family:var(--app-font-ui);/* 状态栏同色: 优先容器注入的 --safe-area-inset-*（已定义为 0px 时让 env 参与取大），双缺省回落 0px（非 KSU 容器零回归） */padding-top:max(var(--safe-area-inset-top,0px),env(safe-area-inset-top,0px));padding-bottom:max(var(--safe-area-inset-bottom,0px),env(safe-area-inset-bottom,0px))}
 .page{padding:16px 16px 72px;max-width:680px;margin:0 auto}
 /* ===== 顶栏 ===== */
 .app-logo{display:inline-flex;align-items:center;justify-content:center;width:36px;height:36px;border-radius:10px;background:rgba(var(--mdui-color-primary-container),.7);color:rgb(var(--mdui-color-on-primary-container));flex-shrink:0}
@@ -24,7 +40,7 @@ body{background:rgb(var(--mdui-color-surface));color:rgb(var(--mdui-color-on-sur
 .item-icon{display:inline-flex;align-items:center;justify-content:center;width:36px;height:36px;border-radius:10px;background:rgba(var(--mdui-color-surface-container-high),.8);color:rgb(var(--mdui-color-on-surface-variant));flex-shrink:0}
 .item-icon mdui-icon{font-size:20px}
 /* ===== 底部导航栏 ===== */
-.bottom-nav{position:fixed;left:0;right:0;bottom:0;z-index:200;--mdui-navigation-bar-container-shape:16px 16px 0 0}
+.bottom-nav{position:fixed;left:0;right:0;bottom:max(var(--safe-area-inset-bottom,0px),env(safe-area-inset-bottom,0px));z-index:200;--mdui-navigation-bar-container-shape:16px 16px 0 0}
 .bottom-nav mdui-navigation-bar-item{--mdui-navigation-bar-item-active-indicator-height:0px;--mdui-navigation-bar-item-active-indicator-width:0px;--mdui-navigation-bar-item-active-icon-size:24px}
 .card-gap{margin-bottom:16px;display:block;width:100%;box-sizing:border-box}
 /* mdui-card 默认 inline-block，强制占满容器宽度（与功能卡片保持一致） */

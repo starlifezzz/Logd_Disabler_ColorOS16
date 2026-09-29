@@ -55,6 +55,9 @@ try {
     navigator: { clipboard: { writeText: () => Promise.resolve() }, userAgent: '' },
     location: { href: '', reload() {} },
     setTimeout, clearTimeout, setInterval, clearInterval,
+    // window 本体（=sandbox）需带顶层监听 API：真实浏览器必有，缺它会把
+    // 「脚本顶层挂 window.addEventListener」这类合法代码误判为执行失败（假红）
+    addEventListener() {}, removeEventListener() {},
     Promise, JSON, Date, Math, RegExp, Array, Object, String, Number, Boolean, Error, Set, Map, Symbol, Infinity, NaN,
   };
   sandbox.window = sandbox; sandbox.self = sandbox; sandbox.globalThis = sandbox; sandbox.global = sandbox;

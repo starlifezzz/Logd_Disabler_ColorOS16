@@ -33,6 +33,41 @@
      4. app.pages.css       页面层（日志/关于/性能/个人页）
      5. app.theme.crt.css   主题层（CRT 复古风），最后加载以覆盖中性基线
 -->
+<!-- 【状态栏同色·方案A】容器同源端点（唯一非模块内文件引用，非公网 CDN）：
+     请求 /internal/insets.css 会让 KSU/KernelSU-Next/SukiSU/APatch/MMRL 等容器
+     ① 自动开启 edge-to-edge：页面顶进透明状态栏，条带透出页面底色 = 状态栏跟手变色
+     ② 注入 --safe-area-inset-top/bottom 变量（WebUI-X 标准），body/.bottom-nav 消费避让
+     容器不支持时（旧版/浏览器直开）404 无副作用：不开 edge-to-edge、变量缺省回落
+     env/0px，行为与改造前完全一致，零回归。实证同用法：ReZygisk/zygisklsu/bindhosts。 -->
+<link rel="stylesheet" type="text/css" href="/internal/insets.css">
+<script>
+/* 状态栏同色·自愈轮询：容器 handler 在【请求瞬间】返回 inset 快照——若首次
+   WindowInsets 分发未到就 serve 了 0px，会出现 e2e 已开但 --safe-area-inset-top=0
+   （内容钻状态栏底下）。这里 load 后轮询根变量，仍为 0/空则带 cache-buster 重取
+   /internal/insets.css（每次请求 handler 都重新 get() 最新值，并幂等再开 e2e），
+   8 次内拿到非 0 值即停；非 KSU 容器 404 无副作用，轮询到上限自然结束。 */
+(function(){
+  var n=0,t=null;
+  function stop(){ if(t){clearTimeout(t);t=null;} }
+  function tick(){
+    var v='';
+    try{ v=(getComputedStyle(document.documentElement).getPropertyValue('--safe-area-inset-top')||'').trim(); }catch(e){}
+    if(v&&v!=='0px'){
+      /* inset 到手后顶栏高度会长到 4rem+inset，但 mdui 在 inset 到手前量的
+         body 内联 paddingTop 还是旧值 → 按 offsetHeight 重同步，防内容被顶栏压住 */
+      try{var b=document.querySelector('mdui-top-app-bar');if(b&&document.body)document.body.style.paddingTop=b.offsetHeight+'px';}catch(e){}
+      stop(); return;
+    }
+    if(++n>8){ stop(); return; }
+    var l=document.createElement('link');
+    l.rel='stylesheet';
+    l.href='/internal/insets.css?r='+n+'_'+Date.now();
+    document.head.appendChild(l);
+    t=setTimeout(tick,250);
+  }
+  window.addEventListener('load',function(){ t=setTimeout(tick,150); });
+})();
+</script>
 </head>
 <body>
 <div id="app" v-cloak>
@@ -65,8 +100,9 @@
       <button type="button" class="crt-boot-skip" @click="skipBoot()">[ ESC ] SKIP BOOT ▸</button>
     </div>
   </div>
-  <!-- 顶栏 -->
-  <mdui-top-app-bar scroll-behavior="shrink">
+  <!-- 顶栏：hide=下滑收起/上滑回弹（mdui 默认变体上 shrink 视觉零效果，保留仅为语义超集）；
+       收起态的 top 偏移由 app.base.css 文档层镜像（shadow :host([hide]) 会被文档规则压死） -->
+  <mdui-top-app-bar scroll-behavior="hide shrink">
     <mdui-top-app-bar-title>
       <div style="display:flex;align-items:center;gap:10px">
         <span class="app-logo"><mdui-icon name="speed--outlined"></mdui-icon></span>
