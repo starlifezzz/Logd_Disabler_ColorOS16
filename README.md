@@ -1,203 +1,92 @@
-# ColorOS 16 终极优化模块
+# ColorOS 16 优化模块
 
-> **专为一加ACE5等ColorOS 16设备打造的KernelSU系统优化模块**
+> 一加 Ace5 亲测的 KernelSU 模块 —— 日志、广告、OTA、冗余服务，图形界面点点开关就能关。
 
-![KernelSU Compatible](https://img.shields.io/badge/KernelSU-Compatible-green?logo=android)
+![KernelSU](https://img.shields.io/badge/KernelSU-Compatible-green?logo=android)
 ![ColorOS 16](https://img.shields.io/badge/ColorOS-16-blue)
 
-## 🎯 核心特性
+## 这是什么
 
-### ✨ **UI控制界面（KernelSU 0.7.0+）**
-- **内置图形化设置界面**：在KernelSU管理器中直接开关各项功能
-- **无需编辑配置文件**：通过直观的UI界面控制所有优化选项
-- **本地框架渲染**：WebUI 基于 Vue 3 + mdui 2（全部资源随模块本地打包，不依赖 CDN/在线组件库）
-- **配置实时持久化**：UI 设置写入 `config.json`（`/data/adb/Logd_Disabler_ColorOS16/config.json`），重启后由脚本读取生效
+专为 ColorOS 16 写的系统优化模块。装好后在 **KernelSU 管理器里直接打开图形界面**，32 个优化项想开就开、想关就关，不用碰任何配置文件。
 
-### 🔧 **配置机制说明（v2.0）**
-- **唯一配置源**：`/data/adb/Logd_Disabler_ColorOS16/config.json`（模块外数据目录，升级模块不覆盖配置）
-- **WebUI 唯一写入者**：开关状态通过原子写（base64 + 临时文件 + mv）持久化，服务脚本只读执行
-- **UI 修改即时生效**：开关状态即写即存，重启设备后由 service.sh 执行实际优化
-- **双向操作**：每个功能都支持"开启优化 / 关闭恢复"
-- **v1.x 自动迁移**：首次运行 service.sh 会从旧 `persist.sys.coloros16_optimize_gui.*` 属性一次性迁移，升级不丢配置
+- 配置存在模块外面，**覆盖升级不丢设置**
+- 所有修改都是"软"的（挂载 + 禁用命令），**卸载模块一键全部还原**
+- 界面、图标、字体全部打包在模块里，**不联网、不依赖 CDN**
 
-### 🔒 **安全可靠**
-- **Systemless 设计**：所有优化基于 mount bind / pm 命令，卸载模块后大部分修改自动复原
-- **多阶段执行**：post-fs-data（挂载覆盖 + SELinux 规则）、service（包管理 + 参数）、boot-completed（健康校验）
-- **完整日志**：操作日志记录在 `/data/adb/logd_disabler/*.log`
+## 界面长什么样
 
-### ⚡ **深度优化**
-- 彻底禁用logd日志系统
-- 完全阻断OTA自动更新
-- 屏蔽系统广告与数据收集
-- 禁用冗余后台服务
-- 内核级内存/IO优化
+打开界面先看到一段复古 POST 自检动画，跑完进入主界面，底部五个标签：
 
-## 📋 功能列表
+| 标签 | 干什么 |
+|------|--------|
+| **优化** | 32 个开关，按分组排列，每个都能点进详情看说明 |
+| **性能** | 内存 / IO / 负载一目了然 |
+| **日志** | 操作日志实时看，不用连电脑 |
+| **关于** | 版本与说明 |
+| **GitHub** | 项目主页 |
 
-| 功能 | 描述 | 默认状态 |
-|------|------|----------|
-| **日志系统优化** | 彻底禁用logd，永久封死复活 | ✅ 启用 |
-| **OTA更新阻断** | 禁用所有系统更新组件 | ✅ 启用 |
-| **开发者选项锁定** | 防止系统重置开发者设置 | ✅ 启用 |
-| **广告与数据收集屏蔽** | 关闭系统广告和用户数据统计 | ✅ 启用 |
-| **内存/IO轻量优化** | 内核参数调优，提升性能 | ✅ 启用 |
-| **健康与运动服务** | 禁用健康相关后台服务 | ❌ 禁用 |
-| **流量监控与网络服务** | 减少后台网络活动 | ❌ 禁用 |
-| **锁屏杂志与壁纸服务** | 节省存储和网络资源 | ❌ 禁用 |
-| **游戏空间与性能监控** | 减少系统负载 | ❌ 禁用 |
-| **钱包与支付服务** | 禁用NFC支付相关服务 | ❌ 禁用 |
-| **备份与云服务** | 禁用自动备份功能 | ❌ 禁用 |
-| **额外内核优化** | 更深入的内核参数调整 | ✅ 启用 |
-| **进程查杀优化** | 杀死冗余后台进程 | ✅ 启用 |
-| **系统属性开关** | 锁定各种系统服务开关 | ✅ 启用 |
+开关覆盖范围：
 
-## 🎮 UI控制界面使用
+- **核心**：logd 日志禁用、OTA 拦截、系统广告与数据收集屏蔽
+- **性能**：内存 / IO 调优、内核参数、冗余进程清理
+- **可选服务**：健康、钱包、备份、游戏空间、锁屏杂志、语音助手、AI 助手、多媒体……（含子开关，共 32 项）
+- **不会碰的**：WiFi、蓝牙、音频、相机、传感器等核心功能，模块自动跳过，不会误伤
 
-### 前提条件
-- **KernelSU版本**: 0.7.0 或更高版本
-- **Android版本**: Android 10+
+> 禁用某个服务 = 对应功能停用（比如关了健康服务就不同步健康数据），详情页里都写了，按需取舍。
 
-### 使用方法
-1. **安装模块**并重启设备
-2. 打开 **KernelSU管理器**
-3. 进入 **"模块"** 页面
-4. 点击 **"ColorOS 16 终极优化模块"**
-5. 在弹出的UI界面中**直接开关各项功能**
-6. **重启设备**使设置生效
+## 快速开始
 
-### UI界面分组
-- **核心优化**: 日志禁用、OTA阻断、开发者选项锁定
-- **隐私与广告**: 系统广告和数据收集屏蔽  
-- **性能优化**: 内存/IO优化、内核调优、进程查杀
-- **可选服务**: 健康服务、网络监控、锁屏杂志等
+1. KernelSU 管理器 → 模块 → 安装 `Logd_Disabler_ColorOS16.zip` → **重启**
+2. 管理器里点「ColorOS 16 优化」打开界面
+3. 按需开关 → **再重启一次**，设置全部生效
 
-## 📂 配置管理
+装完不想折腾？默认配置开箱即用。
 
-### 配置存储机制（v2.0）
-- **配置源**：`/data/adb/Logd_Disabler_ColorOS16/config.json`（如 `disable_logd`、`block_ota` 等键）
-- **写入方式**：WebUI 开关修改后原子写入（base64 + 临时文件 + mv），模块外目录不受升级影响
-- **读取时机**：post-fs-data（挂载覆盖）和 service（包管理 + 参数）阶段读取 config.json 决定是否执行优化
-- **兼容性**：v1.x 的 `persist.sys.coloros16_optimize_gui.*` 属性在首次开机时自动迁移，无需手动处理
+## 配置和日志在哪
 
-### 手动修改配置（高级用户）
-```bash
-# 通过 adb 查看当前配置
-adb shell
-su
-cat /data/adb/Logd_Disabler_ColorOS16/config.json
-
-# 手动修改（示例：启用日志禁用），修改后需重启生效
-sed -i 's/"disable_logd": false/"disable_logd": true/' /data/adb/Logd_Disabler_ColorOS16/config.json
-reboot
+```text
+配置  /data/adb/Logd_Disabler_ColorOS16/config.json   # 模块外目录，升级不覆盖
+日志  /data/adb/logd_disabler/service.log             # 界面「日志」页可直接看
+      /data/adb/logd_disabler/post-fs-data.log
 ```
 
-### 验证状态
-```bash
-# 执行验证脚本（v2.0 自动读取 config.json）
-su
-sh /data/adb/modules/Logd_Disabler_ColorOS16/verify_status.sh
-```
+高级用户也可以直接改 `config.json`，重启后生效。
 
-## 🚀 快速开始
+## 恢复与排错
 
-### 方法1: 使用UI界面（推荐）
-1. 安装 `Logd_Disabler_ColorOS16.zip`
-2. 重启设备
-3. 在KernelSU管理器中点击模块名称
-4. 通过UI界面调整设置
-5. 再次重启设备
+| 情况 | 怎么办 |
+|------|--------|
+| 想恢复原样 | 界面里把开关全关 + 重启；或者直接**卸载模块**（自动回滚，被禁的服务全部还原） |
+| 改了没生效 | 改完开关要**重启**才生效 |
+| 出问题了 | 先看界面「日志」页，再提 [Issue](https://github.com/starlifezzz/Logd_Disabler_ColorOS16/issues) |
 
-### 方法2: 手动修改配置
-```bash
-# 查看当前所有配置
-adb shell
-su
-cat /data/adb/Logd_Disabler_ColorOS16/config.json
+## 兼容性
 
-# 示例：启用 OTA 阻断（修改后重启生效）
-sed -i 's/"block_ota": false/"block_ota": true/' /data/adb/Logd_Disabler_ColorOS16/config.json
-```
+- **主测机型**：一加 Ace5（ColorOS 16.0.2）
+- 其他 ColorOS 16 一加 / OPPO 机型理论可用，欢迎反馈
+- KernelSU 3.x 管理器自带 WebUI；WebUI-X、MMRL 等容器也能打开
 
-### 验证状态
-```bash
-# 执行验证脚本
-su
-sh /data/adb/modules/Logd_Disabler_ColorOS16/verify_status.sh
-```
+## 更新日志
 
-## 🔧 高级功能
+见 [Releases](https://github.com/starlifezzz/Logd_Disabler_ColorOS16/releases) 与提交记录。
 
-### 实时状态验证
-模块内置完整的状态验证脚本，可检查：
-- ✅ 每项功能的配置状态
-- ✅ 实际系统运行状态（进程、包、属性、内核参数）
-- ✅ 设备兼容性检测
-- ✅ SELinux状态检查
-
-### 设备适配优化
-- **专为一加ACE5优化**：移除了不存在的OPPO专用包
-- **智能包检测**：自动识别设备上实际存在的系统包
-- **动态配置**：根据设备实际情况调整优化策略
-
-## ⚠️ 注意事项
-
-### 必读警告
-- **修改配置后必须重启**才能生效
-- **部分功能可能影响系统某些特性**（如健康数据同步、自动备份、语音助手等）
-- **禁用系统工具类服务**（如 engineermode、crashbox）可能影响问题诊断
-
-### 故障排除
-如果遇到问题：
-1. 检查KernelSU模块是否已启用
-2. 确认KernelSU版本 >= 0.7.0（WebUI功能需要）
-3. 查看模块日志：`cat /data/adb/logd_disabler/service.log` 和 `post-fs-data.log`
-4. 查看 SELinux 拒绝：`dmesg | grep avc`
-5. 运行验证脚本诊断问题
-
-### 卸载恢复
-在KernelSU管理器中**禁用或卸载模块**，mount bind 覆盖会随重启消失，pm disable 的包需手动恢复或重启后重新 enable（建议卸载前先在 WebUI 中关闭所有开关）。
-
-## 🚀 更新日志
-
-### v1.5 (2026-08-09)
-- **修复**：彻底解决"包不存在"误判问题——service.sh 不再以 `service check` 判断 PMS 就绪（那只是 binder 服务注册），改为轮询 `pm list packages --user 0` 直到真正能列出包（实测等待约 6 秒），55 个系统包全部 `disable-user 成功`
-- **修复**：`pmx()` su 提升机制，统一通过 su 域执行 pm 命令，绕过 ksu 域 SELinux 限制
-- **修复**：包存在性检查统一加 `--user 0`，避免多用户环境下输出为空导致误判
-- **改进**：新增 `pmx_verbose`（保留 stderr），失败时输出真实错误详情，便于排障
-- **改进**：enable 恢复逻辑新增分支——包被卸载时直接走 `install-existing` 恢复
-- **安全**：移除 `services.txt` 追踪（涉及设备私有包列表，不再入库）
-- **WebUI**：修复 mdui 图标渲染问题（`--outlined` 后缀），全部按钮图标正常显示
-
-### v1.4
-- 支持 WebUI 图形化设置界面
-- 引入 `persist.sys.coloros16_optimize_gui.*` 属性配置机制
-
-## 📱 兼容性
-
-### 支持设备
-- **主要测试设备**: 一加ACE5 (ColorOS 16.0.2)
-- **兼容设备**: 所有搭载ColorOS 16的一加/OPPO设备
-- **KernelSU版本**: v0.7.0或更高版本（UI功能），v0.5.0+（基础功能）
-- **Android版本**: Android 10+
-
-### 已验证功能
-✅ 日志系统彻底禁用  
-✅ OTA更新完全阻断  
-✅ 广告与数据收集屏蔽  
-✅ 冗余进程自动查杀  
-✅ 内核参数优化生效  
-✅ UI控制界面正常工作  
-
-## 📄 许可证
+## 许可
 
 Copyright © 2026 zhangchongjie. All rights reserved.
 
-This module is for personal use only. Redistribution or commercial use without permission is prohibited.
-
-## 💬 反馈与支持
-
-遇到问题或有改进建议？欢迎提交Issue或联系开发者！
+仅供个人使用，未经许可禁止商用分发。
 
 ---
 
-**💡 提示**: 推荐使用KernelSU UI界面进行配置，简单直观且不易出错。高级用户可通过 `setprop` 命令精细控制每个开关。
+## ❤️ 打赏
+
+用得顺手的话，请作者喝杯奶茶 ☕ —— 每一份支持都是继续更新的动力。
+
+<p align="center">
+  <img src=".github/sponsor/alipay.jpg" width="260" alt="支付宝收款码">
+  &nbsp;&nbsp;&nbsp;&nbsp;
+  <img src=".github/sponsor/wechat.png" width="260" alt="微信支付收款码">
+</p>
+<p align="center">
+  <sub>支付宝 · 微信支付（扫码即达，感谢支持 🙏）</sub>
+</p>
