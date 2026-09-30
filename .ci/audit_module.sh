@@ -29,10 +29,16 @@ HIT=$(grep -nE "(>|>>|cp|mv|rm|sed -i)[^|;&]*[[:space:]]+/(system|vendor|product
 #   L201 "# ... kill -9 误杀 system_server" 和
 #   L604 "# 【警告】pkill -9 -x 是精确名匹配，不会误伤 system_server"
 #   当成违规 —— 实际这两行恰恰证明作者已规避该风险。
+# [防呆增强] 黑名单追加两个"精确包名"硬止损：android（framework-res、
+#   system_server 宿主）与 oplus（oplus-framework-res）—— 对这俩执行
+#   禁/杀必 bootloop。匹配用两侧定界符保证"整词"：前缀不能是 .
+#   （放行 com.android.xxx / oplus.xxx 子包），后缀不能是 . - 字母数字
+#   （放行 android.hardware.* 既有项与 oplus-framework-res.apk 路径）；
+#   `pkill -f oplus` 这种子串误伤写法照样被抓。只加码不放松，现网零违规。
 HIT=$(grep -nE "(pkill|kill -9|stop[[:space:]]|force-stop|disable-user)[^#]*" "$SRC"/*.sh 2>/dev/null \
       | grep -vE "^[^:]*:[0-9]+:[[:space:]]*#" \
-      | grep -E "system_server|zygote64|zygote|surfaceflinger|android\.hardware\.|oplus\.security\.server|oplus\.sensor" | head -5)
-[ -z "$HIT" ] && ok "操作黑名单零违规：未对 system_server/zygote/zygote64/surfaceflinger/android.hardware.*/oplus.security.server/oplus.sensor 执行杀/禁" || { no "踩到操作黑名单"; echo "$HIT" | sed 's/^/       /'; }
+      | grep -E "system_server|zygote64|zygote|surfaceflinger|android\.hardware\.|oplus\.security\.server|oplus\.sensor|(^|[^.[:alnum:]_-])(android|oplus)([^.[:alnum:]_-]|$)" | head -5)
+[ -z "$HIT" ] && ok "操作黑名单零违规：未对 system_server/zygote/zygote64/surfaceflinger/android.hardware.*/oplus.security.server/oplus.sensor/精确包名android|oplus 执行杀/禁" || { no "踩到操作黑名单"; echo "$HIT" | sed 's/^/       /'; }
 
 echo "═══ B. 模块开发规范 ═══"
 SBAD=0
