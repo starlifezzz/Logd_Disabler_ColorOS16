@@ -134,11 +134,8 @@
       <span class="progress-pct neon-text">{{ progress }}%</span>
     </div>
 
-    <!-- 全局操作栏 -->
-    <div class="global-actions">
-      <mdui-button variant="tonal" icon="flash_on--outlined" @click="globalOptimize()" :disabled="cfgOpBusy">一键全部优化</mdui-button>
-      <mdui-button variant="text" icon="restart_alt--outlined" @click="restoreDefault()" :disabled="cfgOpBusy">恢复默认</mdui-button>
-    </div>
+    <!-- 全局操作栏（v2.3.19 按需求删除「一键全部优化/恢复默认」，保留空栏避免 CSS 孤儿） -->
+    <div class="global-actions"></div>
 
     <!-- 功能分组卡片 -->
     <template v-for="group in FEATURES" :key="group.group">
@@ -398,7 +395,7 @@
         <mdui-button variant="text" icon="upload_file--outlined" @click="importConfig()">导入配置</mdui-button>
       </div>
       <div class="perf-actions" style="padding:0 20px 16px">
-        <mdui-button variant="text" icon="restore--outlined" @click="restoreDefault()">恢复默认（全部未优化）</mdui-button>
+        <!-- （v2.3.19 按需求删除「恢复默认（全部未优化）」，保留空栏避免 perf-actions CSS 孤儿） -->
       </div>
     </mdui-card>
 
@@ -655,18 +652,46 @@ var FEATURES = [
 { group: '隐私与广告', groupIcon: 'visibility_off--outlined', items: [
   { key: 'block_ads_and_tracking', icon: 'block--outlined', title: '广告与数据收集',
     desc: '关闭个性化广告、用户体验计划、数据统计',
-      pkgs: ['com.oplus.statistics.rom', 'com.coloros.sceneservice', 'com.oplus.onetrace', 'com.oplus.midas', 'com.oplus.qualityprotect'],
-      subNames: ['系统数据统计', '用户体验计划', 'OneTrace 追踪服务', 'Midas 数据服务', '质量保护服务'],
-      detail: '原理：禁用 5 个统计包（系统数据统计、用户体验计划、OneTrace 追踪、Midas 数据服务、质量保护服务），并把广告与统计相关属性（ad_enable、personalized_ad、track 等）置 0。其中 com.oplus.midas 本身不是可禁用的包，而是共享进程名（onetrace/obrain/qualityprotect 三个包共用）；质量保护服务是其唯一剩余宿主，禁用宿主即可让该 140MB 统计进程无处可依（真机试测 0 崩溃、0 外部绑定）。\n\n效果：个性化广告、用户体验计划与后台数据统计停止，不再上报使用数据。\n\n代价：广告不再个性化（仍会显示通用广告），系统失去使用情况统计。\n\n回滚：关闭本项后重启，或卸载模块即可恢复。',
+      pkgs: ['com.oplus.statistics.rom', 'com.oplus.onetrace', 'com.oplus.midas', 'com.oplus.qualityprotect'],
+      subNames: ['用户体验计划', 'OneTrace 追踪服务', 'Midas 数据服务', '质量保护服务'],
+      subDescs: [
+        'ColorOS 用户体验计划统计主程序（statistics.rom），负责采集使用行为、生成统计报表并定时上报。',
+        'ColorOS 全局行为追踪组件（onetrace），在应用前后台切换等节点记录事件，供广告画像与统计分析使用。',
+        '共享统计进程名载体（onetrace/obrain/qualityprotect 声明共用 com.oplus.midas 进程），本身不是独立功能包。',
+        '质量保护服务（判定表 §10 谨慎处理类），是共享统计进程 com.oplus.midas 的唯一剩余有效宿主。'
+      ],
+      subDetails: [
+        '原理：禁用统计主程序后，用户体验计划的定时采样与报表上报停止，系统不再收集使用行为数据。\n\n代价：ColorOS 产品改进计划失去数据来源；个性化广告因缺少画像退化为通用广告。',
+        '原理：禁用后 onetrace 事件追踪与写入停止，广告画像与统计分析失去该数据源。\n\n代价：仅影响后台追踪上报；应用功能与通知不受影响。',
+        '原理：禁用该声明方后，统计共享进程不再由本包作为入口拉起，仅剩 qualityprotect 一个宿主。\n\n代价：无独立功能，禁用无感。',
+        '原理：禁用宿主后，140MB 的统计共享进程无处可依（真机试测 0 崩溃、0 外部绑定、非 persistent）。\n\n代价：质量保护后台检测停止；统计共享进程整体消失，省内存。'
+      ],
+      detail: '原理：禁用 4 个统计包（用户体验计划、OneTrace 追踪、Midas 数据服务、质量保护服务），并把广告与统计相关属性（ad_enable、personalized_ad、track 等）置 0。其中 com.oplus.midas 本身不是可禁用的包，而是共享进程名（onetrace/obrain/qualityprotect 三个包共用）；质量保护服务是其唯一剩余宿主，禁用宿主即可让该 140MB 统计进程无处可依（真机试测 0 崩溃、0 外部绑定）。\n\n效果：个性化广告、用户体验计划与后台数据统计停止，不再上报使用数据。\n\n代价：广告不再个性化（仍会显示通用广告），系统失去使用情况统计。\n\n回滚：关闭本项后重启，或卸载模块即可恢复。',
       checkCmd: 'test "$(getprop persist.sys.oplus.ad_enable 2>/dev/null)" = "0" && echo disabled || echo enabled',
-      verifyCmd: 'echo "包:"; for p in com.oplus.statistics.rom com.coloros.sceneservice com.oplus.onetrace com.oplus.midas com.oplus.qualityprotect; do if pm list packages -d --user 0 2>/dev/null | grep -qF "package:$p"; then echo "$p:disabled"; elif ! pm list packages --user 0 2>/dev/null | grep -qF "package:$p"; then echo "$p:missing"; else echo "$p:enabled"; fi; done; echo "属性:"; echo "ad=$(getprop persist.sys.oplus.ad_enable 2>/dev/null)"; echo "pad=$(getprop persist.sys.oplus.personalized_ad 2>/dev/null)"; echo "track=$(getprop persist.ad.track 2>/dev/null)"; echo "usage=$(getprop persist.sys.usage_stat_enable 2>/dev/null)"; echo "collect=$(getprop persist.oppo.collect 2>/dev/null)"'
+      verifyCmd: 'echo "包:"; for p in com.oplus.statistics.rom com.oplus.onetrace com.oplus.midas com.oplus.qualityprotect; do if pm list packages -d --user 0 2>/dev/null | grep -qF "package:$p"; then echo "$p:disabled"; elif ! pm list packages --user 0 2>/dev/null | grep -qF "package:$p"; then echo "$p:missing"; else echo "$p:enabled"; fi; done; echo "属性:"; echo "ad=$(getprop persist.sys.oplus.ad_enable 2>/dev/null)"; echo "pad=$(getprop persist.sys.oplus.personalized_ad 2>/dev/null)"; echo "track=$(getprop persist.ad.track 2>/dev/null)"; echo "usage=$(getprop persist.sys.usage_stat_enable 2>/dev/null)"; echo "collect=$(getprop persist.oppo.collect 2>/dev/null)"'
   },
   { key: 'disable_telemetry_cloud', icon: 'cloud_sync--outlined', title: '遥测与云回传服务',
-    desc: '禁用 HeyTap 消息/云、灵犀泛在、运营商自动注册等 6 个常驻数据回传包',
-    deps: '⚠️ 连带影响：com.heytap.htms 是 HeyTap 消息/推送通道，禁用后可能收不到欢太与部分系统消息通知；com.heytap.mcs 为消息云服务，与之相关联。其余 4 项（mydevices/pantanal.ums/ctautoregist/thirdkit）为设备互联云、泛在服务、运营商自动注册、三方能力服务，对日常使用基本无感。本组【不】包含 com.oplus.location（定位，核心功能）与便签/时钟/模糊/手势等用户可见功能。',
+    desc: '禁用 HeyTap 消息推送、oppo推送、灵犀泛在、运营商自动注册等 6 个常驻数据回传包',
+    deps: '⚠️ 连带影响：com.heytap.htms 是 HeyTap 消息/推送通道，禁用后可能收不到欢太与部分系统消息通知；com.heytap.mcs（oppo推送）为消息云通道，与之相关联。其余 4 项（mydevices/pantanal.ums/ctautoregist/thirdkit）为设备互联云、泛在服务、运营商自动注册、三方能力服务，对日常使用基本无感。本组【不】包含 com.oplus.location（定位，核心功能）与便签/时钟/模糊/手势等用户可见功能。',
     pkgs: ['com.heytap.htms', 'com.heytap.mcs', 'com.heytap.mydevices', 'com.oplus.pantanal.ums', 'com.oppo.ctautoregist', 'com.oplus.thirdkit'],
-    subNames: ['HeyTap 消息推送', 'HeyTap 消息云服务', 'HeyTap 设备互联云', '灵犀泛在服务', '运营商自动注册', '三方能力服务'],
-    detail: '原理：禁用 6 个常驻回传包——HeyTap 消息推送/消息云、设备互联云、灵犀泛在、运营商自动注册、三方能力服务。\n\n效果：这些通道的云回传与自动注册停止，减少后台流量与无谓唤醒。\n\n代价：欢太与部分系统消息通知可能收不到（连带影响详见卡片警告）。\n\n回滚：关闭本项后重启，或卸载模块即可恢复。',
+    subNames: ['HeyTap 消息推送', 'oppo推送', 'HeyTap 设备互联云', '灵犀泛在服务', '运营商自动注册', '三方能力服务'],
+    subDescs: [
+      'HeyTap 消息推送通道（htms），承载欢太商店与部分系统消息的实时推送下发。',
+      'oppo推送（com.heytap.mcs，原 HeyTap 消息云服务），OPPO 应用消息的云端下发通道，负责经 OPPO 服务器向应用转送通知与运营消息。',
+      'HeyTap 设备互联云（mydevices），账号下多设备互查与云端互联的通道。',
+      '灵犀泛在服务（pantanal.ums），ColorOS 泛在连接的后台广播通道，负责跨端发现与流转。',
+      '运营商自动注册组件（ctautoregist，判定表：开机注册），开机后自动向运营商/厂商上报设备信息。',
+      '三方能力服务（thirdkit，判定表：兼容问题解决），向三方应用提供兼容性支撑的常驻组件。'
+    ],
+    subDetails: [
+      '原理：禁用后欢太与部分系统消息的推送通道断开，不再后台拉取消息与唤醒。\n\n代价：可能收不到欢太商店活动与部分系统通知；IM 类应用自建推送不受影响。',
+      '原理：禁用后 OPPO 推送通道与云端配置拉取停止，不再接收经 OPPO 服务器下发的应用消息。\n\n代价：依赖 OPPO 推送的应用通知与运营消息收不到；App 自建推送、IM 直连不受影响。',
+      '原理：禁用后设备互联云的注册与心跳停止，账号下设备互联链路断开。\n\n代价：跨设备查找/云端互联不可用；本机功能不受影响。',
+      '原理：禁用后泛在服务的广播与常驻停止，不再参与跨端发现。\n\n代价：跨设备流转/接力类体验失效；上网与本机应用不受影响。',
+      '原理：禁用后开机不再自动执行运营商/厂商注册上报，减少无谓网络请求。\n\n代价：运营商侧设备注册与统计缺失；通话短信等通信功能不受影响。',
+      '原理：禁用后三方兼容能力通道停止，不再后台常驻。\n\n代价：依赖该通道的三方兼容特性可能缺失；常见应用无感。'
+    ],
+    detail: '原理：禁用 6 个常驻回传包——HeyTap 消息推送、oppo推送、设备互联云、灵犀泛在、运营商自动注册、三方能力服务。\n\n效果：这些通道的云回传与自动注册停止，减少后台流量与无谓唤醒。\n\n代价：欢太与部分系统消息通知可能收不到（连带影响详见卡片警告）。\n\n回滚：关闭本项后重启，或卸载模块即可恢复。',
     checkCmd: 'pm list packages -d --user 0 2>/dev/null | grep -qF "package:com.heytap.htms" && echo disabled || echo enabled',
     verifyCmd: 'for p in com.heytap.htms com.heytap.mcs com.heytap.mydevices com.oplus.pantanal.ums com.oppo.ctautoregist com.oplus.thirdkit; do if pm list packages -d --user 0 2>/dev/null | grep -qF "package:$p"; then echo "$p:disabled"; elif ! pm list packages --user 0 2>/dev/null | grep -qF "package:$p"; then echo "$p:missing"; else echo "$p:enabled"; fi; done; echo "== persistent 标记（persistent=1 的禁用后进程存活到重启，属正常）=="; for p in com.heytap.htms; do echo "  $p: $(dumpsys package $p 2>/dev/null | grep -m1 "flags=" | grep -o PERSISTENT || echo 非persistent)"; done; echo "== 残留进程 =="; ps -A -o PID,NAME 2>/dev/null | grep -E "heytap.htms|heytap.mcs|heytap.mydevices|pantanal.ums|ctautoregist|oplus.thirdkit" || echo "  (无残留)"'
   }
@@ -698,6 +723,14 @@ var FEATURES = [
     desc: '关闭流量统计与数据上报',
     pkgs: ['com.oplus.trafficmonitor', 'com.oplus.dmp'],
     subNames: ['流量监控', '数据管理平台 DMP'],
+    subDescs: [
+      '系统流量统计服务（trafficmonitor），按应用累计流量并驱动套餐提醒与后台流量管理。',
+      '数据管理平台 DMP（判定表无条目），汇聚使用数据供画像与推荐系统使用。'
+    ],
+    subDetails: [
+      '原理：禁用后流量统计与套餐提醒数据停止累计，后台流量管理不再运行。\n\n代价：设置里的流量统计/套餐提醒不可用；上网本身不受影响。',
+      '原理：禁用后数据汇聚与分发停止，为广告/推荐供数的数据平台离线。\n\n代价：个性化推荐失去数据源；无功能面影响。'
+    ],
     detail: '原理：禁用流量监控与数据管理 2 个系统包（trafficmonitor、dmp）。\n\n效果：流量统计与后台流量管理停止。\n\n代价：流量统计与套餐提醒类功能不可用。\n\n回滚：关闭本项后重启，或卸载模块即可恢复。',
     checkCmd: 'pm list packages -d --user 0 2>/dev/null | grep -qF "package:com.oplus.trafficmonitor" && echo disabled || echo enabled',
     verifyCmd: 'for p in com.oplus.trafficmonitor com.oplus.dmp; do if pm list packages -d --user 0 2>/dev/null | grep -qF "package:$p"; then echo "$p:disabled"; elif ! pm list packages --user 0 2>/dev/null | grep -qF "package:$p"; then echo "$p:missing"; else echo "$p:enabled"; fi; done'
@@ -706,6 +739,14 @@ var FEATURES = [
     desc: '关闭游戏空间与应用增强服务',
     pkgs: ['com.oplus.games', 'com.oplus.cosa'],
     subNames: ['游戏空间', '应用增强/游戏中心'],
+    subDescs: [
+      '游戏空间应用本体（games），提供游戏列表、游戏模式与游戏工具入口。',
+      '应用增强与游戏中心辅助（cosa，判定表：应用增强服务/游戏中心），提供游戏性能调度与增强能力。'
+    ],
+    subDetails: [
+      '原理：禁用后游戏空间入口与游戏模式后台停止。\n\n代价：游戏空间 App 打不开，游戏工具箱/游戏模式不可用；游戏本体不受影响。',
+      '原理：禁用后游戏性能增强与游戏中心辅助服务停止。\n\n代价：游戏内增强（性能调度/网络优化）失效；游戏可正常游玩。'
+    ],
     detail: '原理：禁用游戏空间与游戏中心辅助 2 个包（games、cosa）。\n\n效果：游戏空间入口与游戏工具后台停止。\n\n代价：游戏模式、游戏内工具等辅助功能不可用。\n\n回滚：关闭本项后重启，或卸载模块即可恢复。',
     checkCmd: 'pm list packages -d --user 0 2>/dev/null | grep -qF "package:com.oplus.games" && echo disabled || echo enabled',
     verifyCmd: 'for p in com.oplus.games com.oplus.cosa; do if pm list packages -d --user 0 2>/dev/null | grep -qF "package:$p"; then echo "$p:disabled"; elif ! pm list packages --user 0 2>/dev/null | grep -qF "package:$p"; then echo "$p:missing"; else echo "$p:enabled"; fi; done'
@@ -714,6 +755,14 @@ var FEATURES = [
     desc: '关闭钱包与安全支付',
     pkgs: ['com.oplus.pay', 'com.coloros.securepay'],
     subNames: ['安全支付', '支付安全组件'],
+    subDescs: [
+      '钱包支付服务（com.oplus.pay，判定表：安全支付），负责钱包余额、支付下单等后台能力。',
+      '支付安全组件（coloros.securepay，判定表：支付安全组件），为支付场景提供安全环境与加固检测。'
+    ],
+    subDetails: [
+      '原理：禁用后钱包支付后台服务停止，不再发起支付相关请求。\n\n代价：钱包 App 支付/余额功能不可用；微信、支付宝等三方支付走各自通道，不受影响。',
+      '原理：禁用后支付安全环境检测停止，支付场景的安全加固不再运行。\n\n代价：钱包类支付失去安全组件加固；三方支付有各自安全体系，不受影响。'
+    ],
     detail: '原理：禁用钱包与安全支付 2 个系统包（pay、securepay）。\n\n效果：钱包相关后台服务停止。\n\n代价：钱包及其关联服务不可用，不使用钱包则无感。\n\n回滚：关闭本项后重启，或卸载模块即可恢复。',
     checkCmd: 'pm list packages -d --user 0 2>/dev/null | grep -qF "package:com.oplus.pay" && echo disabled || echo enabled',
     verifyCmd: 'for p in com.oplus.pay com.coloros.securepay; do if pm list packages -d --user 0 2>/dev/null | grep -qF "package:$p"; then echo "$p:disabled"; elif ! pm list packages --user 0 2>/dev/null | grep -qF "package:$p"; then echo "$p:missing"; else echo "$p:enabled"; fi; done'
@@ -722,6 +771,14 @@ var FEATURES = [
     desc: '关闭备份与云同步',
     pkgs: ['com.oplus.wifibackuprestore', 'com.heytap.cloud'],
     subNames: ['WiFi 备份恢复', '云服务'],
+    subDescs: [
+      'WiFi 备份恢复组件（wifibackuprestore），换机时通过 WiFi 直连迁移热点与配置数据。',
+      'HeyTap 云服务（heytap.cloud，判定表：云服务），相册/联系人/设置云端同步与备份的中枢。'
+    ],
+    subDetails: [
+      '原理：禁用后换机 WiFi 直连备份通道停止，不再后台监听迁移请求。\n\n代价：新机换机的 WiFi 备份恢复不可用；日常联网不受影响。',
+      '原理：禁用后云端同步与备份任务停止，不再后台上传数据。\n\n代价：云相册/云联系人同步与云备份不可用；依赖云端的换机恢复受限。'
+    ],
     detail: '原理：禁用 WiFi 备份恢复与 HeyTap 云备份 2 个包。\n\n效果：云备份与换机备份通道停止。\n\n代价：云端备份/恢复功能不可用。\n\n回滚：关闭本项后重启，或卸载模块即可恢复。',
     checkCmd: 'pm list packages -d --user 0 2>/dev/null | grep -qF "package:com.heytap.cloud" && echo disabled || echo enabled',
     verifyCmd: 'for p in com.oplus.wifibackuprestore com.heytap.cloud; do if pm list packages -d --user 0 2>/dev/null | grep -qF "package:$p"; then echo "$p:disabled"; elif ! pm list packages --user 0 2>/dev/null | grep -qF "package:$p"; then echo "$p:missing"; else echo "$p:enabled"; fi; done'
@@ -731,7 +788,27 @@ var FEATURES = [
     deps: '⚠️ 连带影响：AI 记忆/小组件/写作等前端依赖 O Brain 与智慧能力引擎。只保留前端而禁用引擎时，AI 功能将不可用（若整组禁用则无影响）；小布识屏相关组件被禁用后，智慧识屏/翻译等入口会失效。',
     depsKeep: { engine: ['com.oplus.obrain', 'com.oplus.deepthinker'], hint: '⚠️ 连带警示：你在 AI 智能助手中保留了部分前端组件（如 AI 记忆/小组件），但 O Brain 与智慧能力引擎已被禁用，保留的 AI 功能实际不可用。建议一并恢复引擎，或干脆整组禁用。' },
     pkgs: ['com.oplus.aimemory', 'com.oplus.aiunit', 'com.oplus.aiwidgets', 'com.oplus.aiwriter', 'com.oplus.metis', 'com.oplus.obrain', 'com.oplus.deepthinker', 'com.coloros.colordirectservice'],
-    subNames: ['AI 记忆', 'AI 能力', 'AI 小组件', 'AI 写作', '用户行为记录', 'O Brain', '智慧能力服务', '小布识屏相关组件'],
+    subNames: ['AI 记忆', 'AI 能力', 'AI 小组件', 'AI 写作', '用户行为记录+AI决策推荐', 'O Brain', '智慧能力服务', '小布识屏相关组件'],
+    subDescs: [
+      'AI 记忆数据服务（aimemory），采集并索引用户内容供「AI 记忆」功能检索。',
+      'AI 单元能力包（aiunit），承载端侧 AI 推理能力，供各 AI 功能调用。',
+      'AI 小组件服务（aiwidgets），驱动桌面 AI 卡片的内容生成与刷新。',
+      'AI 写作服务（aiwriter），为输入法/备忘等场景提供文本生成与润色。',
+      'metis 智能决策引擎（判定表：用户行为记录），内置行为采集与 AI 推荐决策 Provider，供 Breeno/场景服务做推荐。',
+      'O Brain 智慧中枢（obrain），AI 功能的统一调度引擎，是 AI 前端的后端依赖。',
+      '智慧能力服务（deepthinker，判定表：智慧能力服务），提供智慧建议/摘要等 AI 能力实现。',
+      '小布识屏数据组件（colordirectservice，判定表：小布识屏相关组件），含屏幕文本提取的无障碍服务声明，供识屏/翻译取词。'
+    ],
+    subDetails: [
+      '原理：禁用后 AI 记忆的数据采集与索引停止，记忆库不再增长。\n\n代价：「AI 记忆」查不到新内容；已有数据不再处理。',
+      '原理：禁用后端侧 AI 能力服务停止，依赖它的 AI 功能失去引擎。\n\n代价：依赖 aiunit 的 AI 功能不可用；系统常规功能不受影响。',
+      '原理：禁用后 AI 小组件的内容生成与刷新停止。\n\n代价：桌面 AI 小组件不再更新，可能显示空白或占位。',
+      '原理：禁用后 AI 写作的生成服务停止，写作助手不可唤起。\n\n代价：AI 写作/润色不可用；普通输入不受影响。',
+      '原理：禁用后用户行为记录与 AI 决策推荐链路停止，不再为上层提供推荐分。\n\n代价：负一屏/桌面等处的智能推荐变差或消失；无功能面影响。',
+      '原理：禁用后 O Brain 调度引擎停止，AI 前端（记忆/小组件/写作）失去后端。\n\n代价：保留前端而禁本引擎时相关 AI 功能不可用（连带警示见卡片）。',
+      '原理：禁用后智慧能力实现停止，依赖它的智慧建议/摘要接口失效。\n\n代价：智慧类建议功能不可用；系统常规操作不受影响。',
+      '原理：禁用后小布识屏的取词数据组件停止，识屏数据流断开。\n\n代价：智慧识屏/翻译取词等入口失效（连带警示见卡片）。'
+    ],
     detail: '原理：禁用 O Brain、智慧能力引擎等 8 个 AI 后端包（记忆、AI 单元、小组件、写作等）。\n\n效果：AI 记忆与 AI 生成类后台能力停止。\n\n代价：AI 前端入口依赖这些引擎，相关功能将不可用（连带影响详见卡片警告）。\n\n回滚：关闭本项后重启，或卸载模块即可恢复。',
     checkCmd: 'pm list packages -d --user 0 2>/dev/null | grep -qF "package:com.oplus.aimemory" && echo disabled || echo enabled',
     verifyCmd: 'for p in com.oplus.aimemory com.oplus.aiunit com.oplus.aiwidgets com.oplus.aiwriter com.oplus.metis com.oplus.obrain com.oplus.deepthinker com.coloros.colordirectservice; do if pm list packages -d --user 0 2>/dev/null | grep -qF "package:$p"; then echo "$p:disabled"; elif ! pm list packages --user 0 2>/dev/null | grep -qF "package:$p"; then echo "$p:missing"; else echo "$p:enabled"; fi; done'
@@ -741,6 +818,18 @@ var FEATURES = [
     deps: '⚠️ 连带影响：TTS 无障碍引擎被禁用后，系统朗读/无障碍播报功能将失效；语音唤醒组件被禁用后，小布语音助手只能手动打开使用。',
     pkgs: ['com.oplus.ovoicemanager', 'com.oplus.ovoicemanager.wakeup', 'com.heytap.speechassist', 'com.oplus.ttsaccessibilityengine'],
     subNames: ['语音助手支持组件', '语音助手支持组件', '小布语音助手', 'TTS 无障碍引擎'],
+    subDescs: [
+      '小布语音管理组件（ovoicemanager），负责语音服务的进程管理与配置调度（与下行唤醒组件成对）。',
+      '语音唤醒组件（ovoicemanager.wakeup），低功耗监听「小布小布」唤醒词的服务。',
+      '小布语音助手主程序（speechassist），含语音识别与 AnalogSkill 无障碍服务声明。',
+      'ColorOS TTS 朗读引擎（ttsaccessibilityengine），为系统朗读/无障碍播报提供语音合成。'
+    ],
+    subDetails: [
+      '原理：禁用后语音服务管理框架停止，语音助手无法被唤起。\n\n代价：小布语音助手不可用；通话录音等独立音频功能不受影响。',
+      '原理：禁用后唤醒词监听停止，麦克风不再为唤醒常开。\n\n代价：语音唤醒失效，只能手动打开小布；待机功耗略有收益。',
+      '原理：禁用后语音识别与助手主服务停止，语音请求不再处理。\n\n代价：小布语音助手彻底不可用；其 a11y 服务随包停用（当前设备无障碍服务未启用，无额外影响）。',
+      '原理：禁用后系统文本转语音引擎下线，朗读请求无引擎可用。\n\n代价：系统朗读/无障碍播报失效；不使用朗读功能则无感（详见卡片连带警示）。'
+    ],
     detail: '原理：禁用小布语音管理、唤醒组件、语音识别与 TTS 引擎等 4 个包。\n\n效果：小布语音助手与语音唤醒停止。\n\n代价：语音唤醒不可用，TTS 朗读/无障碍播报失效（连带影响详见卡片警告）。\n\n回滚：关闭本项后重启，或卸载模块即可恢复。',
     checkCmd: 'pm list packages -d --user 0 2>/dev/null | grep -qF "package:com.oplus.ovoicemanager" && echo disabled || echo enabled',
     verifyCmd: 'for p in com.oplus.ovoicemanager com.oplus.ovoicemanager.wakeup com.heytap.speechassist com.oplus.ttsaccessibilityengine; do if pm list packages -d --user 0 2>/dev/null | grep -qF "package:$p"; then echo "$p:disabled"; elif ! pm list packages --user 0 2>/dev/null | grep -qF "package:$p"; then echo "$p:missing"; else echo "$p:enabled"; fi; done'
@@ -750,6 +839,26 @@ var FEATURES = [
     deps: '⚠️ 连带影响：锁屏时钟/个性化时钟组件与"锁屏样式小组件"相互依赖，只保留其中部分可能导致锁屏界面异常（时钟不显示等）。注：锁屏助手(com.coloros.lockassistant)为 persistent 系统保护应用，pm 无法禁用，已从本组移除。',
     pkgs: ['com.oplus.themestore', 'com.heytap.themestore', 'com.oplus.keyguard.clock.magazine', 'com.oplus.keyguard.clock.gallery', 'com.oplus.keyguard.clock.graffiti', 'com.oplus.keyguard.personality.clocks', 'com.oplus.keyguard.style.widgets', 'com.heytap.pictorial'],
     subNames: ['主题商店', '主题商店(欢太)', '锁屏杂志时钟', '锁屏图库时钟', '锁屏涂鸦时钟', '个性化时钟', '锁屏样式小组件', '乐划锁屏', '动态壁纸选择器'],
+    subDescs: [
+      'OPPO 主题商店应用（oplus.themestore），下载主题/字体/AOD 的商店入口。',
+      '欢太主题商店（heytap.themestore，判定表：主题商店，无法卸载可 suspend），欢太渠道的主题分发。',
+      '锁屏杂志时钟组件，提供杂志画报风格的锁屏时钟样式。',
+      '锁屏图库时钟组件，提供相册图片背景的锁屏时钟样式。',
+      '锁屏涂鸦时钟组件，提供涂鸦手写风格的锁屏时钟样式。',
+      '个性化时钟集合组件（personality.clocks），承载可选的锁屏时钟合集。',
+      '锁屏样式小组件（style.widgets），锁屏界面快捷部件的样式提供方。',
+      '乐划锁屏（heytap.pictorial，判定表：乐划锁屏），锁屏页的信息流内容推荐。'
+    ],
+    subDetails: [
+      '原理：禁用后主题商店应用与其后台下载服务停止。\n\n代价：主题商店打不开，新主题/字体不可下载；已应用主题继续有效。',
+      '原理：禁用后欢太渠道的主题分发与更新检查停止。\n\n代价：欢太渠道主题更新不可用；本地主题不受影响。',
+      '原理：禁用后该时钟样式的渲染提供方下线，锁屏不再加载它。\n\n代价：若锁屏正用该样式，可能回退默认时钟或显示异常（依赖警示见卡片）。',
+      '原理：禁用后图库时钟渲染提供方下线。\n\n代价：该样式不可用；锁屏样式相互依赖，可能连带异常（见卡片警示）。',
+      '原理：禁用后涂鸦时钟渲染提供方下线。\n\n代价：该样式不可用；可能连带锁屏样式异常（见卡片警示）。',
+      '原理：禁用后个性化时钟资源与提供方下线。\n\n代价：个性化时钟选择列表失效；可能出现锁屏时钟不显示（见卡片警示）。',
+      '原理：禁用后锁屏样式与快捷部件资源下线。\n\n代价：锁屏快捷部件消失，存在样式切换异常风险（见卡片警示）。',
+      '原理：禁用后乐划内容流拉取与展示停止，锁屏不再推送资讯。\n\n代价：锁屏资讯流消失（界面更清爽）；锁屏基础功能不受影响。'
+    ],
     detail: '原理：禁用主题商店与锁屏时钟杂志等 9 个主题/个性化包。\n\n效果：主题下载与杂志锁屏更新停止。\n\n代价：锁屏时钟与主题组件相互依赖，可能出现锁屏样式异常（连带影响详见卡片警告）。\n\n回滚：关闭本项后重启，或卸载模块即可恢复。',
     checkCmd: 'pm list packages -d --user 0 2>/dev/null | grep -qF "package:com.oplus.themestore" && echo disabled || echo enabled',
     verifyCmd: 'for p in com.oplus.themestore com.heytap.themestore com.oplus.keyguard.clock.magazine com.oplus.keyguard.clock.gallery com.oplus.keyguard.clock.graffiti com.oplus.keyguard.personality.clocks com.oplus.keyguard.style.widgets com.heytap.pictorial; do if pm list packages -d --user 0 2>/dev/null | grep -qF "package:$p"; then echo "$p:disabled"; elif ! pm list packages --user 0 2>/dev/null | grep -qF "package:$p"; then echo "$p:missing"; else echo "$p:enabled"; fi; done; echo "属性:"; echo "mag=$(getprop persist.sys.lockscreen_magazine 2>/dev/null)"'
@@ -759,6 +868,20 @@ var FEATURES = [
     deps: '⚠️ 连带影响：网络感知/蜂窝网络质量被禁用后，网络信号优化与智能切换功能失效（基础上网不受影响）；WiFi 质量组件被禁用后，WiFi 弱信号自动优化不可用。',
     pkgs: ['com.oplus.networksense', 'com.oplus.cellularqoe', 'com.oplus.tai.wifiqoe', 'com.oplus.tai.borderpresearch', 'com.oplus.nearcomm'],
     subNames: ['网络感知', '蜂窝网络质量', 'WiFi 质量', '边界预搜索', '近场通信'],
+    subDescs: [
+      '网络感知服务（networksense），持续评估网络状态供智能切换策略使用。',
+      '蜂窝网络质量评估（cellularqoe），测量数据业务 QoE 指标供调度参考。',
+      'WiFi 质量评估组件（tai.wifiqoe），评估 WiFi 弱信号与漫游质量。',
+      '边界预搜索组件（tai.borderpresearch），在网络边界提前探测可用链路以加速切换。',
+      '近场通信优化服务（nearcomm），管理近场互联的链路优化（非 NFC 支付栈）。'
+    ],
+    subDetails: [
+      '原理：禁用后网络状态感知采样停止，智能切换失去输入。\n\n代价：网络智能优化/切换失效；基础上网不受影响。',
+      '原理：禁用后蜂窝 QoE 评估停止，不再上报网络质量指标。\n\n代价：蜂窝侧质量优化失效；通话与上网不受影响。',
+      '原理：禁用后 WiFi 质量评估停止，弱信号自动优化失去依据。\n\n代价：WiFi 弱信号优化不可用；正常连接不受影响。',
+      '原理：禁用后边界探测与预搜索停止，不再提前测试链路。\n\n代价：网络切换预加速失效，切换可能略慢；上网不受影响。',
+      '原理：禁用后近场链路优化服务停止，不再为近场互联做链路调优。\n\n代价：近场互联优化通道失效；NFC 支付/刷卡走独立栈，不受影响。'
+    ],
     detail: '原理：禁用网络感知、蜂窝与 WiFi 质量评估等 5 个网络优化包。\n\n效果：信号优化与智能切换策略停止。\n\n代价：网络质量优化失效，基础上网不受影响（连带影响详见卡片警告）。\n\n回滚：关闭本项后重启，或卸载模块即可恢复。',
     checkCmd: 'pm list packages -d --user 0 2>/dev/null | grep -qF "package:com.oplus.networksense" && echo disabled || echo enabled',
     verifyCmd: 'for p in com.oplus.networksense com.oplus.cellularqoe com.oplus.tai.wifiqoe com.oplus.tai.borderpresearch com.oplus.nearcomm; do if pm list packages -d --user 0 2>/dev/null | grep -qF "package:$p"; then echo "$p:disabled"; elif ! pm list packages --user 0 2>/dev/null | grep -qF "package:$p"; then echo "$p:missing"; else echo "$p:enabled"; fi; done'
@@ -768,6 +891,14 @@ var FEATURES = [
     deps: '⚠️ 连带影响：安全键盘被禁用后，支付/密码输入使用系统默认键盘（安全性降低）；安全中心被禁用后，骚扰拦截、权限管理等功能入口失效。建议保留本项不优化。',
     pkgs: ['com.oplus.securitykeyboard', 'com.coloros.securityguard'],
     subNames: ['安全键盘', '安全事件'],
+    subDescs: [
+      '安全键盘组件（securitykeyboard），支付/密码输入时接管输入框的防记录键盘。',
+      '安全中心事件服务（coloros.securityguard，判定表：安全事件），承载骚扰拦截与权限安全事件后台。'
+    ],
+    subDetails: [
+      '原理：禁用后安全键盘不再接管敏感输入框，回落系统默认键盘。\n\n代价：支付/密码输入改用默认键盘，防侧录保护降低（建议保留本项不优化）。',
+      '原理：禁用后安全中心后台事件服务停止，安全事件不再汇聚。\n\n代价：骚扰拦截、权限管理等安全中心功能入口失效（建议保留本项不优化）。'
+    ],
     detail: '原理：禁用安全键盘与安全中心 2 个包。\n\n效果：安全键盘与安全中心后台停止。\n\n代价：密码输入改用默认键盘，骚扰拦截与权限管理等安全功能不可用（连带影响详见卡片警告）。\n\n回滚：关闭本项后重启，或卸载模块即可恢复。',
     checkCmd: 'pm list packages -d --user 0 2>/dev/null | grep -qF "package:com.oplus.securitykeyboard" && echo disabled || echo enabled',
     verifyCmd: 'for p in com.oplus.securitykeyboard com.coloros.securityguard; do if pm list packages -d --user 0 2>/dev/null | grep -qF "package:$p"; then echo "$p:disabled"; elif ! pm list packages --user 0 2>/dev/null | grep -qF "package:$p"; then echo "$p:missing"; else echo "$p:enabled"; fi; done'
@@ -777,6 +908,18 @@ var FEATURES = [
     deps: '⚠️ 连带影响：录屏组件被禁用后系统录屏入口失效（第三方录屏 app 不受影响）；媒体控制被禁用后，通知栏媒体卡片/快捷控制不可用。',
     pkgs: ['com.oplus.screenrecorder', 'com.coloros.karaoke', 'com.oplus.mediacontroller', 'com.oplus.mediaturbo'],
     subNames: ['录屏', '耳机返听', '媒体控制', '媒体加速'],
+    subDescs: [
+      '系统录屏组件（screenrecorder），下拉开关与悬浮录屏的系统实现。',
+      'K 歌耳机返听组件（coloros.karaoke），为 K 歌场景提供低延迟耳返。',
+      '媒体控制服务（mediacontroller），驱动通知栏媒体卡片与快捷播放控制。',
+      '媒体加速组件（mediaturbo），为媒体播放提供硬件解码加速辅助。'
+    ],
+    subDetails: [
+      '原理：禁用后系统录屏入口与录制服务下线。\n\n代价：系统录屏不可用；第三方录屏 App 不受影响。',
+      '原理：禁用后耳机返听链路停止，麦克风音频不再回传耳返。\n\n代价：K 歌/耳返类应用的实时监听失效；播放与通话不受影响。',
+      '原理：禁用后媒体会话控制停止，通知栏媒体卡片不再生成。\n\n代价：通知栏媒体卡片/快捷控制不可用；音乐播放本身不受影响。',
+      '原理：禁用后媒体加速辅助下线，播放走常规解码路径。\n\n代价：失去媒体加速优化，极端场景功耗略增；正常播放不受影响。'
+    ],
     detail: '原理：禁用系统录屏、K 歌、媒体控制等 4 个包。\n\n效果：系统录屏入口与通知栏媒体卡片停止。\n\n代价：系统录屏不可用（第三方录屏不受影响），媒体快捷控制失效（连带影响详见卡片警告）。\n\n回滚：关闭本项后重启，或卸载模块即可恢复。',
     checkCmd: 'pm list packages -d --user 0 2>/dev/null | grep -qF "package:com.oplus.screenrecorder" && echo disabled || echo enabled',
     verifyCmd: 'for p in com.oplus.screenrecorder com.coloros.karaoke com.oplus.mediacontroller com.oplus.mediaturbo; do if pm list packages -d --user 0 2>/dev/null | grep -qF "package:$p"; then echo "$p:disabled"; elif ! pm list packages --user 0 2>/dev/null | grep -qF "package:$p"; then echo "$p:missing"; else echo "$p:enabled"; fi; done'
@@ -786,6 +929,28 @@ var FEATURES = [
     deps: '⚠️ 连带影响：日志工具(日志服务)被禁用后 logcat 输出受限，后续排查问题将缺乏日志依据；崩溃盒被禁用后，app 崩溃记录不会上报（对普通使用无感）。',
     pkgs: ['com.oplus.powermonitor', 'com.oplus.audiomonitor', 'com.oplus.logkit', 'com.oplus.engineermode', 'com.oplus.crashbox', 'com.oplus.contentportal', 'com.oplus.postmanservice', 'com.oplus.subsys', 'com.oplus.engineernetwork'],
     subNames: ['电源监控', '音频监控', '日志工具', '工程模式', '崩溃盒', '内容门户', 'Postman 服务', '子系统服务', '工程网络'],
+    subDescs: [
+      '电源监控服务（powermonitor），按应用统计耗电并供设置页展示。',
+      '音频监控服务（audiomonitor），监测音频通路状态与异常。',
+      'ColorOS 日志工具（logkit，判定表：日志工具），系统级日志抓取与落盘组件。',
+      '工程模式应用（engineermode），产线/维修用的调试菜单入口。',
+      '崩溃盒（crashbox），收集应用崩溃记录并上报的组件。',
+      '内容门户（contentportal），负一屏/浏览器等内容源聚合分发。',
+      'Postman 服务（postmanservice，判定表：常规检测支持组件），承担常规巡检与上报支持。',
+      '子系统服务（subsys），聚合基带/WiFi 等子系统状态的辅助服务。',
+      '工程网络组件（engineernetwork），网络调试用的工程入口。'
+    ],
+    subDetails: [
+      '原理：禁用后耗电统计采样停止，不再累计应用功耗数据。\n\n代价：设置里的电量统计/耗电排行不准或缺失；续航本身不受影响。',
+      '原理：禁用后音频通路监测停止，不再后台轮询音频状态。\n\n代价：音频异常的后台监测缺失；实际播放不受影响。',
+      '原理：禁用后 logkit 日志抓取停止，logcat 输出受限。\n\n代价：后续排查问题缺乏日志依据；日常使用无感（详见卡片警示）。',
+      '原理：禁用后工程模式入口下线，不再响应拨号码唤起。\n\n代价：工程调试菜单不可用；普通用户无感。',
+      '原理：禁用后崩溃记录收集与上报停止。\n\n代价：App 崩溃不再上报，厂商侧感知不到；对使用无感（详见卡片警示）。',
+      '原理：禁用后内容门户分发停止，不再后台拉取资讯内容。\n\n代价：部分内容入口（浏览器资讯等）失去内容源；常用 App 不受影响。',
+      '原理：禁用后常规检测支持停止，不再周期性巡检上报。\n\n代价：常规自检报告缺失；对使用无感。',
+      '原理：禁用后子系统状态聚合服务停止，不再轮询各子系统。\n\n代价：子系统状态监控缺失；通话/上网等子系统功能本身不受影响。',
+      '原理：禁用后工程网络调试入口下线。\n\n代价：网络工程调试不可用；普通联网不受影响。'
+    ],
     detail: '原理：禁用功耗/音频监控、日志工具、崩溃盒等 9 个监控与工具包（含 logkit）。\n\n效果：后台监控与日志采集停止，省内存省 CPU。\n\n代价：logcat 输出受限、崩溃记录缺失，排障缺少日志依据（连带影响详见卡片警告）。\n\n回滚：关闭本项后重启，或卸载模块即可恢复。',
     checkCmd: 'pm list packages -d --user 0 2>/dev/null | grep -qF "package:com.oplus.powermonitor" && echo disabled || echo enabled',
     verifyCmd: 'for p in com.oplus.powermonitor com.oplus.audiomonitor com.oplus.logkit com.oplus.engineermode com.oplus.crashbox com.oplus.contentportal com.oplus.postmanservice com.oplus.subsys com.oplus.engineernetwork; do if pm list packages -d --user 0 2>/dev/null | grep -qF "package:$p"; then echo "$p:disabled"; elif ! pm list packages --user 0 2>/dev/null | grep -qF "package:$p"; then echo "$p:missing"; else echo "$p:enabled"; fi; done'
@@ -848,6 +1013,14 @@ var FEATURES = [
     desc: '关闭速览（负一屏）及支持组件',
     pkgs: ['com.coloros.ocs.opencapabilityservice', 'com.coloros.assistantscreen'],
     subNames: ['速览的支持组件', '速览/负一屏'],
+    subDescs: [
+      '速览开放能力服务（ocs.opencapabilityservice），为负一屏卡片提供第三方能力接入通道。',
+      '速览/负一屏本体（assistantscreen），左滑负一屏页面与其内容聚合。'
+    ],
+    subDetails: [
+      '原理：禁用后速览卡片的开放能力通道停止，卡片内容不再刷新。\n\n代价：负一屏卡片失效；左滑入口是否存在由下行 assistantscreen 决定。',
+      '原理：禁用后负一屏页面下线，左滑不再进入负一屏。\n\n代价：左滑负一屏不可用或显示空白；桌面主屏不受影响。'
+    ],
     subGroup: '屏幕服务', subGroupKey: "disable_screen_services",
     detail: '原理：禁用负一屏（速览）的 2 个支撑包（opencapabilityservice、assistantscreen）。\n\n效果：负一屏卡片服务停止。\n\n代价：左滑负一屏不可用或显示空白。\n\n回滚：关闭本项后重启，或卸载模块即可恢复。',
     checkCmd: 'pm list packages -d --user 0 2>/dev/null | grep -qF "package:com.coloros.ocs.opencapabilityservice" && echo disabled || echo enabled',
@@ -1193,10 +1366,17 @@ var app = Vue.createApp({
       this.toastClose();
       if (fn) fn();
     },
-    // 导出到 /storage/emulated/0/Download/coloros16_config.json
+    // 导出配置（带二次确认，防误触）——确认后才真正写文件
     exportConfig: function() {
       var self = this;
       if (!this.config) { this.addLog('无可导出的配置（config 未加载）', 'warn'); return; }
+      this.showConfirm('导出配置', '把当前全部开关与白名单备份到 Download/coloros16_config.json，覆盖同名旧备份文件？', function() {
+        self._doExportConfig();
+      });
+    },
+    // 导出到 /storage/emulated/0/Download/coloros16_config.json
+    _doExportConfig: function() {
+      var self = this;
       this.cfgOpBusy = true;
       var json = JSON.stringify(this.config, null, 2);
       var b64 = btoa(unescape(encodeURIComponent(json)));
@@ -1213,12 +1393,19 @@ var app = Vue.createApp({
         }
       });
     },
+    // 导入配置（带二次确认，防误触）——导入会覆盖当前配置并立即批量改 pm，确认后才执行
+    importConfig: function() {
+      var self = this;
+      this.showConfirm('导入配置', '将用备份文件【覆盖当前全部开关与白名单】，并立即按备份重新执行全部 pm 同步（当前未备份的改动会丢失）。确认导入？', function() {
+        self._doImportConfig();
+      });
+    },
     // 导入：读取 Download 的备份文件，覆盖当前配置并**重新执行 pm 同步**（立即生效）
     // 【v2.2.2 修复】旧版只写 config.json + 刷新 UI，不执行 pm：
     // 用户导入后修改某项（pm 即时生效为 B）再导入恢复 config=A，
     // 但 pm 仍是 B → 双向校验报"期望禁用却仍启用" → 开关显示 pending（未恢复）。
     // 现在导入后对全部包类功能按新 config 重新 pm disable/enable，真正恢复。
-    importConfig: function() {
+    _doImportConfig: function() {
       var self = this;
       this.cfgOpBusy = true;
       sh('cat /storage/emulated/0/Download/coloros16_config.json 2>/dev/null').then(function(r) {
@@ -1324,61 +1511,8 @@ var app = Vue.createApp({
         this.confirmCb = null;
       }
     },
-    // 恢复默认：全部开关置 false，写回并刷新（含 pm 恢复）
-    restoreDefault: function() {
-      var self = this;
-      this.showConfirm('⚠️ 恢复默认', '将关闭所有优化项并恢复全部被禁用的包，确定继续？', function() {
-        self._doRestoreDefault();
-      });
-    },
-    _doRestoreDefault: function() {
-      var self = this;
-      if (!this.config) this.config = {};
-      this.cfgOpBusy = true;
-      // 清掉所有功能开关与 keep，保留 version 字段
-      var keep = { version: this.config.version || 2 };
-      FEATURES.forEach(function(g) {
-        g.items.forEach(function(item) {
-          keep[item.key] = false;
-          delete keep[item.key + '_keep'];
-          if (item.subGroupKey) keep[item.subGroupKey] = false;
-        });
-      });
-      this.config = keep;
-      this.writeConfig().then(function(ok) {
-        if (!ok) {
-          self.cfgOpBusy = false;
-          self.addLog('恢复默认写回失败', 'error');
-          self.showSnack('❌ 恢复默认失败');
-          return;
-        }
-        self.addLog('✅ 已恢复默认配置，正在恢复全部包...');
-        // 恢复全部包：收集所有可能被禁用的包并 pm enable
-        var pkgs = [];
-        FEATURES.forEach(function(g) {
-          g.items.forEach(function(item) {
-            if (item.pkgs) item.pkgs.forEach(function(p) {
-              if (pkgs.indexOf(p) < 0) pkgs.push(p);
-            });
-          });
-        });
-        var chain = Promise.resolve();
-        var fail = 0;
-        pkgs.forEach(function(p) {
-          chain = chain.then(function() {
-            return sh('pm enable ' + p + ' 2>/dev/null').then(function(r2) {
-              if (r2.errno !== 0 && !/new state: enabled|Success/i.test(r2.stdout)) fail++;
-            });
-          });
-        });
-        chain.then(function() {
-          self.cfgOpBusy = false;
-          self.addLog(fail > 0 ? '⚠️ 恢复完成，但 ' + fail + ' 个包失败' : '✅ 已恢复全部包（' + pkgs.length + ' 个）');
-          self.refreshAll();
-          self.showSnack(fail > 0 ? '⚠️ 恢复默认完成，' + fail + ' 个包失败' : '✅ 已恢复默认配置');
-        });
-      });
-    },
+    // （v2.3.19 按需求整体删除：恢复默认 功能连同入口按钮一并移除；
+    //  误触恢复可用「导入配置」走备份，或卸载模块全量还原）
     // ---------- 日志 ----------
     scrollTop: function() {
       window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -1805,9 +1939,11 @@ var app = Vue.createApp({
       return gname;
     },
     // item.detail → 只输出「原理」与「代价」两段（代价显示名统一为「风险」），其余段不进弹窗
-    _detailSegs: function(item) {
+    _detailSegs: function(itemOrText) {
       var rows = [];
-      String(item.detail || '').split(/\n\n+/).forEach(function(s) {
+      // 【R2】接受 item（读 item.detail）或已选好的 detail 文本（子包行传本行 subDetails）
+      var text = (typeof itemOrText === 'string') ? itemOrText : String(itemOrText && itemOrText.detail || '');
+      String(text).split(/\n\n+/).forEach(function(s) {
         var m = s.trim().match(/^([^：:]{1,8})[：:]\s*([\s\S]+)$/);
         if (!m) return;
         var k = m[1].trim();
@@ -1830,15 +1966,21 @@ var app = Vue.createApp({
     // 包详情：说明 / 包名 / 状态 / 大小（异步）/ 原理 / 风险 —— 与功能详情同一清单，仅多包级两行
     showPkgDetail: function(item, pkg, idx) {
       var self = this;
+      // 【R2 修复】多包子项的子包行=独立叶子：说明/原理/风险优先取本行专属
+      // subDescs/subDetails（与 subNames 对齐），弹窗标题带「父项 › 子行」层级；
+      // 单包行或未补写的行回退 item.desc/detail（保持原行为）
+      var rowName = (item.pkgs && item.pkgs.length > 1 && item.subNames && item.subNames[idx]) ? item.subNames[idx] : '';
+      var rowDesc = (rowName && item.subDescs && item.subDescs[idx]) ? item.subDescs[idx] : (item.desc || '');
+      var rowDetail = (rowName && item.subDetails && item.subDetails[idx]) ? item.subDetails[idx] : (item.detail || '');
       var rows = [
-        { type: 'kv', k: '说明', v: item.desc || '' },
+        { type: 'kv', k: '说明', v: rowDesc },
         { type: 'kv', k: '包名', v: pkg, mono: true },
         { type: 'kv', k: '状态', v: this.pkgStateText(item.key, pkg), accent: true },
         { type: 'kv', k: 'APK 大小', v: '' },
         { type: 'divider' }
       ];
-      this._detailSegs(item).forEach(function(r) { rows.push(r); });
-      this._openDetail(item.title, this._groupOf(item.key), rows, [
+      this._detailSegs(rowDetail).forEach(function(r) { rows.push(r); });
+      this._openDetail(rowName ? item.title + ' › ' + rowName : item.title, this._groupOf(item.key), rows, [
         { text: '关闭', variant: 'text', fn: 'close' }
       ]);
       var seq = this.detailSeq;   // 本代弹窗：回填前核对，防旧请求写进新弹窗
@@ -1901,7 +2043,10 @@ var app = Vue.createApp({
       return sh('cat "' + CONFIG_PATH + '" 2>/dev/null').then(function(r) {
         var cfg = null;
         try { cfg = JSON.parse(r.stdout || ''); } catch(e) { cfg = null; }
-        if (cfg && cfg.version) {
+        // 【防丢 v2.3.19】有内容但缺 version 的文件也直接采用（补 version 后加载），
+        // 避免落到旧属性迁移/重置分支把用户配置洗掉；仅空文件/坏 JSON 才走迁移。
+        if (cfg && typeof cfg === 'object' && Object.keys(cfg).length) {
+          if (!cfg.version) cfg.version = 2;
           self.config = cfg;
           return cfg;
         }
@@ -1946,7 +2091,11 @@ var app = Vue.createApp({
     // 原子写 config.json：base64 编码避免引号转义，先写临时文件再 mv
     writeConfig: function() {
       var self = this;
-      var json = JSON.stringify(this.config || {}, null, 2);
+      if (!this.config) this.config = {};
+      // 【防丢 v2.3.19】version 键缺则强制补上——2026-10-03 实测 config.json 丢
+      // version 后触发 service.sh 兜底全量重置（用户配置被清空+全量恢复）。
+      if (!this.config.version) this.config.version = 2;
+      var json = JSON.stringify(this.config, null, 2);
       var b64 = btoa(unescape(encodeURIComponent(json)));
       var cmd = 'echo "' + b64 + '" | base64 -d > "' + CONFIG_PATH + '.tmp" && mv "' + CONFIG_PATH + '.tmp" "' + CONFIG_PATH + '"';
       return sh(cmd).then(function(r) {
@@ -2517,57 +2666,7 @@ var app = Vue.createApp({
         });
       }
     },
-    // ---------- OPT-1: 一键全部优化 ----------
-    globalOptimize: function() {
-      var self = this;
-      this.showConfirm('⚡ 一键全部优化', '将禁用所有可优化的包并清除白名单，确定继续？', function() {
-        self._doGlobalOptimize();
-      });
-    },
-    _doGlobalOptimize: function() {
-      var self = this;
-      this.cfgOpBusy = true;
-      // 将所有包类功能开关设为 true
-      if (!this.config) this.config = {};
-      FEATURES.forEach(function(g) {
-        g.items.forEach(function(item) {
-          self.config[item.key] = true;
-          delete self.config[item.key + '_keep']; // 清除白名单
-          if (item.subGroupKey) self.config[item.subGroupKey] = true;
-        });
-      });
-      this.writeConfig().then(function(ok) {
-        if (!ok) {
-          self.cfgOpBusy = false;
-          self.showSnack('❌ 一键优化写入失败');
-          return;
-        }
-        // 对所有包执行 pm disable
-        var allPkgs = [];
-        FEATURES.forEach(function(g) {
-          g.items.forEach(function(item) {
-            if (item.pkgs) item.pkgs.forEach(function(p) {
-              if (allPkgs.indexOf(p) < 0) allPkgs.push(p);
-            });
-          });
-        });
-        var chain = Promise.resolve();
-        var fail = 0;
-        allPkgs.forEach(function(p) {
-          chain = chain.then(function() {
-            return sh('pm disable-user --user 0 ' + p + ' 2>/dev/null || pm disable ' + p + ' 2>/dev/null').then(function(r) {
-              if (r.errno !== 0 && !/new state: disabled|Success/i.test(r.stdout)) fail++;
-            });
-          });
-        });
-        chain.then(function() {
-          self.cfgOpBusy = false;
-          self.addLog(fail > 0 ? '⚠️ 一键优化完成，' + fail + ' 个包失败' : '✅ 一键优化完成（' + allPkgs.length + ' 个包已禁用）');
-          self.refreshAll();
-          self.showSnack(fail > 0 ? '⚠️ 一键优化完成，' + fail + ' 个包未生效' : '✅ 一键全部优化成功');
-        });
-      });
-    },
+    // ---------- OPT-1: 一键全部优化 —— v2.3.19 按需求整体删除（入口按钮同步下线）----------
     // ---------- OPT-3: 「检查更新」已按需求整体移除 ----------
     // 理由：KernelSU 管理器本身就会读 module.prop 的 updateJson 字段做更新检测，
     //       WebUI 再实现一份等于多一个维护点。

@@ -46,8 +46,9 @@ body{background:rgb(var(--mdui-color-surface));color:rgb(var(--mdui-color-on-sur
 /* mdui-card 默认 inline-block，强制占满容器宽度（与功能卡片保持一致） */
 mdui-card{width:100%}
 .info-row{display:flex;justify-content:space-between;align-items:center;padding:10px 16px;font-size:14px}
-.info-row .k{color:rgb(var(--mdui-color-on-surface-variant))}
-.info-row .v{font-weight:500}
+/* 【修复】标签列禁止收缩：否则长内容(.v flex-basis=文本全宽)溢出时按比例把 .k 压到每行1字竖排 */
+.info-row .k{color:rgb(var(--mdui-color-on-surface-variant));flex:0 0 auto;white-space:nowrap}
+.info-row .v{font-weight:500;min-width:0;overflow-wrap:anywhere}
 /* mdui-dialog 居中修复 */
 mdui-dialog{margin:0 auto !important}
 mdui-dialog::part(panel){

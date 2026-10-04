@@ -79,7 +79,8 @@ if [ ! -f "$DUMMY" ]; then
 fi
 
 # ===================== SELinux 规则注入 =====================
-# 【关键修复】允许 late_start service 执行 pm disable-user / pm uninstall
+# 【关键修复】允许 late_start service 执行 pm disable-user（pm uninstall
+# 已按 coloros.md P0 铁律从模块移除——卸载类命令会致 ColorOS16 bootloop）
 # 注意：正确做法是使用模块自带的 sepolicy.rule 文件（KernelSU 在
 #       post-fs-data 阶段自动加载，无需手动调用 ksud sepolicy）。
 #       KernelSU v3.2.4 的 ksud sepolicy 子命令没有 --live 参数！

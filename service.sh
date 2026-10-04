@@ -91,23 +91,37 @@ if [ ! -f "$CONFIG" ]; then
 fi
 
 # 配置缺失或损坏时兜底：生成全 false 默认配置
+# 【v2.3.19 修复·2026-10-03】文件存在但仅缺 version 键 → 原地注入修复（保留全部开关），
+# 不再整体清空。实测 13:10:00 / 22:11:30 两次因丢 version 触发本兜底，
+# 把用户配置清成全 false 并导致下一次 service 运行全量恢复（误 enable 所有包）。
 if ! grep -q '"version"' "$CONFIG" 2>/dev/null; then
-    log "[迁移] config.json 无效，生成默认配置（全部关闭）..."
     CONFIG_DIR="$(dirname "$CONFIG")"
     mkdir -p "$CONFIG_DIR"
-    {
-        echo "{"
-        echo "  \"version\": 2,"
-        ALL_KEYS="disable_logd block_ota lock_developer_options block_ads_and_tracking kill_redundant_processes system_prop_toggles memory_io_optimization extra_kernel_optimization disable_health_services disable_network_monitoring disable_gamespace disable_wallet_services disable_backup_services disable_ai_assistants disable_voice_assistants disable_theme_services disable_network_optimization disable_security_services disable_media_services disable_system_tools disable_speedview disable_quick_search disable_app_recover disable_notification_mgr disable_device_link disable_device_connect disable_remote_control disable_travel_engine disable_settings_related disable_screen_services disable_wifi_log disable_bluetooth_log disable_data_collection disable_telemetry_cloud"
-        first=1
-        for key in $ALL_KEYS; do
-            [ $first -eq 0 ] && echo ","
-            printf '  "%s": false' "$key"
-            first=0
-        done
-        echo ""
-        echo "}"
-    } > "$CONFIG.tmp" && mv "$CONFIG.tmp" "$CONFIG"
+    if [ -f "$CONFIG" ] && [ "$(head -n1 "$CONFIG" 2>/dev/null)" = "{" ] \
+        && sed -n '2p' "$CONFIG" 2>/dev/null | grep -q '":'; then
+        # 美观 JSON（首行单独 {、第二行即首个键）→ 在 { 后插入 version 行，其余原样保留
+        log "[迁移] config.json 缺 version 键 → 原地注入修复（保留全部开关，不清空）"
+        {
+            echo "{"
+            echo "  \"version\": 2,"
+            tail -n +2 "$CONFIG"
+        } > "$CONFIG.tmp" && mv "$CONFIG.tmp" "$CONFIG"
+    else
+        log "[迁移] config.json 无效，生成默认配置（全部关闭）..."
+        {
+            echo "{"
+            echo "  \"version\": 2,"
+            ALL_KEYS="disable_logd block_ota lock_developer_options block_ads_and_tracking kill_redundant_processes system_prop_toggles memory_io_optimization extra_kernel_optimization disable_health_services disable_network_monitoring disable_gamespace disable_wallet_services disable_backup_services disable_ai_assistants disable_voice_assistants disable_theme_services disable_network_optimization disable_security_services disable_media_services disable_system_tools disable_speedview disable_quick_search disable_app_recover disable_notification_mgr disable_device_link disable_device_connect disable_remote_control disable_travel_engine disable_settings_related disable_screen_services disable_wifi_log disable_bluetooth_log disable_data_collection disable_telemetry_cloud"
+            first=1
+            for key in $ALL_KEYS; do
+                [ $first -eq 0 ] && echo ","
+                printf '  "%s": false' "$key"
+                first=0
+            done
+            echo ""
+            echo "}"
+        } > "$CONFIG.tmp" && mv "$CONFIG.tmp" "$CONFIG"
+    fi
 fi
 
 # ===================== 辅助函数 =====================
@@ -193,6 +207,36 @@ if [ "$PMS_READY" != "1" ]; then
     log "[PMS] ⚠️ 120 秒内 pm 仍无法列出包，pm 操作可能失败"
 fi
 
+# ===================== 0. 开机崩溃根因修复（2026-10-02） =====================
+# 【根因·dropbox 实证】system_server 在 SyncManager.sendOnUnsyncableAccount()
+#   向 com.wifi.masterkey.lite 的 AccountSyncV5Service 发起 bindService 时抛
+#   java.lang.SecurityException: Not allowed to bind to service →
+#   system_server 崩溃循环（单次开机内 69s/87s/104s 连崩 3 次）→ 卡开机。
+#   2026-10-02 全部 9 条 system_server_crash 均为该同一堆栈。
+# 【方案】PMS 就绪后立即 pm disable-user 该包（本脚本实测在崩溃前完成：
+#   04:42:33 开始 → 04:42:44 完成，首崩 04:43:31）。禁用后其 SyncAdapter
+#   不再进入 SyncManager 枚举 → 不再 bind → 不再崩。
+#   pm disable-user 状态持久写入 package-restrictions.xml，一次成功永久生效。
+# 【性质】硬编码崩溃修复，不受 config.json 任何开关控制（必须先保证能开机）。
+# 【警告】警告：pm disable 会禁用整个应用（WiFi万能钥匙极速版），其功能不可用。
+# 【回滚】pm enable com.wifi.masterkey.lite 或卸载本模块（uninstall.sh 收录）即恢复。
+if [ "$PMS_READY" = "1" ]; then
+    BOOTFIX_PKG="com.wifi.masterkey.lite"
+    if pmx pm list packages --user 0 | grep -qF "$BOOTFIX_PKG"; then
+        result=$(pmx_verbose pm disable-user --user 0 "$BOOTFIX_PKG")
+        if echo "$result" | grep -qiE "new state: disabled|Success"; then
+            log "[BootFix] ✅ 已禁用 $BOOTFIX_PKG（防 SyncManager bind 崩溃）: $result"
+            am force-stop "$BOOTFIX_PKG" 2>/dev/null
+        else
+            log "[BootFix] ❌ 禁用失败 $BOOTFIX_PKG: $result"
+        fi
+    else
+        log "[BootFix] $BOOTFIX_PKG 不在包列表（已禁用/卸载或不存在），无需处理"
+    fi
+else
+    log "[BootFix] ⚠️ PMS 未就绪，跳过 $BOOTFIX_PKG 禁用"
+fi
+
 # 【v2.0.2】杀进程：禁用成功后立即清理该包残留进程
 # 原因：pm disable-user 只阻止包再次启动，不会杀掉已运行进程
 # （实测 exsystemservice/subsys 禁用后进程仍存活，直到重启）。
@@ -217,7 +261,9 @@ kill_pkg_procs() {
     log "  ⚠️ $pkg 持续存活（persistent），已尝试多轮强杀"
 }
 
-# 禁用包：优先 pm disable-user，失败则 fallback 到 pm uninstall
+# 禁用包：方法1 pm disable-user → 方法2 pm disable（全局兜底）；绝不 uninstall
+# 【2026-10-02 事故】原"方法2=pm uninstall -k"已移除：与手动卸载 thirdkit
+# 致不开机的命令同族（见 coloros.md P0 铁律），模块永不执行卸载。
 # 第二个参数为可选 keep 键名（如 disable_ai_assistants），
 # 若该包在 config.json 的 <key>_keep（逗号分隔）中则跳过禁用——
 # 用于支持 WebUI 单独启用子包。
@@ -262,19 +308,14 @@ disable_pkg() {
         return 0
     fi
     log "  ⚠️ disable-user 失败: $pkg ($result)"
-    # 方法2：pm uninstall -k --user 0（fallback）
-    result2=$(pmx_verbose pm uninstall -k --user 0 "$pkg")
-    if echo "$result2" | grep -q "Success"; then
-        log "  ✅ uninstall fallback 成功: $pkg"
-        kill_pkg_procs "$pkg"
-        return 0
-    fi
-    log "  ⚠️ uninstall fallback 失败: $pkg ($result2)"
-    # 方法3：pm disable --user 0（全局禁用，persistent 应用专用兜底）
+    # 【2026-10-02 事故】此处曾有"方法2：pm uninstall -k --user 0"fallback，
+    # 与手动卸载 thirdkit 致不开机的命令同族（见 coloros.md P0），已移除。
+    # 永不卸载：失败只允许继续"停用"，绝不做减法。
+    # 方法2：pm disable --user 0（全局禁用，persistent 应用专用兜底）
     # 【v2.0.3】com.coloros.lockassistant 等 persistent 应用无法被 disable-user
     # 禁用（系统立即重新拉起），改用全局 disable + 强杀进程组合。
-    result3=$(pmx_verbose pm disable --user 0 "$pkg" 2>&1)
-    if echo "$result3" | grep -qiE "new state: disabled|Success"; then
+    result2=$(pmx_verbose pm disable --user 0 "$pkg" 2>&1)
+    if echo "$result2" | grep -qiE "new state: disabled|Success"; then
         log "  ✅ pm disable 成功（persistent 兜底）: $pkg"
         # persistent 应用禁用后系统会尝试重启，需多轮强杀
         kill_pkg_procs "$pkg"
@@ -282,7 +323,7 @@ disable_pkg() {
         kill_pkg_procs "$pkg"
         return 0
     fi
-    log "  ❌ 三种方法均失败: $pkg ($result3)"
+    log "  ❌ 两种方法均失败: $pkg ($result2)"
     return 1
 }
 
@@ -321,7 +362,7 @@ enable_pkg() {
         return 0
     fi
     log "  ⚠️ install-existing fallback 失败: $pkg ($result2)"
-    # 方法3：pm enable（全局恢复，对应 disable_pkg 方法3 的 persistent 兜底）
+    # 方法3：pm enable（全局恢复，对应 disable_pkg 的 pm disable persistent 兜底）
     result3=$(pmx_verbose pm enable "$pkg" 2>&1)
     if echo "$result3" | grep -qiE "new state: enabled|Success"; then
         log "  ✅ pm enable 成功（persistent 恢复）: $pkg"
@@ -476,7 +517,8 @@ if is_on "block_ads_and_tracking"; then
     setprop persist.sys.usage_stat_enable 0
     setprop persist.oppo.collect 0
       disable_pkg "com.oplus.statistics.rom" "block_ads_and_tracking"
-      disable_pkg "com.coloros.sceneservice" "block_ads_and_tracking"
+      # 2026-10-02 标签审计：sceneservice=小布指令/场景服务后端（判定表归「小布系列」，非「用户体验计划」）
+      # 涉安全支持组件 → 移出广告组，默认不禁（此前误列5包；真实用户体验计划=com.oplus.statistics.rom）
       disable_pkg "com.oplus.onetrace" "block_ads_and_tracking"
       disable_pkg "com.oplus.midas" "block_ads_and_tracking"
       # 警告：质量保护服务（disabletable §10「卸载后暂无影响，但需谨慎处理」类）
@@ -498,7 +540,6 @@ else
     setprop persist.sys.usage_stat_enable 1
     setprop persist.oppo.collect 1
       enable_pkg "com.oplus.statistics.rom"
-      enable_pkg "com.coloros.sceneservice"
       enable_pkg "com.oplus.onetrace"
       enable_pkg "com.oplus.midas"
       enable_pkg "com.oplus.qualityprotect"
@@ -678,9 +719,11 @@ fi
 if is_on "disable_screen_services"; then
     log "[ScreenServices] 禁用..."
     is_on "disable_speedview" && disable_pkg "com.coloros.ocs.opencapabilityservice" "disable_speedview"
+    is_on "disable_quick_search" && disable_pkg "com.heytap.quicksearchbox" "disable_quick_search"
 else
     log "[ScreenServices] 恢复..."
     ! is_on "disable_speedview" && enable_pkg "com.coloros.ocs.opencapabilityservice"
+    ! is_on "disable_quick_search" && enable_pkg "com.heytap.quicksearchbox"
 fi
 
 # ===================== 挂载复核（开机后最终证据） =====================

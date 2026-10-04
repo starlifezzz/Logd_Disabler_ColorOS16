@@ -264,8 +264,10 @@ mdui-list-item::part(body){justify-content:center;gap:0}
 .crt-boot-skip:active{background:rgba(238,143,196,.15)}
 
 /* ===== 功能详情弹窗（ITEM.INFO）内容区整体小 3 号：14→11px =====
-   覆盖 base 层 .info-row 的 14px；行内不再写死字号，统一由本节控制。 */
-.item-info-body .info-row{font-size:11px}
+   覆盖 base 层 .info-row 的 14px；行内不再写死字号，统一由本节控制。
+   【布局】kv 行上下堆叠：标签独占一行在上、内容整宽在下（长文案不再挤压标签，
+   与下方 seg-block 的"段名在上/正文在下"观感一致；About 卡片仍走 base 横排） */
+.item-info-body .info-row{font-size:11px;display:flex;flex-direction:column;gap:3px;align-items:stretch;padding:8px 16px}
 .item-info-body .info-row .k{font-size:11px;font-weight:700}
 .item-info-body .info-row .v{font-size:11px}
 /* 原理段块级堆叠：段名小标签在上、正文整宽左对齐（正常段落换行，无右对齐锯齿） */

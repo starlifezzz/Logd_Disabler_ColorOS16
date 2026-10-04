@@ -5,8 +5,14 @@ MODDIR=${0%/*}
 BOOT_COUNT_FILE="/data/adb/coloros16_boot_count"
 BOOTLOOP_FLAG="/data/adb/coloros16_bootloop_flag"
 echo "0" > "$BOOT_COUNT_FILE"
-rm -f "$BOOTLOOP_FLAG"
-rm -f "$MODDIR/disable"
+# 【修复 2026-10-03】disable 标记只在 bootloop 自动禁用时恢复，禁止无条件自删：
+#   flag 由 post-fs-data 计数≥3 时与 disable 同时创建 → 启动成功即两者一起恢复（保留原自动治愈语义）；
+#   手动 touch disable（实验布防/人工停用）不带 flag → 必须保留。
+#   教训：原无条件 rm -f "$MODDIR/disable" 会把手动布防标记在开机后抹掉 → 模块照跑（A/B 实验第一轮实锤）。
+if [ -f "$BOOTLOOP_FLAG" ]; then
+    rm -f "$BOOTLOOP_FLAG"
+    rm -f "$MODDIR/disable"
+fi
 
 # 健康校验：检查核心系统服务
 sleep 10 # 等待系统完全稳定

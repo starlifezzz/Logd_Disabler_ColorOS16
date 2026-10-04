@@ -40,6 +40,15 @@ HIT=$(grep -nE "(pkill|kill -9|stop[[:space:]]|force-stop|disable-user)[^#]*" "$
       | grep -E "system_server|zygote64|zygote|surfaceflinger|android\.hardware\.|oplus\.security\.server|oplus\.sensor|(^|[^.[:alnum:]_-])(android|oplus)([^.[:alnum:]_-]|$)" | head -5)
 [ -z "$HIT" ] && ok "操作黑名单零违规：未对 system_server/zygote/zygote64/surfaceflinger/android.hardware.*/oplus.security.server/oplus.sensor/精确包名android|oplus 执行杀/禁" || { no "踩到操作黑名单"; echo "$HIT" | sed 's/^/       /'; }
 
+# [2026-10-02 事故加固] 禁用只允许 disable-user/disable，绝不 uninstall：
+#   手动 pm uninstall --user 0 com.oplus.thirdkit 当场 bootloop（见 coloros.md P0）；
+#   模块 disable_pkg 的 uninstall fallback 同族命令已移除。这里钉死：
+#   任何脚本出现"执行 pm uninstall"（pm / cmd package / 带 -k 变体）即红。
+#   注释行按惯例排除；动态拼接（pmx_verbose pm uninstall）同样被抓。
+HIT=$(grep -nE "pm[[:space:]]+uninstall|package[[:space:]]+uninstall|uninstall[[:space:]]+-k" "$SRC"/*.sh 2>/dev/null \
+      | grep -vE "^[^:]*:[0-9]+:[[:space:]]*#" | head -5)
+[ -z "$HIT" ] && ok "pm uninstall 零执行：禁用只走 disable-user/disable（2026-10-02 thirdkit 卸载事故红线）" || { no "踩到 pm uninstall 红线（系统包卸载=bootloop）"; echo "$HIT" | sed 's/^/       /'; }
+
 echo "═══ B. 模块开发规范 ═══"
 SBAD=0
 for f in $SH; do

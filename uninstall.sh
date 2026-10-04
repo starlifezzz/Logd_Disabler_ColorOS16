@@ -117,6 +117,7 @@ com.heytap.mydevices
 com.oplus.pantanal.ums
 com.oppo.ctautoregist
 com.oplus.thirdkit
+com.wifi.masterkey.lite
 "
 RESTORED=0
 SKIPPED=0
