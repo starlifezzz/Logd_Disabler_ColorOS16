@@ -711,7 +711,7 @@ var FEATURES = [
   },
   { key: 'disable_thermal_control', icon: 'sports_esports--outlined', title: '去温控',
     desc: '解除 CPU/GPU 内核温控与 oiface 性能调度限制',
-    detail: '原理：每次开机将 31 个 CPU/GPU/表面温感内核温控 zone 置为 disabled，42 个限频/降亮阀门先快照后清零，并把 oiface 性能调度属性软抑制（persist.sys.oiface.enable=0）。电池、充电、PMIC、Modem、相机等 73 个安全温控 zone 与芯片临界硬件断电全部保留。\n\n效果：游戏与重载场景不降频、不锁帧、不降亮度，长时间维持峰值性能（首次开启重启后生效）。\n\n代价：⚠️高风险——机身与电池持续高温，加速电池老化，长期使用存在鼓包风险；除硬件最后一道保护外无任何软件降温手段。\n\n回滚：WebUI 关闭本项重启即恢复（sysfs 开机重置 + oiface 属性回写原值）；卸载模块立即恢复（zone 回 enabled、阀门按快照还原、属性回写）。',
+    detail: '原理：每次开机将 31 个 CPU/GPU/表面温感内核温控 zone 置为 disabled，41 个限频/降亮阀门先快照后清零，并把 oiface 性能调度属性软抑制（persist.sys.oiface.enable=0）。电池、充电、PMIC、Modem、相机等 73 个安全温控 zone 与芯片临界硬件断电全部保留。\n\n效果：游戏与重载场景不降频、不锁帧、不降亮度，长时间维持峰值性能（首次开启重启后生效）。\n\n代价：⚠️高风险——机身与电池持续高温，加速电池老化，长期使用存在鼓包风险；除硬件最后一道保护外无任何软件降温手段。\n\n回滚：WebUI 关闭本项重启即恢复（sysfs 开机重置 + oiface 属性回写原值）；卸载模块立即恢复（zone 回 enabled、阀门按快照还原、属性回写）。',
     checkCmd: 'p=$(getprop persist.sys.oiface.enable 2>/dev/null); if [ "$p" = "0" ]; then echo suppressed; else echo stock; fi',
     verifyCmd: 'echo "oiface=$(getprop persist.sys.oiface.enable 2>/dev/null)"; n=0; for z in /sys/class/thermal/thermal_zone*; do grep -q "^disabled" "$z/mode" 2>/dev/null && n=$((n+1)); done; echo "zones_disabled=$n"; m=0; for c in /sys/class/thermal/cooling_device*; do [ "$(cat "$c/cur_state" 2>/dev/null)" = "0" ] && m=$((m+1)); done; echo "cooling_at_zero=$m"'
   }
