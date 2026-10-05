@@ -62,7 +62,7 @@ if [ ! -f "$CONFIG" ]; then
     mkdir -p "$CONFIG_DIR"
     # 全部 34 个开关 key（含 2 个总开关），与 WebUI FEATURES 一一对应
     # v2.3.8：新增数据回传/遥测等 3 项（32 → 35）；v2.3.9 移除其中的 MGLRU 开关（35 → 34），原因见下方 8b 说明
-    ALL_KEYS="disable_logd block_ota lock_developer_options block_ads_and_tracking kill_redundant_processes system_prop_toggles memory_io_optimization extra_kernel_optimization disable_health_services disable_network_monitoring disable_gamespace disable_wallet_services disable_backup_services disable_ai_assistants disable_voice_assistants disable_theme_services disable_network_optimization disable_security_services disable_media_services disable_system_tools disable_speedview disable_quick_search disable_app_recover disable_notification_mgr disable_device_link disable_device_connect disable_remote_control disable_travel_engine disable_settings_related disable_screen_services disable_wifi_log disable_bluetooth_log disable_data_collection disable_telemetry_cloud"
+    ALL_KEYS="disable_logd block_ota lock_developer_options block_ads_and_tracking kill_redundant_processes system_prop_toggles memory_io_optimization extra_kernel_optimization disable_health_services disable_network_monitoring disable_gamespace disable_wallet_services disable_backup_services disable_ai_assistants disable_voice_assistants disable_theme_services disable_network_optimization disable_security_services disable_media_services disable_system_tools disable_speedview disable_quick_search disable_app_recover disable_notification_mgr disable_device_link disable_device_connect disable_remote_control disable_travel_engine disable_settings_related disable_screen_services disable_wifi_log disable_bluetooth_log disable_data_collection disable_telemetry_cloud disable_thermal_control"
     # keep 白名单 key（有子包的功能）
     KEEP_KEYS="block_ota_keep block_ads_and_tracking_keep disable_health_services_keep disable_network_monitoring_keep disable_gamespace_keep disable_wallet_services_keep disable_backup_services_keep disable_ai_assistants_keep disable_voice_assistants_keep disable_theme_services_keep disable_network_optimization_keep disable_security_services_keep disable_media_services_keep disable_system_tools_keep disable_speedview_keep disable_quick_search_keep disable_app_recover_keep disable_notification_mgr_keep disable_device_link_keep disable_device_connect_keep disable_remote_control_keep disable_travel_engine_keep disable_telemetry_cloud_keep"
     {
@@ -108,7 +108,7 @@ if ! grep -q '"version"' "$CONFIG" 2>/dev/null; then
         {
             echo "{"
             echo "  \"version\": 2,"
-            ALL_KEYS="disable_logd block_ota lock_developer_options block_ads_and_tracking kill_redundant_processes system_prop_toggles memory_io_optimization extra_kernel_optimization disable_health_services disable_network_monitoring disable_gamespace disable_wallet_services disable_backup_services disable_ai_assistants disable_voice_assistants disable_theme_services disable_network_optimization disable_security_services disable_media_services disable_system_tools disable_speedview disable_quick_search disable_app_recover disable_notification_mgr disable_device_link disable_device_connect disable_remote_control disable_travel_engine disable_settings_related disable_screen_services disable_wifi_log disable_bluetooth_log disable_data_collection disable_telemetry_cloud"
+            ALL_KEYS="disable_logd block_ota lock_developer_options block_ads_and_tracking kill_redundant_processes system_prop_toggles memory_io_optimization extra_kernel_optimization disable_health_services disable_network_monitoring disable_gamespace disable_wallet_services disable_backup_services disable_ai_assistants disable_voice_assistants disable_theme_services disable_network_optimization disable_security_services disable_media_services disable_system_tools disable_speedview disable_quick_search disable_app_recover disable_notification_mgr disable_device_link disable_device_connect disable_remote_control disable_travel_engine disable_settings_related disable_screen_services disable_wifi_log disable_bluetooth_log disable_data_collection disable_telemetry_cloud disable_thermal_control"
             first=1
             for key in $ALL_KEYS; do
                 [ $first -eq 0 ] && echo ","
@@ -641,6 +641,53 @@ fi
 #        （v2.3.8 实测日志 02:11:02 已实际发生过一次降级）。
 #        故本模块【完全不再写入 /sys/kernel/mm/lru_gen/*】，保持出厂状态。
 #        uninstall.sh 保留一行 echo 0x0003 作为从 v2.3.8 升级的兜底（幂等 = 出厂值）。
+
+# ===================== 8c. 去温控内核层（⚠️ 高风险 · 白名单 · 可还原） =====================
+# 【原理·档①】每次开机把【白名单】温控 zone 置 disabled、限频/降亮阀门【先快照后清零】。
+#        白名单只含 CPU/GPU/表面温感（含 ColorOS16 分层拟合温感 shell_front/frame/back）；
+#        bcl / ibat / usb / PMIC / 充电 / Modem / 相机 等 73 个安全 zone 一律不碰。
+# 【警告】解除温控后机身与电池持续高温，长期使用加速电池老化、存在鼓包风险；
+#        tsens 临界硬件断电与 PMIC OCP 属硬件层，本块无法也无意关闭。
+#        oiface/horae 本体在 ons​ervices 白名单内，本模块【不禁用任何温控进程】（档②仅软抑制属性，
+#        见 post-fs-data.sh）。
+# 【回滚】sysfs 每次开机重置 → 关闭本项重启即恢复；
+#        卸载模块时 uninstall.sh 第 4b 节立即恢复（zone 回 enabled + 阀门按快照回写）。
+_thermal_apply() {
+    _zn=0
+    for z in /sys/class/thermal/thermal_zone*; do
+        _t=$(cat "$z/type" 2>/dev/null) || continue
+        case "$_t" in
+            cpu-*|cpuss-*|gpuss-*|shell_front|shell_frame|shell_back|skin-msm-therm)
+                if echo disabled > "$z/mode" 2>/dev/null; then _zn=$((_zn+1)); fi ;;
+        esac
+    done
+    _cn=0
+    for c in /sys/class/thermal/cooling_device*; do
+        _t=$(cat "$c/type" 2>/dev/null) || continue
+        case "$_t" in
+            cpufreq-*|cpu-cluster*|cpu-hotplug*|pause-cpu*|thermal-pause-*|thermal-cluster-*|gpu|gpu-dump-skip-cdev|devfreq-*|panel0-backlight|display-fps|ddr-cdev)
+                if echo 0 > "$c/cur_state" 2>/dev/null; then _cn=$((_cn+1)); fi ;;
+        esac
+    done
+}
+if is_on "disable_thermal_control"; then
+    log "[Thermal] 去温控启用：快照 cooling → 白名单 zone 禁用 + 阀门清零..."
+    SNAP="$WORK_DIR/thermal_cooling_snapshot.txt"
+    : > "$SNAP.tmp" 2>/dev/null
+    for c in /sys/class/thermal/cooling_device*; do
+        _i=${c##*cooling_device}
+        _v=$(cat "$c/cur_state" 2>/dev/null) || continue
+        echo "$_i=$_v" >> "$SNAP.tmp"
+    done
+    mv "$SNAP.tmp" "$SNAP" 2>/dev/null
+    _thermal_apply
+    log "[Thermal] 首轮 zone=$_zn cooling=$_cn，5 秒后复核一轮（防温控服务回写）..."
+    sleep 5
+    _thermal_apply
+    log "[Thermal] 复核轮 zone=$_zn cooling=$_cn；快照行数=$(wc -l < "$SNAP" 2>/dev/null) (期望 72)"
+else
+    log "[Thermal] 关闭：zone/阀门由开机默认值自然恢复；oiface 属性回写见 post-fs-data.sh"
+fi
 
 # ===================== 9. 数据回传与采集守护（v2.3.8 新增，v2.3.10 移除 mediametrics） =====================
 # 【分工】bind 空文件由 post-fs-data.sh 在开机早期完成；本段在 late_start

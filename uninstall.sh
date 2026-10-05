@@ -248,6 +248,36 @@ echo always > /sys/kernel/mm/transparent_hugepage/khugepaged/defrag 2>/dev/null
 echo 0x0003 > /sys/kernel/mm/lru_gen/enabled 2>/dev/null
 log "[MGLRU] 卸载回滚：lru_gen.enabled=$(cat /sys/kernel/mm/lru_gen/enabled 2>/dev/null) (出厂值 0x0003)"
 
+# ===================== 4b. 去温控回滚（⚠️ 必须在第 5 节清理 WORK_DIR 之前） =====================
+# 【范围】与 service.sh 8c / post-fs-data.sh 完全同源的白名单：仅 CPU/GPU/表面温感 zone
+#        与限频/降亮阀门；安全 zone（bcl/ibat/usb/PMIC/充电/Modem/相机）从未被本模块改动。
+# 【动作】zone → enabled；阀门 → 按开机快照逐点回写；oiface 属性 → 按原值文件回写。
+ui_print "- 恢复温控（zone/阀门/oiface 属性）..."
+_tzc=0
+for z in /sys/class/thermal/thermal_zone*; do
+    _t=$(cat "$z/type" 2>/dev/null) || continue
+    case "$_t" in
+        cpu-*|cpuss-*|gpuss-*|shell_front|shell_frame|shell_back|skin-msm-therm)
+            if echo enabled > "$z/mode" 2>/dev/null; then _tzc=$((_tzc+1)); fi ;;
+    esac
+done
+_zc=0
+SNAP="$WORK_DIR/thermal_cooling_snapshot.txt"
+if [ -f "$SNAP" ]; then
+    while IFS='=' read -r _i _v; do
+        [ -n "$_i" ] || continue
+        if echo "$_v" > "/sys/class/thermal/cooling_device$_i/cur_state" 2>/dev/null; then
+            _zc=$((_zc+1))
+        fi
+    done < "$SNAP"
+fi
+OIFACE_ORIG="$WORK_DIR/oiface_orig.txt"
+if [ -s "$OIFACE_ORIG" ]; then
+    setprop persist.sys.oiface.enable "$(cat "$OIFACE_ORIG" 2>/dev/null)"
+fi
+log "[Thermal] 卸载回滚: zone=$_tzc 回写 enabled / cooling=$_zc 按快照还原 / oiface=$(getprop persist.sys.oiface.enable 2>/dev/null)"
+rm -f "$SNAP" "$OIFACE_ORIG" 2>/dev/null
+
 # ===================== 5. 清理配置与日志 =====================
 ui_print "- 清理配置数据..."
 rm -rf "$CONFIG_DIR" 2>/dev/null

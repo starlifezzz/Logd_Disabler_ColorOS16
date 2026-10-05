@@ -708,6 +708,12 @@ var FEATURES = [
     detail: '原理：把内核日志级别 printk 由 "4 4 1 7" 降到 "3 3 3 3"（console_loglevel 同步设为 3），并把透明大页(THP)的 enabled / defrag / khugepaged/defrag 全部设为 never。\n\n效果：减少内核日志刷屏与大页合并带来的 CPU 开销，内存分配更平稳。\n\n代价：内核 WARNING / OOPS 不再打印到控制台，排障需要改看 dmesg 或 pstore；个别超大内存应用的分配可能略慢。\n\n回滚：WebUI 关闭本项后重启，service.sh 会写回恢复值（printk "4 4 1 7"、THP 设为 always）。',
     checkCmd: 'p=$(cat /proc/sys/kernel/printk 2>/dev/null); echo "$p"',
     verifyCmd: 'echo "printk=$(cat /proc/sys/kernel/printk 2>/dev/null)"; echo "console_loglevel=$(cat /proc/sys/kernel/printk_console_loglevel 2>/dev/null)"; echo "thp_enabled=$(cat /sys/kernel/mm/transparent_hugepage/enabled 2>/dev/null)"; echo "thp_defrag=$(cat /sys/kernel/mm/transparent_hugepage/defrag 2>/dev/null)"; echo "thp_khugepaged=$(cat /sys/kernel/mm/transparent_hugepage/khugepaged/defrag 2>/dev/null)"'
+  },
+  { key: 'disable_thermal_control', icon: 'sports_esports--outlined', title: '去温控',
+    desc: '解除 CPU/GPU 内核温控与 oiface 性能调度限制',
+    detail: '原理：每次开机将 31 个 CPU/GPU/表面温感内核温控 zone 置为 disabled，42 个限频/降亮阀门先快照后清零，并把 oiface 性能调度属性软抑制（persist.sys.oiface.enable=0）。电池、充电、PMIC、Modem、相机等 73 个安全温控 zone 与芯片临界硬件断电全部保留。\n\n效果：游戏与重载场景不降频、不锁帧、不降亮度，长时间维持峰值性能（首次开启重启后生效）。\n\n代价：⚠️高风险——机身与电池持续高温，加速电池老化，长期使用存在鼓包风险；除硬件最后一道保护外无任何软件降温手段。\n\n回滚：WebUI 关闭本项重启即恢复（sysfs 开机重置 + oiface 属性回写原值）；卸载模块立即恢复（zone 回 enabled、阀门按快照还原、属性回写）。',
+    checkCmd: 'p=$(getprop persist.sys.oiface.enable 2>/dev/null); if [ "$p" = "0" ]; then echo suppressed; else echo stock; fi',
+    verifyCmd: 'echo "oiface=$(getprop persist.sys.oiface.enable 2>/dev/null)"; n=0; for z in /sys/class/thermal/thermal_zone*; do grep -q "^disabled" "$z/mode" 2>/dev/null && n=$((n+1)); done; echo "zones_disabled=$n"; m=0; for c in /sys/class/thermal/cooling_device*; do [ "$(cat "$c/cur_state" 2>/dev/null)" = "0" ] && m=$((m+1)); done; echo "cooling_at_zero=$m"'
   }
  ]},
 { group: '可选禁用服务', groupIcon: 'apps--outlined', items: [
@@ -1148,6 +1154,8 @@ var app = Vue.createApp({
       cfgOpBusy: false,
         // ===== 二次确认回调（弹窗本体已并入 detailOpen 统一模板） =====
         confirmCb: null,
+        // 去温控二次确认的单次放行标志（确认后重入 onSwitchChange 用，进函数即复位）
+        _thermalConfirmPass: false,
       // ===== 首次使用引导 =====
       showGuide: false,
       // ===== OPT-8: 操作历史撤销栈 =====
@@ -2107,6 +2115,21 @@ var app = Vue.createApp({
         e.target.checked = s.enabled;
         return;
       }
+      // 【去温控】⚠️ 高风险功能：开启前强制二次确认。确认后 _thermalConfirmPass
+      // 放行一次重入；进入正常路径即复位 → 下次开启重新询问；点取消则开关弹回关闭。
+      if (item.key === 'disable_thermal_control' && wantOn && !this._thermalConfirmPass) {
+        var selfT = this;
+        e.target.checked = false;
+        this.showConfirm('开启去温控？（⚠️ 高风险）',
+          '解除温控后机身与电池将持续高温，会加速电池老化、长期使用有鼓包风险（电池与充电安全保护仍保留）。重启后生效。确认开启？',
+          function() {
+            selfT._thermalConfirmPass = true;
+            e.target.checked = true;
+            selfT.onSwitchChange(item, e);
+          });
+        return;
+      }
+      if (item.key === 'disable_thermal_control') this._thermalConfirmPass = false;
       s.loading = true;
       var action = wantOn ? '禁用' : '恢复';
       this.addLog('正在' + action + ' ' + item.title + '...');

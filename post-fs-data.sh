@@ -435,6 +435,29 @@ else
     log "[DataCollection] 未启用，跳过"
 fi
 
+# ===================== 去温控·档② oiface 属性软抑制（⚠️ 高风险 · 可还原） =====================
+# 【原理】oiface = ColorOS 性能调度服务（与温控深度联动）；persist.sys.oiface.enable=0
+#        时调度层不再干预温控决策（社区 ThermGuard 同款第一层）。本块只改属性，
+#        【不 start/stop 任何进程】——horae/oiface 本体在 ons​ervices 白名单内必须存活。
+# 【时机】persist 属性跨重启存活，必须每次开机双向写回，故放 post-fs-data（早于 oiface 启动）。
+# 【警告】高风险：属去温控组合的一环，单独关闭本开关不足以恢复整机温控（zone 层见 service.sh 8c）。
+# 【回滚】关闭本项 → 按 oiface_orig.txt 保存的原值写回；卸载 → uninstall.sh 4b 同款回写。
+OIFACE_ORIG="$WORK_DIR/oiface_orig.txt"
+if is_on "disable_thermal_control"; then
+    if [ ! -s "$OIFACE_ORIG" ]; then
+        _ov=$(getprop persist.sys.oiface.enable 2>/dev/null)
+        [ -n "$_ov" ] || _ov=2
+        echo "$_ov" > "$OIFACE_ORIG"
+    fi
+    setprop persist.sys.oiface.enable 0
+    log "[Thermal] oiface 软抑制: persist.sys.oiface.enable=$(getprop persist.sys.oiface.enable 2>/dev/null) (期望 0，原值 $(cat "$OIFACE_ORIG" 2>/dev/null))"
+else
+    if [ -s "$OIFACE_ORIG" ]; then
+        setprop persist.sys.oiface.enable "$(cat "$OIFACE_ORIG" 2>/dev/null)"
+        log "[Thermal] oiface 回写: persist.sys.oiface.enable=$(getprop persist.sys.oiface.enable 2>/dev/null) (原值 $(cat "$OIFACE_ORIG"))"
+    fi
+fi
+
 # ===================== 挂载自检（模块自己记录，不依赖外部手动验证） =====================
 # 说明：这些都是【只读】观察（grep /proc/mounts、读文件、ls -Z），
 #       不产生任何副作用。结果写入本日志 + service.sh 开机复核。

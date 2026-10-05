@@ -42,7 +42,7 @@ grep -n 'echo 0x' $SRC/service.sh $SRC/post-fs-data.sh $SRC/customize.sh $SRC/bo
 echo "═══ C. 开关数量与同步 ═══"
 AK=$(grep -m1 'ALL_KEYS="' $SRC/service.sh | sed 's/.*ALL_KEYS="//;s/".*//')
 N=$(echo $AK | wc -w)
-[ "$N" = "34" ] && ok "ALL_KEYS 数量 = 34" || no "ALL_KEYS = $N (期望 34)"
+[ "$N" = "35" ] && ok "ALL_KEYS 数量 = 35" || no "ALL_KEYS = $N (期望 35)"
 AK2=$(grep -m1 -A0 'ALL_KEYS="' $SRC/service.sh | head -1)
 C1=$(grep -c 'ALL_KEYS="' $SRC/service.sh); [ "$C1" = "2" ] && ok "ALL_KEYS 出现 2 处" || no "ALL_KEYS 出现 $C1 处"
 grep -m1 'ALL_KEYS="' $SRC/service.sh | grep -q enable_mglru && no "ALL_KEYS 仍含 enable_mglru" || ok "ALL_KEYS 已无 enable_mglru"
@@ -63,13 +63,13 @@ extra=[k for k in feats if k not in ak]
 missing=[k for k in ak if k not in feats]
 open(f'{tmp}/feat.txt','w').write("%d\n%s\n%s\n" % (len(feats), ','.join(extra), ','.join(missing)))
 print(f"  FEATURES keys = {len(feats)}")
-if not extra and not missing and len(feats)==34:
-    print(f"  ✅ FEATURES == ALL_KEYS == 34，无缺无多")
+if not extra and not missing and len(feats)==35:
+    print(f"  ✅ FEATURES == ALL_KEYS == 35，无缺无多")
 else:
     print(f"  ❌ extra={extra} missing={missing}")
 PY
-[ "$(sed -n 1p $T/feat.txt)" = "34" ] && [ -z "$(sed -n 2p $T/feat.txt)" ] && [ -z "$(sed -n 3p $T/feat.txt)" ] \
-  && ok "FEATURES ↔ ALL_KEYS 一致(34)" || no "FEATURES ↔ ALL_KEYS 不一致"
+[ "$(sed -n 1p $T/feat.txt)" = "35" ] && [ -z "$(sed -n 2p $T/feat.txt)" ] && [ -z "$(sed -n 3p $T/feat.txt)" ] \
+  && ok "FEATURES ↔ ALL_KEYS 一致(35)" || no "FEATURES ↔ ALL_KEYS 不一致"
 
 echo "═══ E. 核心功能仍完整 ═══"
 BINS="midasd ostatsd ostats_pullerd ostats_tpd criticallog subsystem_ramdump"
@@ -184,7 +184,8 @@ echo
 echo "═══ F6. 二级开关 → 一级实时联动（v2.3.15 实测 bug 回归）═══"
 # 实测：打开「屏幕」一级 → 关「全局搜索」二级 → 一级仍显示开；直到关「速览」的三级才掉。
 # 病因：onPkgSwitch(三级) 会调 syncSubGroupSwitch，onSwitchChange(二级) 从不调。
-ON2=$(sed -n "$(grep -n 'onSwitchChange: function' $SRC/webroot/index.html|head -1|cut -d: -f1),+60p" $SRC/webroot/index.html)
+# 窗口 60→75：onSwitchChange 于 v2.3.19 增加去温控二次确认门（+15 行），窗口须覆盖函数全体现有体
+ON2=$(sed -n "$(grep -n 'onSwitchChange: function' $SRC/webroot/index.html|head -1|cut -d: -f1),+75p" $SRC/webroot/index.html)
 echo "$ON2" | grep -q 'this\.syncSubGroupSwitch(item\.key);' && ok "onSwitchChange 会重算一级" || no "onSwitchChange 没调 syncSubGroupSwitch（旧 bug）"
 echo "$ON2" | grep -q 'if (item\.synthetic && item\.subItems)' && ok "一级回滚会连带回滚其下二级（规格1）" || no "缺合成一级回滚联级"
 echo "$ON2" | grep -q '属性写入失败：回滚所有 UI 状态' && ok "保留属性写入失败回滚分支" || no "误删回滚分支"
@@ -205,7 +206,7 @@ process.exit(g>0&&m===0&&scr===2&&sp===2&&union.size===3?0:1);" && ok "所有带
 
 echo "═══ F7. 命令 ↔ WebUI 全量对拍（脚本 xmap2 / xmap3）═══"
 node "$CI/xmap2.js" >/dev/null 2>&1 && ok "PKG_TABLE+特殊块 23 个键逐包一致、keep 传参齐全" || { no "xmap2 对拍失败"; node "$CI/xmap2.js" 2>&1 | grep '❌' | sed 's/^/       /'; }
-node "$CI/xmap3.js" >/dev/null 2>&1 && ok "32 键双向覆盖 / verifyCmd 可解析 / 方向同向 / 特殊块有实现" || { no "xmap3 对拍失败"; node "$CI/xmap3.js" 2>&1 | grep '❌' | sed 's/^/       /'; }
+node "$CI/xmap3.js" >/dev/null 2>&1 && ok "35 键双向覆盖 / verifyCmd 可解析 / 方向同向 / 特殊块有实现" || { no "xmap3 对拍失败"; node "$CI/xmap3.js" 2>&1 | grep '❌' | sed 's/^/       /'; }
 # 不变量：KEEP_KEYS 必须等于「所有 ≥2 包的功能」+「block_ota/block_ads 特殊块」
 node -e "
 const fs=require('fs');
@@ -303,7 +304,7 @@ echo "═══ F11. UI 四项修复（v2.3.18）═══"
 IDX4=$SRC/webroot/index.html
 # L2 之后：CSS 断言走 $CSS_ALL（分层文件），模板/JS 断言仍走 index.html
 
-# ---- #2 系统控制与日志(原守护进程)1-7 / 性能优化2项 / 健康服务 的字体与折叠头(.agg-header)统一 ----
+# ---- #2 系统控制与日志(原守护进程)1-7 / 性能优化3项 / 健康服务 的字体与折叠头(.agg-header)统一 ----
 grep -q 'part(headline){font-size:15px;font-weight:500;line-height:1.3;color:rgb(var(--mdui-color-on-surface))}' $CSS_ALL \
   && ok "【#2】list-item headline 钉为 15px/500/on-surface" || no "【#2】list-item headline 排版未钉死"
 grep -q '^\.agg-title-main{font-size:15px;font-weight:500;color:rgb(var(--mdui-color-on-surface))' $CSS_ALL \
