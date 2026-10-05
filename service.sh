@@ -648,7 +648,7 @@ fi
 #        bcl / ibat / usb / PMIC / 充电 / Modem / 相机 等 73 个安全 zone 一律不碰。
 # 【警告】解除温控后机身与电池持续高温，长期使用加速电池老化、存在鼓包风险；
 #        tsens 临界硬件断电与 PMIC OCP 属硬件层，本块无法也无意关闭。
-#        oiface/horae 本体在 ons​ervices 白名单内，本模块【不禁用任何温控进程】（档②仅软抑制属性，
+#        oiface/horae 本体在 onservices 白名单内，本模块【不禁用任何温控进程】（档②仅软抑制属性，
 #        见 post-fs-data.sh）。
 # 【回滚】sysfs 每次开机重置 → 关闭本项重启即恢复；
 #        卸载模块时 uninstall.sh 第 4b 节立即恢复（zone 回 enabled + 阀门按快照回写）。
@@ -701,6 +701,11 @@ fi
 #        杀掉 + bind 后服务永不回来 → Oboe/AAudio 应用（如节拍器）建流时
 #        libmediametrics::BaseItem::submitBuffer 会阻塞等服务 → 无声 + ANR。
 #        实证 /data/anr/anr_29538_2026-09-27-02-26-14-440，详见 post-fs-data.sh 注释。
+# 【onservices.txt 豁免 · opt-in 默认关】撞表目标（豁免点名）：midasd / ostatsd / ostats_pullerd / ostats_tpd / criticallog / subsystem_ramdump
+#        —— 六者全部在 onservices.txt 开机自启保留表中，仅当 disable_data_collection 被用户显式开启
+#        （默认 false，config 缺键即 false）才对其 pkill；属用户声明式豁免，非遗漏。
+#        kill_redundant_processes 六目标（smartscene preload sysmonitor hotstart daemondaemon
+#        oplusmemchecker）经查均不在 onservices.txt 表内，无需豁免。
 if is_on "disable_data_collection"; then
     log "[DataCollection] 杀残留进程 + 复核..."
     for dcproc in midasd ostatsd ostats_pullerd ostats_tpd criticallog subsystem_ramdump; do

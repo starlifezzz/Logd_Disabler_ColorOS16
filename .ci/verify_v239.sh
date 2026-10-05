@@ -593,6 +593,63 @@ grep -qE '>OnePlus Ace5<|>ColorOS 16<' $IDXS && no "SYSTEM CONFIG 出现写死�
 # 3) getprop 读取链 + 10 机型映射表（映射被清则未知型号显示成 brand+model）
 grep -q 'echo "model=\$(getprop ro.product.model)"' $IDXS && grep -q 'PKG110' $IDXS && ok "getprop 读取链 + 机型映射表在位" || no "读取链或映射表丢失"
 
+echo "═══ F20. 去温控补刀/回滚链防删 + 白名单同源 + onservices 豁免 ═══"
+BCC=$SRC/boot-completed.sh
+# 1) 第三读者在位：缺失 → 开机回写窗口（实测 zone 31→12）无人补禁，回归必现
+grep -q 'disable_thermal_control' "$BCC" && ok "boot-completed 第三读者在位（disable_thermal_control 判定）" || no "boot-completed 缺 disable_thermal_control（补刀块被删？）"
+# 2) 补刀时序：自带 sleep 20 天然晚于 8c 与 boot_completed 触发（删掉即失去窗口保护）
+grep -q 'sleep 20' "$BCC" && ok "补刀时序 sleep 20 在位" || no "补刀 sleep 20 丢失"
+# 3) 补刀动作：zone 禁用 / cooling 清零 / 落盘标记 三件套
+grep -qF 'echo disabled > "$z/mode"' "$BCC" && grep -qF 'thermal_zone*' "$BCC" && ok "补刀 zone 禁用循环在位" || no "补刀 zone 禁用循环丢失"
+grep -qF 'echo 0 > "$c/cur_state"' "$BCC" && grep -qF 'cooling_device*' "$BCC" && ok "补刀 cooling 清零循环在位" || no "补刀 cooling 清零循环丢失"
+grep -qF 'boot_completed 补刀' "$BCC" && ok "补刀落盘日志标记在位" || no "补刀日志标记丢失"
+# 4) 三读者同一 config 路径（漂移 → 各读各的、判定分裂；xmap3 只管 service↔pfs，这里补 boot-completed）
+SC=$(grep -m1 '^CONFIG="' $SRC/service.sh | sed 's/.*CONFIG="//;s/".*//')
+PC=$(grep -m1 'CONFIG_FILE="' $SRC/post-fs-data.sh | sed 's/.*CONFIG_FILE="//;s/".*//')
+if [ -n "$SC" ] && [ "$SC" = "$PC" ] && grep -qF "$SC" "$BCC"; then ok "三读者同路径: $SC"
+else no "config 路径分裂: service=[$SC] pfs=[$PC]"; fi
+# 5) zone 白名单三处同源：钉死基准串（单点漂移/删除/三处同步改动一律红 → 改白名单须同步改本锚，属有意设计）
+ZARM='cpu-*|cpuss-*|gpuss-*|shell_front|shell_frame|shell_back|skin-msm-therm)'
+zget(){ grep -m1 'cpu-\*|cpuss-\*' "$1" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//'; }
+zbad=""
+for zf in service.sh boot-completed.sh uninstall.sh; do
+  [ "$(zget "$SRC/$zf")" = "$ZARM" ] || zbad="$zbad $zf"
+done
+[ -z "$zbad" ] && ok "zone 白名单三文件 == 基准串" || no "zone 白名单漂移/缺失:$zbad"
+# 6) cooling 白名单两处同源（uninstall 按快照逐点回写、无白名单，故只比 service/boot-completed）
+CARMA='cpufreq-*|cpu-cluster*|cpu-hotplug*|pause-cpu*|thermal-pause-*|thermal-cluster-*|gpu|gpu-dump-skip-cdev|devfreq-*|panel0-backlight|display-fps|ddr-cdev)'
+cget(){ grep -m1 'cpufreq-\*|cpu-cluster\*' "$1" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//'; }
+cbad=""
+for cf in service.sh boot-completed.sh; do
+  [ "$(cget "$SRC/$cf")" = "$CARMA" ] || cbad="$cbad $cf"
+done
+[ -z "$cbad" ] && ok "cooling 白名单两文件 == 基准串" || no "cooling 白名单漂移/缺失:$cbad"
+# 7) uninstall 4b 回滚链三件套（卸载后温控必须复原）
+grep -qF 'echo enabled > "$z/mode"' $SRC/uninstall.sh && ok "uninstall 4b zone→enabled 在位" || no "uninstall zone 回写丢失"
+grep -qF 'thermal_cooling_snapshot.txt' $SRC/uninstall.sh && ok "uninstall 冷却快照回写在位" || no "uninstall 冷却快照回写丢失"
+grep -qF 'setprop persist.sys.oiface.enable "$(cat' $SRC/uninstall.sh && ok "uninstall oiface 原值回写在位" || no "uninstall oiface 回写丢失"
+# 8) onservices 豁免：pkill 目标撞开机自启保留表者必须在豁免声明行点名（空提取=报错不放行，防 0 vs 0 假通过）
+EX=$SRC/reference/onservices.txt
+if [ ! -f "$EX" ]; then
+  no "缺 reference/onservices.txt（豁免检查无法执行）"
+else
+  TG=$(grep -hoE 'KILL_LIST="[^"]+"' $SRC/service.sh | head -1 | sed 's/KILL_LIST="//;s/"//')
+  TG="$TG $(grep -hoE 'for dcproc in [^;]+' $SRC/service.sh | sed 's/for dcproc in //')"
+  TG=$(echo $TG)
+  if [ -z "$TG" ]; then
+    no "pkill 目标提取失败（KILL_LIST/dcproc 格式漂移？）"
+  else
+    XB=""
+    for tn in $TG; do
+      if grep -qw "$tn" "$EX"; then
+        grep '豁免' $SRC/service.sh | grep -qw "$tn" || XB="$XB $tn"
+      fi
+    done
+    if [ -z "$XB" ]; then ok "onservices 撞表 pkill 目标均已在豁免声明点名"
+    else no "onservices 撞表但豁免声明未点名:$XB"; fi
+  fi
+fi
+
 echo "════════ 结果：$P 通过 / $F 失败 ════════"
 [ "$F" = "0" ] && echo "🎉 全部通过" || echo "⚠️ 有失败项"
 exit $F

@@ -438,7 +438,7 @@ fi
 # ===================== 去温控·档② oiface 属性软抑制（⚠️ 高风险 · 可还原） =====================
 # 【原理】oiface = ColorOS 性能调度服务（与温控深度联动）；persist.sys.oiface.enable=0
 #        时调度层不再干预温控决策（社区 ThermGuard 同款第一层）。本块只改属性，
-#        【不 start/stop 任何进程】——horae/oiface 本体在 ons​ervices 白名单内必须存活。
+#        【不 start/stop 任何进程】——horae/oiface 本体在 onservices 白名单内必须存活。
 # 【时机】persist 属性跨重启存活，必须每次开机双向写回，故放 post-fs-data（早于 oiface 启动）。
 # 【警告】高风险：属去温控组合的一环，单独关闭本开关不足以恢复整机温控（zone 层见 service.sh 8c）。
 # 【回滚】关闭本项 → 按 oiface_orig.txt 保存的原值写回；卸载 → uninstall.sh 4b 同款回写。
