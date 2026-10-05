@@ -9,7 +9,6 @@
 #           新增禁用项只需在 PKG_TABLE 加一行，无需新增逻辑块
 # ================================================================
 
-MODDIR=${0%/*}
 PROP_PREFIX="persist.sys.coloros16_optimize_gui."   # 仅用于旧属性迁移（v1.x 兼容）
 CONFIG="/data/adb/Logd_Disabler_ColorOS16/config.json"
 WORK_DIR="/data/adb/logd_disabler"
@@ -57,7 +56,6 @@ get_keep() {
 # ===================== 旧属性迁移（v1.x → v2.0） =====================
 # 首次运行：若 config.json 不存在，则从旧 persist.sys.coloros16_optimize_gui.*
 # 属性一次性迁移生成，保证升级不丢用户配置。
-MIGRATED=0
 if [ ! -f "$CONFIG" ]; then
     log "[迁移] 未找到 config.json，尝试从旧 persist 属性迁移..."
     CONFIG_DIR="$(dirname "$CONFIG")"
@@ -86,7 +84,6 @@ if [ ! -f "$CONFIG" ]; then
         echo ""
         echo "}"
     } > "$CONFIG.tmp" && mv "$CONFIG.tmp" "$CONFIG"
-    MIGRATED=1
     log "[迁移] 完成：已生成 config.json"
 fi
 

@@ -9,7 +9,6 @@
 # 说明：KernelSU 卸载模块时自动执行本脚本（存在即调用）
 # ============================================================
 
-MODDIR=${0%/*}
 WORK_DIR="/data/adb/logd_disabler"
 CONFIG_DIR="/data/adb/Logd_Disabler_ColorOS16"
 

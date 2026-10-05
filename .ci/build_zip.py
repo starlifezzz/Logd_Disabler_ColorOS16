@@ -5,7 +5,7 @@ OUT=os.path.join(SRC,'Logd_Disabler_ColorOS16.zip')
 # 排除规则照抄 zip.sh
 # 完全照抄 CI 的 -x 规则：*.git* *.github* *.lingma* .gitignore README.md
 #   Logd_Disabler_ColorOS16.zip zip.sh update.json reference/*
-EXCL_DIRS = {'.git','.github','.lingma','reference','META-INF','node_modules'}
+EXCL_DIRS = {'.git','.github','.lingma','reference','META-INF','node_modules','__pycache__'}
 EXCL_FILES = {'Logd_Disabler_ColorOS16.zip','verify_status.sh','README.md',
               '.gitignore','zip.sh','update.json'}
 EXCL_PAT = re.compile(r'^(verify_.*|.*\.orig|.*\.bak|.*\.swp)$')

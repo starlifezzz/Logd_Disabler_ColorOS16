@@ -303,7 +303,7 @@ echo "═══ F11. UI 四项修复（v2.3.18）═══"
 IDX4=$SRC/webroot/index.html
 # L2 之后：CSS 断言走 $CSS_ALL（分层文件），模板/JS 断言仍走 index.html
 
-# ---- #2 守护进程1-7 / 性能优化2项 / 健康服务 的字体与折叠头(.agg-header)统一 ----
+# ---- #2 系统控制与日志(原守护进程)1-7 / 性能优化2项 / 健康服务 的字体与折叠头(.agg-header)统一 ----
 grep -q 'part(headline){font-size:15px;font-weight:500;line-height:1.3;color:rgb(var(--mdui-color-on-surface))}' $CSS_ALL \
   && ok "【#2】list-item headline 钉为 15px/500/on-surface" || no "【#2】list-item headline 排版未钉死"
 grep -q '^\.agg-title-main{font-size:15px;font-weight:500;color:rgb(var(--mdui-color-on-surface))' $CSS_ALL \
