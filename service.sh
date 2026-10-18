@@ -138,8 +138,9 @@ ORIG_STATE_FILE="$WORK_DIR/pkg_orig_state.txt"
 
 # 查询包当前真实状态：enabled / disabled / missing
 pkg_live_state() {
-    if pmx pm list packages --user 0 2>/dev/null | grep -qF "package:$1"; then
-        if pmx pm list packages -d --user 0 2>/dev/null | grep -qF "package:$1"; then
+    # -x 整行精确匹配：包名前缀撞车（如 com.oplus.ovoicemanager vs .wakeup）会误判存在
+    if pmx pm list packages --user 0 2>/dev/null | grep -qxF "package:$1"; then
+        if pmx pm list packages -d --user 0 2>/dev/null | grep -qxF "package:$1"; then
             echo "disabled"
         else
             echo "enabled"
@@ -294,7 +295,7 @@ fi
 # 【回滚】pm enable com.wifi.masterkey.lite 或卸载本模块（uninstall.sh 收录）即恢复。
 if [ "$PMS_READY" = "1" ]; then
     BOOTFIX_PKG="com.wifi.masterkey.lite"
-    if pmx pm list packages --user 0 | grep -qF "$BOOTFIX_PKG"; then
+    if pmx pm list packages --user 0 | grep -qxF "$BOOTFIX_PKG"; then
         # 【v2.3.19-fix】masterkey 是模块【无条件禁用】的崩溃修复项（不挂任何 config 开关），
         # 其基线由 bootstrap_orig_states 的 _bootfix 条目负责认领为 enabled
         # （模块禁的一定要在卸载时还原）→ 此处不做归属判定，直接禁用。

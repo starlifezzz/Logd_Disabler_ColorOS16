@@ -1841,8 +1841,8 @@ var app = Vue.createApp({
       //   本模块从不卸载（P0 铁律），包对 user0 不可见只能是【用户自己卸的】，
       //   模块无权复活（社区反馈事故：装模块后爱玩机卸载的 App 自行回来）。
       //   故恢复侧只发 `pm enable`；包不存在 → 判定失败并如实提示"未安装，不复活"。
-      var hasPkg = 'pm list packages --user 0 2>/dev/null | grep -qF "package:' + pkg + '"';
-      var readState = 'if ' + hasPkg + '; then if pm list packages -d --user 0 2>/dev/null | grep -qF "package:' + pkg + '"; then echo disabled; else echo enabled; fi; else echo missing; fi';
+      var hasPkg = 'pm list packages --user 0 2>/dev/null | grep -qxF "package:' + pkg + '"';
+      var readState = 'if ' + hasPkg + '; then if pm list packages -d --user 0 2>/dev/null | grep -qxF "package:' + pkg + '"; then echo disabled; else echo enabled; fi; else echo missing; fi';
       var cmd = wantDisabled
         ? 'if ' + hasPkg + '; then pm disable-user --user 0 ' + pkg + ' 2>/dev/null || pm disable ' + pkg + '; fi'
         : 'if ' + hasPkg + '; then pm enable ' + pkg + '; fi';

@@ -132,7 +132,8 @@ for pkg in $ALL_PKGS; do
         SKIPPED=$((SKIPPED + 1))   # 用户既存状态，保留
         continue
     fi
-    if pmx pm list packages -d --user 0 2>/dev/null | grep -qF "package:$pkg"; then
+    # -x 整行精确匹配（防前缀撞车误判）
+    if pmx pm list packages -d --user 0 2>/dev/null | grep -qxF "package:$pkg"; then
         if pmx pm enable --user 0 "$pkg" >/dev/null 2>&1; then
             RESTORED=$((RESTORED + 1))
         fi

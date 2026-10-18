@@ -664,6 +664,10 @@ sed -n '/^disable_pkg() {/,/^}/p' $SRC/service.sh | grep -q '非本模块改动'
 # 3) 恢复侧必须基线门控 + 绝不 install-existing + 不复活 missing
 sed -n '/^enable_pkg() {/,/^}/p' $SRC/service.sh | grep -q 'orig_state_of "$pkg"' && ok "enable_pkg 基线门控" || no "enable_pkg 无基线门控"
 sed -n '/^enable_pkg() {/,/^}/p' $SRC/service.sh | grep -q '不复活' && ok "enable_pkg 不复活被用户卸载的包" || no "enable_pkg 无「不复活」分支"
+# 6) 三态探测必须整行精确（-x）：防包名前缀撞车（com.oplus.ovoicemanager vs .wakeup 实测同装）
+grep -q 'grep -qxF "package:$1"' $SRC/service.sh && ok "pkg_live_state 整行精确匹配（防前缀撞车）" || no "三态探测未用 -qxF（前缀撞车会误判存在）"
+grep -q 'grep -qxF "package:$pkg"' $SRC/uninstall.sh && ok "uninstall 恢复循环整行精确匹配" || no "uninstall 恢复循环未用 -qxF"
+echo "$ON" | grep -q 'grep -qxF "package:' && ok "WebUI 恢复探测整行精确匹配" || no "WebUI 探测未用 -qxF"
 ! grep -qE '^[^#]*install-existing' $SRC/service.sh && ok "service.sh 零 install-existing 执行（仅注释提及）" || no "service.sh 仍有 install-existing 执行行"
 ! grep -qE '^[^#]*install-existing' $SRC/uninstall.sh && ok "uninstall.sh 零 install-existing 执行" || no "uninstall.sh 仍有 install-existing 执行行"
 # 4) 自举调用点存在且早于 PKG_TABLE 主循环；自举为幂等合并（不覆盖已有基线）
