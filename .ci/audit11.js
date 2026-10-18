@@ -55,13 +55,18 @@ console.log(`     （另有 ${[...disabled].length} 个系统已禁用包不在�
 console.log('═══ 2. WebUI pkgStates vs 真机 pm（UI 是否说真话）═══');
 let uiM=[], uiN=0;
 const ps=st.pkgStates||{};
+const psN=Object.keys(ps).length;
 Object.keys(ps).forEach(k=>Object.keys(ps[k]).forEach(p=>{
   if(!all.has(p)) { if(ps[k][p]!=='missing') uiM.push(`${k}/${p} 真机未安装但 UI 记 ${ps[k][p]}`); return; }
   uiN++;
   const real = disabled.has(p)?'disabled':'enabled';
   if(ps[k][p]!==real) uiM.push(`${k}/${p}: UI=${ps[k][p]} 真机=${real}`);
 }));
-uiM.length? uiM.forEach(m=>no(m)) : ok(`UI ${uiN} 条子包状态与真机完全一致`);
+// 【0 vs 0 假通过防护】pkgStates 为空（快照抓取失败/state.json 残缺）时
+// 原逻辑会打印「UI 0 条子包状态与真机完全一致」这种误导性绿 → 显式判红
+if(!psN) no(`state.json 无 pkgStates 记录（快照残缺/抓取失败）→ UI 状态无从核对`);
+else if(uiM.length) uiM.forEach(m=>no(m));
+else ok(`UI ${uiN} 条子包状态与真机完全一致（pkgStates ${psN} 组）`);
 
 console.log('═══ 3. 屏幕服务（你复现的场景）语义核对 ═══');
 const g=(k)=>cfg[k];
