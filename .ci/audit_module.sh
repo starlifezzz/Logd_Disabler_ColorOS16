@@ -45,9 +45,12 @@ HIT=$(grep -nE "(pkill|kill -9|stop[[:space:]]|force-stop|disable-user)[^#]*" "$
 #   模块 disable_pkg 的 uninstall fallback 同族命令已移除。这里钉死：
 #   任何脚本出现"执行 pm uninstall"（pm / cmd package / 带 -k 变体）即红。
 #   注释行按惯例排除；动态拼接（pmx_verbose pm uninstall）同样被抓。
-HIT=$(grep -nE "pm[[:space:]]+uninstall|package[[:space:]]+uninstall|uninstall[[:space:]]+-k" "$SRC"/*.sh 2>/dev/null \
+# [2026-10-12 事故加固·v2.3.19-fix] 同类红线扩展到 install-existing：
+#   恢复侧 install-existing 会把【用户自己卸载的包】复活（社区反馈）；
+#   模块从不卸载 → 包不可见=用户卸的 → 恢复只允许 pm enable。同一条红线钉死。
+HIT=$(grep -nE "pm[[:space:]]+uninstall|package[[:space:]]+uninstall|uninstall[[:space:]]+-k|install-existing" "$SRC"/*.sh 2>/dev/null \
       | grep -vE "^[^:]*:[0-9]+:[[:space:]]*#" | head -5)
-[ -z "$HIT" ] && ok "pm uninstall 零执行：禁用只走 disable-user/disable（2026-10-02 thirdkit 卸载事故红线）" || { no "踩到 pm uninstall 红线（系统包卸载=bootloop）"; echo "$HIT" | sed 's/^/       /'; }
+[ -z "$HIT" ] && ok "pm uninstall / install-existing 零执行：禁用只走 disable-user/disable、恢复只走 pm enable（2026-10-02 thirdkit 卸载事故 + 2026-10-12 误复活事故红线）" || { no "踩到 卸载/复活 红线（系统包卸载=bootloop；复活用户卸载=违背用户意愿）"; echo "$HIT" | sed 's/^/       /'; }
 
 echo "═══ B. 模块开发规范 ═══"
 SBAD=0

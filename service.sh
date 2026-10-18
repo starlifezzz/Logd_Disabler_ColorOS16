@@ -121,6 +121,81 @@ if ! grep -q '"version"' "$CONFIG" 2>/dev/null; then
     fi
 fi
 
+# ===================== 包归属基线（v2.3.19-fix 2026-10-12） =====================
+# 【社区反馈事故】装模块后，用户自己用爱玩机卸载/禁用的 App 被"恢复"回来了。
+# 根因：旧版恢复路径只认 config 开关，无法区分
+#   "本模块禁用的包" vs "用户自己禁用/卸载的包"：
+#     - 可见但被禁用 → 无条件 pm enable（覆盖用户自己的禁用）
+#     - 对 user0 不可见 → cmd package install-existing（把用户卸载的包复活）
+# 方案：首次触碰任何包【之前】，把它的真实状态登记为"基线"（只记一次，永不覆盖）：
+#   enabled / disabled / missing
+#   - 禁用：基线非 enabled（= 用户既存状态）→ 本模块不接管、不 disable
+#   - 恢复：仅 基线=enabled 且当前被禁用 的包才 pm enable（= 本模块禁的）
+#           基线=disabled/missing 一律不动，绝不 install-existing
+#   - 模块从不执行卸载（P0 铁律），故"对 user0 不可见"只可能是用户自己卸的
+# 表位置：/data/adb/logd_disabler/pkg_orig_state.txt（每行 pkg|state）
+ORIG_STATE_FILE="$WORK_DIR/pkg_orig_state.txt"
+
+# 查询包当前真实状态：enabled / disabled / missing
+pkg_live_state() {
+    if pmx pm list packages --user 0 2>/dev/null | grep -qF "package:$1"; then
+        if pmx pm list packages -d --user 0 2>/dev/null | grep -qF "package:$1"; then
+            echo "disabled"
+        else
+            echo "enabled"
+        fi
+    else
+        echo "missing"
+    fi
+}
+
+# 读基线（无记录返回空）
+orig_state_of() {
+    [ -f "$ORIG_STATE_FILE" ] || return 0
+    grep -m1 "^$1|" "$ORIG_STATE_FILE" 2>/dev/null | cut -d'|' -f2
+}
+
+# 登记基线（只记一次，绝不覆盖）
+record_orig() {
+    [ -f "$ORIG_STATE_FILE" ] || : > "$ORIG_STATE_FILE" 2>/dev/null
+    grep -q "^$1|" "$ORIG_STATE_FILE" 2>/dev/null && return 0
+    echo "$1|$2" >> "$ORIG_STATE_FILE" 2>/dev/null
+    return 0
+}
+
+# 首次运行自举（迁移保护）：幂等合并 —— 只补【尚无记录】的包，绝不改动已有基线。
+#   - 旧版用户升级：config 为开 且 当前已被禁用 → 认领为 enabled（那是旧版模块禁的，
+#     后续关开关必须能还原）；其余一律按当前真实状态登记（不认领用户既存状态）。
+#   - 全新安装：config 全 false → 全部按当前真实状态登记 = 用户基线，天然安全。
+#   - 多跑无害：已有记录的包直接跳过（避免把后来的用户操作误认成基线）。
+# 【必须在任何 disable_pkg/enable_pkg 之前调用】
+bootstrap_orig_states() {
+    log "[Orig] 建立/合并包归属基线（只补无记录的包）"
+    _EXTRA_TABLE='
+block_ota|com.oplus.ota,com.oplus.sau,com.oplus.cota,com.oplus.romupdate,com.oplus.upgradeguide
+block_ads_and_tracking|com.oplus.statistics.rom,com.oplus.onetrace,com.oplus.midas,com.oplus.qualityprotect
+_bootfix|com.wifi.masterkey.lite'
+    echo "$PKG_TABLE$_EXTRA_TABLE" | while IFS='|' read -r _k _p; do
+        [ -z "$_k" ] && continue
+        _on=0
+        if is_on "$_k"; then _on=1; fi
+        # _bootfix（masterkey）不挂 config 开关：模块无条件禁用它 → 一律按"模块负责"认领
+        # （否则升级用户会被记成 disabled → 卸载不还原 masterkey，破坏可逆性）
+        [ "$_k" = "_bootfix" ] && _on=1
+        for _pkg in $(echo "$_p" | tr ',' ' '); do
+            [ -n "$(orig_state_of "$_pkg")" ] && continue
+            _s=$(pkg_live_state "$_pkg")
+            if [ "$_on" = "1" ] && [ "$_s" = "disabled" ]; then
+                echo "$_pkg|enabled" >> "$ORIG_STATE_FILE"
+            else
+                echo "$_pkg|$_s" >> "$ORIG_STATE_FILE"
+            fi
+        done
+    done
+    log "[Orig] 基线合并完成：$(wc -l < "$ORIG_STATE_FILE" 2>/dev/null | tr -d ' ') 条"
+    return 0
+}
+
 # ===================== 辅助函数 =====================
 
 # ============================================================
@@ -220,6 +295,9 @@ fi
 if [ "$PMS_READY" = "1" ]; then
     BOOTFIX_PKG="com.wifi.masterkey.lite"
     if pmx pm list packages --user 0 | grep -qF "$BOOTFIX_PKG"; then
+        # 【v2.3.19-fix】masterkey 是模块【无条件禁用】的崩溃修复项（不挂任何 config 开关），
+        # 其基线由 bootstrap_orig_states 的 _bootfix 条目负责认领为 enabled
+        # （模块禁的一定要在卸载时还原）→ 此处不做归属判定，直接禁用。
         result=$(pmx_verbose pm disable-user --user 0 "$BOOTFIX_PKG")
         if echo "$result" | grep -qiE "new state: disabled|Success"; then
             log "[BootFix] ✅ 已禁用 $BOOTFIX_PKG（防 SyncManager bind 崩溃）: $result"
@@ -268,6 +346,17 @@ kill_pkg_procs() {
 disable_pkg() {
     local pkg="$1"
     local keep_key="$2"
+    # 【v2.3.19-fix】归属判定：首次触碰先登记基线（模块安装前的真实状态）。
+    # 基线非 enabled（用户自己已禁用 / 已卸载 / 本机无此包）→ 本模块不接管，
+    # 既不 disable 也不在将来"恢复"它 —— 用户既存状态必须原样保留。
+    local _live _orig
+    _live=$(pkg_live_state "$pkg")
+    record_orig "$pkg" "$_live"
+    _orig=$(orig_state_of "$pkg")
+    if [ "$_orig" != "enabled" ]; then
+        log "  ⏭️ 非本模块改动（基线=$_orig），跳过: $pkg"
+        return 0
+    fi
     # 【子包白名单】用户在 WebUI 单独启用（不禁用）的包
     if [ -n "$keep_key" ]; then
         local keep_val
@@ -324,48 +413,52 @@ disable_pkg() {
     return 1
 }
 
-# 恢复包：优先 pm enable，失败则 fallback 到 cmd package install-existing
+# 恢复包：只还原"本模块禁用过"的包（基线=enabled 且当前确实被禁用）
+# 【v2.3.19-fix 2026-10-12】绝不 install-existing：
+#   - 本模块从不执行卸载（P0 铁律）→ 包对 user0 不可见 = 用户自己卸载的，
+#     模块无权复活（社区反馈事故：装模块后爱玩机卸载的 App 自行回来）。
+#   - 基线 disabled/missing = 用户既存状态，恢复阶段一律不动。
+#   仅保留纯"启用"动作（pm enable），不做任何"安装"动作。
 enable_pkg() {
     local pkg="$1"
-    # 检查包是否已经对用户可见且未被禁用
-    if pmx pm list packages --user 0 | grep -qF "$pkg"; then
-        # 还需检查是否在 disabled 列表中
-        if ! pmx pm list packages -d --user 0 | grep -qF "$pkg"; then
-            log "  ✅ 已启用（跳过）: $pkg"
-            return 0
-        fi
-    else
-        # 包对 user 0 不可见（可能被卸载），走 install-existing 恢复
-        log "  ⚠️ 包对 user 0 不可见，尝试 install-existing 恢复: $pkg"
-        result2=$(pmx_verbose cmd package install-existing "$pkg")
-        if echo "$result2" | grep -q "installed for user"; then
-            log "  ✅ install-existing 成功: $pkg"
-            return 0
-        fi
-        log "  ❌ install-existing 失败: $pkg ($result2)"
-        return 1
+    local orig
+    orig=$(orig_state_of "$pkg")
+    if [ -z "$orig" ]; then
+        # 无本模块改动记录（旧版升级且未走自举 / 从未触碰）→ 保持现状，不恢复
+        log "  ⏭️ 无本模块改动记录，保持现状不恢复: $pkg"
+        return 0
     fi
-    # 方法1：pm enable --user 0
+    if [ "$orig" != "enabled" ]; then
+        log "  ⏭️ 基线为 $orig（用户既存/本机无此包），不恢复: $pkg"
+        return 0
+    fi
+    local live
+    live=$(pkg_live_state "$pkg")
+    case "$live" in
+        enabled)
+            log "  ✅ 已启用（跳过）: $pkg"
+            return 0 ;;
+        missing)
+            # 基线本是 enabled，现被用户卸载 → 尊重用户操作，不复活
+            log "  ⏭️ 已被用户卸载，不复活: $pkg"
+            return 0 ;;
+    esac
+    # live=disabled 且基线=enabled → 本模块禁的，还原
+    local result
     result=$(pmx_verbose pm enable --user 0 "$pkg")
     if echo "$result" | grep -qiE "new state: enabled|Success"; then
         log "  ✅ enable 成功: $pkg"
         return 0
     fi
-    log "  ⚠️ enable 失败: $pkg ($result)"
-    # 方法2：cmd package install-existing（fallback）
-    result2=$(pmx_verbose cmd package install-existing "$pkg")
-    if echo "$result2" | grep -q "installed for user"; then
-        log "  ✅ install-existing fallback 成功: $pkg"
-        return 0
-    fi
-    log "  ⚠️ install-existing fallback 失败: $pkg ($result2)"
-    # 方法3：pm enable（全局恢复，对应 disable_pkg 的 pm disable persistent 兜底）
-    result3=$(pmx_verbose pm enable "$pkg" 2>&1)
-    if echo "$result3" | grep -qiE "new state: enabled|Success"; then
+    log "  ⚠️ pm enable --user 0 失败: $pkg ($result)"
+    # persistent 类包：全局 enable 兜底（对应 disable_pkg 的 pm disable 兜底）
+    local result2
+    result2=$(pmx_verbose pm enable "$pkg" 2>&1)
+    if echo "$result2" | grep -qiE "new state: enabled|Success"; then
         log "  ✅ pm enable 成功（persistent 恢复）: $pkg"
         return 0
     fi
-    log "  ❌ 三种恢复方法均失败: $pkg ($result3)"
+    log "  ❌ 两种恢复方法均失败: $pkg ($result2)"
     return 1
 }
 
@@ -401,11 +494,14 @@ disable_travel_engine|com.oplus.travelengine
 disable_telemetry_cloud|com.heytap.htms,com.heytap.mcs,com.heytap.mydevices,com.oplus.pantanal.ums,com.oppo.ctautoregist,com.oplus.thirdkit
 '
 
+# 【v2.3.19-fix】建立/复用包归属基线（必须在任何 disable/enable 之前）
+bootstrap_orig_states
+
 # 通用循环：处理标准包禁用项
 # 【修复 v2.0.1】不能用 IFS=',' 后再调用 disable_pkg/enable_pkg！
 # 原因：pmx/pmx_verbose 内部用 su -c "$*" 传参，"$*" 会以当前 IFS 的
 # 第一个字符连接参数。IFS=',' 时 su 收到的命令变成
-# "cmd,package,install-existing,pkg" → 全部执行失败，包被误判"跳过"。
+# "pm,disable-user,pkg" → 全部执行失败，包被误判"跳过"。
 # 改用 tr 展开，保持 IFS 为默认值，函数内 "$*" 正常空格连接。
 echo "$PKG_TABLE" | while IFS='|' read -r key pkgs; do
     [ -z "$key" ] && continue

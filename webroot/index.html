@@ -1836,16 +1836,16 @@ var app = Vue.createApp({
 
       // === 2. 异步执行 pm 命令 ===
       // 【v2.3.17 缺陷2】对 installed=false 的包：
-      //   恢复：`pm enable` 必然失败 → errno!=0 → 回滚 → 用户看到「关了又弹回开」。
-      //         服务端 enable_pkg(service.sh:289) 有 `cmd package install-existing` 兜底，
-      //         WebUI 这条路径以前没有 → 两边不一致，这里补齐。
-      //   禁用：包根本没装，发 pm 也必然失败 → 改为"不发 pm、判定达标"，
-      //         没装 = 比禁用更彻底。
+      //   禁用：包根本没装，发 pm 也必然失败 → 改为"不发 pm、判定达标"，没装 = 比禁用更彻底。
+      // 【v2.3.19-fix】恢复路径【绝不做安装动作】：
+      //   本模块从不卸载（P0 铁律），包对 user0 不可见只能是【用户自己卸的】，
+      //   模块无权复活（社区反馈事故：装模块后爱玩机卸载的 App 自行回来）。
+      //   故恢复侧只发 `pm enable`；包不存在 → 判定失败并如实提示"未安装，不复活"。
       var hasPkg = 'pm list packages --user 0 2>/dev/null | grep -qF "package:' + pkg + '"';
       var readState = 'if ' + hasPkg + '; then if pm list packages -d --user 0 2>/dev/null | grep -qF "package:' + pkg + '"; then echo disabled; else echo enabled; fi; else echo missing; fi';
       var cmd = wantDisabled
         ? 'if ' + hasPkg + '; then pm disable-user --user 0 ' + pkg + ' 2>/dev/null || pm disable ' + pkg + '; fi'
-        : 'if ' + hasPkg + '; then pm enable ' + pkg + '; else cmd package install-existing ' + pkg + ' >/dev/null 2>&1 && pm enable ' + pkg + '; fi';
+        : 'if ' + hasPkg + '; then pm enable ' + pkg + '; fi';
       this.addLog('正在' + action + ' ' + pkg + '...');
       sh(cmd).then(function(r) {
         // 回读真实状态，不用乐观值当事实
@@ -1858,7 +1858,7 @@ var app = Vue.createApp({
           self.syncSubGroupSwitch(item.key);
           // 判定"成功"的标准是【期望达成】，不是 errno：
           //   禁用 → 真实为 disabled 或 missing 都算达成
-          //   恢复 → 真实必须是 enabled（install-existing 也没回来 = 失败）
+          //   恢复 → 真实必须是 enabled（不安装，包不存在就只能算失败）
           var done = wantDisabled ? (real !== 'enabled') : (real === 'enabled');
           if (r.errno === 0 && done) {
             // 【v2.3.14 规格4】三级是【实际开关项】，它的状态必须能活过重启。
@@ -1882,7 +1882,11 @@ var app = Vue.createApp({
           } else {
             // === 失败回滚：pkgStates 已是回读到的真实值，只需把开关拨回去 ===
             e.target.checked = !wantDisabled;
-            self.addLog(pkg + ' ' + action + '失败（当前状态: ' + real + '）: ' + (r.stderr || '未知错误'), 'error');
+            var failMsg = pkg + ' ' + action + '失败（当前状态: ' + real + '）: ' + (r.stderr || '未知错误');
+            if (!wantDisabled && real === 'missing') {
+              failMsg = pkg + ' 未安装 —— 本模块不做安装动作（尊重你之前的卸载），已保持未安装';
+            }
+            self.addLog(failMsg, 'error');
           }
         });
       });

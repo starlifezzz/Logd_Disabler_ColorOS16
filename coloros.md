@@ -51,10 +51,28 @@
   （如遥测组里的 thirdkit）→ 会复刻本次不开机
   - 历史触发：**0 次**（service.log 无任何 uninstall 记录），未流血
   - **已修**：fallback 整段移除，失败直接走 `pm disable --user 0` 全局停用——
-    永不做减法（不卸载），只允许停用；恢复侧 install-existing 保留（救用户手动卸载的包）
-  - 恢复侧本就闭环：uninstall.sh L124-126 先 `pm enable`，对 user0 不可见则 `install-existing`
-- **CI 已补**：`.ci/audit_module.sh` 新增红线——任何 `*.sh` 出现执行 `pm uninstall`
-  （`pm ` / `cmd package ` / 带 `-k` 变体）即判红；注释行排除，坏样本验证通过
+    永不做减法（不卸载），只允许停用
+  - 【v2.3.19-fix 2026-10-12】**恢复侧 install-existing 也已移除**（原以为"救用户手动卸载的包"，
+    实为事故源：见下节误复活记录）。恢复只走 `pm enable`，且按归属基线判定。
+- **CI 已补**：`.ci/audit_module.sh` 红线——任何 `*.sh` 出现执行 `pm uninstall`
+  （`pm ` / `cmd package ` / 带 `-k` 变体）**或 `install-existing`** 即判红；
+  注释行排除，坏样本验证通过
+
+### 🚨 P1 事故：装模块后用户自己卸载的 App 被"复活"（2026-10-12 修复）
+- **现象**：用户先用爱玩机卸载 App（子系统/数据基础/互联/乐划等，= `pm uninstall --user 0`），
+  安装本模块后这些 App 全部自行回来，且每次开机都重现
+- **根因**：恢复路径只认 config 开关，无法区分"本模块禁的包"与"用户自己禁/卸的包"：
+  - 可见但被禁用 → 无条件 `pm enable`（覆盖用户自己的禁用）
+  - 对 user0 不可见 → `cmd package install-existing`（把用户卸载的包复活）
+  - 新装默认 config 全 false → 每次开机全走恢复分支 → 表内每个被卸/禁包每次复活
+- **修复**：新增**包归属基线** `pkg_orig_state.txt`（首次触碰前登记真实状态，只记一次）：
+  - 禁用：基线非 `enabled`（用户既存状态）→ 不接管、不 disable
+  - 恢复：仅 基线=`enabled` 且当前被禁用 → `pm enable`；基线 `disabled/missing` 一律不动
+  - 自举 `bootstrap_orig_states` 幂等合并（旧版升级按 config 认领，全新安装按真实状态登记）
+  - 三处同源：`service.sh`(disable_pkg/enable_pkg/bootfix) · `uninstall.sh`(按基线回滚) ·
+    `webroot/index.html`(onPkgSwitch 恢复只发 pm enable)
+- **教训**：模块不得假设"config 就是全部真相"——设备上存在**模块之外的既存状态**
+  （用户自己禁/卸的包），必须用"基线"显式区分归属，禁用前先取证。
 
 ### keep 白名单语义（WebUI `<key>_keep`，本次实测确认）
 - keep = **保留启用**：disable_pkg 跳过该包；若它处于禁用态，还会被**反向 `pm enable` 拉回**

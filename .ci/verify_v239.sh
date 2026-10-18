@@ -237,9 +237,11 @@ echo "$SP" | grep -q "ownerKeep.indexOf(p) < 0" && ok "合成一级 missing 也�
 echo "$SP" | grep -q "allDisabled" && no "残留 allDisabled（旧的只认 disabled 逻辑）" || ok "旧 allDisabled 逻辑已移除"
 # 静态语义不变量：config=false + 包全 enabled → 必须落到 return false（显示关）
 echo "$SP" | grep -q "return v === 'enabled';" && no "误把「实际已启用」当成达标" || ok "expected=启用 时仅 missing/其他不算达标"
-# ---- 缺陷2：onPkgSwitch 必须有 install-existing 兜底 + 状态回读 ----
+# ---- 缺陷2（v2.3.19-fix 反转）：恢复路径【禁止】install-existing（会复活用户卸载的包）----
 ON=$(sed -n '/onPkgSwitch: function/,/^    },/p' $IDX)
-echo "$ON" | grep -q "cmd package install-existing" && ok "恢复路径有 install-existing 兜底（对齐 service.sh）" || no "缺 install-existing 兜底"
+! echo "$ON" | grep -q "install-existing" && ok "恢复路径无 install-existing（不复活用户卸载的包）" || no "恢复路径仍有 install-existing（违背用户卸载尊重原则）"
+echo "$ON" | grep -q "wantDisabled" && echo "$ON" | grep -qE ": 'if ' \+ hasPkg \+ '; then pm enable ' \+ pkg \+ '; fi'" && ok "恢复命令只有 pm enable（不做安装动作）" || no "恢复命令未收敛为纯 pm enable"
+echo "$ON" | grep -q "本模块不做安装动作" && ok "未安装包恢复时给出「不复活」提示" || no "缺「不复活」提示文案"
 echo "$ON" | grep -q "var readState" && ok "pm 执行后回读真实状态" || no "无状态回读"
 echo "$ON" | grep -q 'pm list packages --user 0' && ok "先探测包是否对 user0 可见" || no "无安装探测"
 echo "$ON" | grep -q "real !== 'enabled'" && ok "禁用成功判定包含 missing 达标" || no "成功判定未含 missing"
@@ -649,6 +651,30 @@ else
     else no "onservices 撞表但豁免声明未点名:$XB"; fi
   fi
 fi
+
+echo "═══ F21. 包归属基线（v2.3.19-fix：不复活用户卸载/禁用的包）═══"
+# 事故：模块恢复路径无法区分"自己禁的"与"用户自己禁/卸的"，每次开机把用户卸载的包复活。
+# 1) 基线机制三件套在位（service.sh）
+for k in 'ORIG_STATE_FILE="$WORK_DIR/pkg_orig_state.txt"' 'pkg_live_state()' 'orig_state_of()' 'record_orig()' 'bootstrap_orig_states()'; do
+  grep -qF "$k" $SRC/service.sh && ok "基线机制在位: $k" || no "基线机制缺失: $k"
+done
+# 2) 禁用侧必须先登记基线、并跳过非 enabled（用户既存）状态
+sed -n '/^disable_pkg() {/,/^}/p' $SRC/service.sh | grep -q 'record_orig "$pkg"' && ok "disable_pkg 先登记基线" || no "disable_pkg 未登记基线"
+sed -n '/^disable_pkg() {/,/^}/p' $SRC/service.sh | grep -q '非本模块改动' && ok "disable_pkg 跳过用户既存状态" || no "disable_pkg 未跳过用户既存状态"
+# 3) 恢复侧必须基线门控 + 绝不 install-existing + 不复活 missing
+sed -n '/^enable_pkg() {/,/^}/p' $SRC/service.sh | grep -q 'orig_state_of "$pkg"' && ok "enable_pkg 基线门控" || no "enable_pkg 无基线门控"
+sed -n '/^enable_pkg() {/,/^}/p' $SRC/service.sh | grep -q '不复活' && ok "enable_pkg 不复活被用户卸载的包" || no "enable_pkg 无「不复活」分支"
+! grep -qE '^[^#]*install-existing' $SRC/service.sh && ok "service.sh 零 install-existing 执行（仅注释提及）" || no "service.sh 仍有 install-existing 执行行"
+! grep -qE '^[^#]*install-existing' $SRC/uninstall.sh && ok "uninstall.sh 零 install-existing 执行" || no "uninstall.sh 仍有 install-existing 执行行"
+# 4) 自举调用点存在且早于 PKG_TABLE 主循环；自举为幂等合并（不覆盖已有基线）
+grep -q '^bootstrap_orig_states$' $SRC/service.sh && ok "bootstrap_orig_states 调用点在位" || no "自举未调用（旧版升级会丢基线认领）"
+BL=$(sed -n '/^bootstrap_orig_states() {/,/^}/p' $SRC/service.sh)
+echo "$BL" | grep -q 'orig_state_of "$_pkg"' && ok "自举幂等合并（跳过已有记录）" || no "自举会覆盖已有基线（危险：把用户操作当基线）"
+echo "$BL" | grep -q 'com.wifi.masterkey.lite' && ok "自举覆盖 bootfix 包（masterkey）" || no "自举漏 bootfix 包"
+echo "$BL" | grep -qF '[ "$_k" = "_bootfix" ] && _on=1' && ok "_bootfix 按模块负责认领（卸载必还原 masterkey）" || no "_bootfix 未按模块负责认领（升级用户 masterkey 不还原）"
+# 5) uninstall 侧按基线回滚 + 清理基线文件
+grep -q 'ORIG_STATE_FILE="$WORK_DIR/pkg_orig_state.txt"' $SRC/uninstall.sh && ok "uninstall 读取同一基线表" || no "uninstall 未接基线表"
+grep -q 'rm -f "$ORIG_STATE_FILE"' $SRC/uninstall.sh && ok "uninstall 清理基线文件（零残留）" || no "uninstall 未清理基线文件"
 
 echo "════════ 结果：$P 通过 / $F 失败 ════════"
 [ "$F" = "0" ] && echo "🎉 全部通过" || echo "⚠️ 有失败项"

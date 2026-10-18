@@ -1,7 +1,7 @@
 #!/system/bin/sh
 # ============================================================
 # Logd_Disabler_ColorOS16 卸载回滚脚本（uninstall.sh）
-# - 恢复所有被禁用的包（pm enable / install-existing）
+# - 按归属基线恢复被禁用的包（仅 pm enable；绝不 install-existing —— v2.3.19-fix）
 # - 恢复被修改的系统属性与内核参数
 # - 卸载 bind mount 覆盖（logd/update_engine/OTA 目录/WiFi conf/蓝牙日志 tmpfs/数据回传 7 二进制）
 # - 恢复 MGLRU 内核参数（lru_gen.enabled → 出厂值 0x0003；v2.3.9 起仅作升级兜底，见第 4 节）
@@ -11,6 +11,7 @@
 
 WORK_DIR="/data/adb/logd_disabler"
 CONFIG_DIR="/data/adb/Logd_Disabler_ColorOS16"
+ORIG_STATE_FILE="$WORK_DIR/pkg_orig_state.txt"   # 【v2.3.19-fix】包归属基线表
 
 ui_print "======================================"
 ui_print "  Logd_Disabler_ColorOS16 回滚中..."
@@ -121,21 +122,22 @@ com.wifi.masterkey.lite
 RESTORED=0
 SKIPPED=0
 for pkg in $ALL_PKGS; do
-    # 恢复策略：先尝试 pm enable；若包对 user0 不可见（曾 uninstall -k），走 install-existing
+    # 【v2.3.19-fix】按归属基线回滚：只还原"本模块禁用过"的包（基线=enabled）。
+    #   - 基线 disabled/missing（用户自己禁/卸的）→ 原样保留，绝不动
+    #   - 绝不 install-existing：本模块从不卸载（P0 铁律），包不可见=用户卸的，无权复活
+    #   - 无记录（旧版遗留包/首次启动前卸载）→ 兜底：仅当"可见且被禁用"才 enable（不安装）
+    orig=""
+    [ -f "$ORIG_STATE_FILE" ] && orig=$(grep -m1 "^$pkg|" "$ORIG_STATE_FILE" 2>/dev/null | cut -d'|' -f2)
+    if [ "$orig" = "disabled" ] || [ "$orig" = "missing" ]; then
+        SKIPPED=$((SKIPPED + 1))   # 用户既存状态，保留
+        continue
+    fi
     if pmx pm list packages -d --user 0 2>/dev/null | grep -qF "package:$pkg"; then
         if pmx pm enable --user 0 "$pkg" >/dev/null 2>&1; then
             RESTORED=$((RESTORED + 1))
         fi
-    elif ! pmx pm list packages --user 0 2>/dev/null | grep -qF "package:$pkg"; then
-        # 包存在但 user0 不可见 → install-existing 恢复
-        if pmx pm list packages 2>/dev/null | grep -qF "package:$pkg"; then
-            pmx cmd package install-existing "$pkg" >/dev/null 2>&1
-            RESTORED=$((RESTORED + 1))
-        else
-            SKIPPED=$((SKIPPED + 1))  # 设备上不存在此包
-        fi
     else
-        SKIPPED=$((SKIPPED + 1))  # 包正常运行中，无需恢复
+        SKIPPED=$((SKIPPED + 1))   # 已启用 / 不存在 → 无需恢复
     fi
 done
 log "包恢复完成: 恢复 $RESTORED 个, 跳过 $SKIPPED 个"
@@ -282,6 +284,7 @@ rm -f "$SNAP" "$OIFACE_ORIG" 2>/dev/null
 ui_print "- 清理配置数据..."
 rm -rf "$CONFIG_DIR" 2>/dev/null
 rm -f "$WORK_DIR/dummy" 2>/dev/null
+rm -f "$ORIG_STATE_FILE" 2>/dev/null   # 清理包归属基线（回滚已完成，无残留）
 # v2.3.7：清理 WiFi persist 副本临时文件
 rm -f "$WORK_DIR/cnss_diag.persist.conf" 2>/dev/null
 rm -f "$WORK_DIR/cnss_diag_always_on.persist.conf" 2>/dev/null
