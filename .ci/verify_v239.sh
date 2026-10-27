@@ -42,7 +42,7 @@ grep -n 'echo 0x' $SRC/service.sh $SRC/post-fs-data.sh $SRC/customize.sh $SRC/bo
 echo "═══ C. 开关数量与同步 ═══"
 AK=$(grep -m1 'ALL_KEYS="' $SRC/service.sh | sed 's/.*ALL_KEYS="//;s/".*//')
 N=$(echo $AK | wc -w)
-[ "$N" = "35" ] && ok "ALL_KEYS 数量 = 35" || no "ALL_KEYS = $N (期望 35)"
+[ "$N" = "37" ] && ok "ALL_KEYS 数量 = 37" || no "ALL_KEYS = $N (期望 37)"
 AK2=$(grep -m1 -A0 'ALL_KEYS="' $SRC/service.sh | head -1)
 C1=$(grep -c 'ALL_KEYS="' $SRC/service.sh); [ "$C1" = "2" ] && ok "ALL_KEYS 出现 2 处" || no "ALL_KEYS 出现 $C1 处"
 grep -m1 'ALL_KEYS="' $SRC/service.sh | grep -q enable_mglru && no "ALL_KEYS 仍含 enable_mglru" || ok "ALL_KEYS 已无 enable_mglru"
@@ -63,13 +63,13 @@ extra=[k for k in feats if k not in ak]
 missing=[k for k in ak if k not in feats]
 open(f'{tmp}/feat.txt','w').write("%d\n%s\n%s\n" % (len(feats), ','.join(extra), ','.join(missing)))
 print(f"  FEATURES keys = {len(feats)}")
-if not extra and not missing and len(feats)==35:
-    print(f"  ✅ FEATURES == ALL_KEYS == 35，无缺无多")
+if not extra and not missing and len(feats)==37:
+    print(f"  ✅ FEATURES == ALL_KEYS == 37，无缺无多")
 else:
     print(f"  ❌ extra={extra} missing={missing}")
 PY
-[ "$(sed -n 1p $T/feat.txt)" = "35" ] && [ -z "$(sed -n 2p $T/feat.txt)" ] && [ -z "$(sed -n 3p $T/feat.txt)" ] \
-  && ok "FEATURES ↔ ALL_KEYS 一致(35)" || no "FEATURES ↔ ALL_KEYS 不一致"
+[ "$(sed -n 1p $T/feat.txt)" = "37" ] && [ -z "$(sed -n 2p $T/feat.txt)" ] && [ -z "$(sed -n 3p $T/feat.txt)" ] \
+  && ok "FEATURES ↔ ALL_KEYS 一致(37)" || no "FEATURES ↔ ALL_KEYS 不一致"
 
 echo "═══ E. 核心功能仍完整 ═══"
 BINS="midasd ostatsd ostats_pullerd ostats_tpd criticallog subsystem_ramdump"
@@ -206,7 +206,7 @@ process.exit(g>0&&m===0&&scr===2&&sp===2&&union.size===3?0:1);" && ok "所有带
 
 echo "═══ F7. 命令 ↔ WebUI 全量对拍（脚本 xmap2 / xmap3）═══"
 node "$CI/xmap2.js" >/dev/null 2>&1 && ok "PKG_TABLE+特殊块 23 个键逐包一致、keep 传参齐全" || { no "xmap2 对拍失败"; node "$CI/xmap2.js" 2>&1 | grep '❌' | sed 's/^/       /'; }
-node "$CI/xmap3.js" >/dev/null 2>&1 && ok "35 键双向覆盖 / verifyCmd 可解析 / 方向同向 / 特殊块有实现" || { no "xmap3 对拍失败"; node "$CI/xmap3.js" 2>&1 | grep '❌' | sed 's/^/       /'; }
+node "$CI/xmap3.js" >/dev/null 2>&1 && ok "37 键双向覆盖 / verifyCmd 可解析 / 方向同向 / 特殊块有实现" || { no "xmap3 对拍失败"; node "$CI/xmap3.js" 2>&1 | grep '❌' | sed 's/^/       /'; }
 # 不变量：KEEP_KEYS 必须等于「所有 ≥2 包的功能」+「block_ota/block_ads 特殊块」
 node -e "
 const fs=require('fs');
@@ -679,6 +679,19 @@ echo "$BL" | grep -qF '[ "$_k" = "_bootfix" ] && _on=1' && ok "_bootfix 按模�
 # 5) uninstall 侧按基线回滚 + 清理基线文件
 grep -q 'ORIG_STATE_FILE="$WORK_DIR/pkg_orig_state.txt"' $SRC/uninstall.sh && ok "uninstall 读取同一基线表" || no "uninstall 未接基线表"
 grep -q 'rm -f "$ORIG_STATE_FILE"' $SRC/uninstall.sh && ok "uninstall 清理基线文件（零残留）" || no "uninstall 未清理基线文件"
+
+echo "═══ I. 云控域名 hosts 覆盖（v2.3.20 模块自带，不依赖 bindhosts）═══"
+[ -f "$SRC/cloud_hosts.sh" ] && ok "cloud_hosts.sh 存在（模块自带 hosts 能力）" || no "缺 cloud_hosts.sh（社区用户无 bindhosts 时功能失效）"
+grep -q "CLOUD_HOSTS_TAG_BEGIN=" $SRC/cloud_hosts.sh && ok "标记段常量存在（可幂等剥离/可还原）" || no "缺标记段常量"
+for f in post-fs-data.sh service.sh boot-completed.sh; do
+  grep -q 'cloud_hosts.sh' $SRC/$f && ok "$f 已接入 cloud_hosts.sh" || no "$f 未接入"
+done
+grep -q 'cloud_hosts_remove' $SRC/uninstall.sh && ok "uninstall.sh 卸载挂载层（可逆性）" || no "uninstall 未卸载 hosts 挂载层"
+# 只允许 bind 挂载：不得出现直接改写 /system/etc/hosts 的写法
+# （正则要求重定向符/命令后紧跟目标路径，避免把标记段里的 ">>>" 误判为写入）
+BADW=$(grep -nE '(>>?[[:space:]]*"?/system/etc/hosts|cp[^|;&]*[[:space:]]+/system/etc/hosts|mv[^|;&]*[[:space:]]+/system/etc/hosts|sed -i[^|;&]*/system/etc/hosts)' $SRC/*.sh 2>/dev/null | grep -vE '^[^:]*:[0-9]+:[[:space:]]*#')
+[ -z "$BADW" ] && ok "只 bind 不改写系统 hosts 文件" || { no "存在直接改写 /system/etc/hosts 的写法（必须只 bind）"; echo "$BADW" | sed 's/^/       /'; }
+grep -q 'localhost' $SRC/cloud_hosts.sh && ok "合并结果带 localhost 安全闸（防空 hosts 断解析）" || no "缺 localhost 安全闸"
 
 echo "════════ 结果：$P 通过 / $F 失败 ════════"
 [ "$F" = "0" ] && echo "🎉 全部通过" || echo "⚠️ 有失败项"

@@ -139,6 +139,21 @@ else
     log "[Logd] 未启用，跳过"
 fi
 
+# ===================== 云控域名阻断（hosts 合并覆盖） =====================
+# 【为什么在模块内做】社区用户多数没装 bindhosts，域名拦截不能依赖外部模块。
+# 【做法】cloud_hosts.sh 读当前生效的 hosts（可能已被其它 hosts 模块挂载）→
+#         剥掉本模块旧标记段 → 追加云控域名 → bind 覆盖 /system/etc/hosts。
+# 【警告】被拦域名解析到 0.0.0.0：场景卡片（出行/快递/日程）与短信推广可能不再刷新；
+#         不影响通话/短信/网络/账号等核心功能。
+# 【回滚】WebUI 关闭对应开关后重启，或卸载模块（uninstall.sh 会卸载挂载层）。
+MODDIR=${0%/*}
+if [ -f "$MODDIR/cloud_hosts.sh" ]; then
+    . "$MODDIR/cloud_hosts.sh"
+    cloud_hosts_apply
+else
+    log "[CloudHosts] ⚠️ 未找到 cloud_hosts.sh，跳过域名阻断"
+fi
+
 # ===================== OTA 阻断 =====================
 if is_on "block_ota"; then
     log "[OTA] 开始 mount 覆盖..."

@@ -1,6 +1,6 @@
 const fs=require('fs');
 const SRC=require('path').resolve(__dirname,'..');
-const shAll=fs.readFileSync(SRC+'/service.sh','utf8')+'\n'+fs.readFileSync(SRC+'/post-fs-data.sh','utf8');
+const shAll=fs.readFileSync(SRC+'/service.sh','utf8')+'\n'+fs.readFileSync(SRC+'/post-fs-data.sh','utf8')+'\n'+fs.readFileSync(SRC+'/cloud_hosts.sh','utf8');
 const sh=shAll;
 const h =fs.readFileSync(SRC+'/webroot/index.html','utf8');
 let P=0,Fa=[];const ok=m=>{P++;console.log('  ✅ '+m)};const no=m=>{Fa.push(m);console.log('  ❌ '+m)};

@@ -37,6 +37,28 @@ if ! pidof system_server >/dev/null 2>&1; then
     start update_engine 2>/dev/null
 fi
 
+# ===================== 云控域名 hosts 最终复核 =====================
+# 【为什么还要复核】post-fs-data / service.sh 都挂过，但 bindhosts 等 hosts 模块
+#   若在之后重新挂载，本模块的域名段会被盖住。boot_completed 是最后一道保险：
+#   标记段不在 → 重新合并一次（合并时会保留对方的全部规则，不丢广告拦截）。
+# 【警告】被拦域名解析到 0.0.0.0：场景卡片与短信推广可能不再刷新。
+# 【回滚】关闭 WebUI 对应开关后重启，或卸载模块即恢复。
+CLOUD_LOG="/data/adb/logd_disabler/service.log"
+is_on() {
+    grep -qE "[\"']$1[\"'][[:space:]]*:[[:space:]]*true" "/data/adb/Logd_Disabler_ColorOS16/config.json" 2>/dev/null
+}
+if [ -f "$MODDIR/cloud_hosts.sh" ]; then
+    . "$MODDIR/cloud_hosts.sh"
+    if is_on "block_cloud_hosts" || is_on "block_scene_hosts"; then
+        if cloud_hosts_active; then
+            echo "[$(date '+%Y-%m-%d %H:%M:%S')] [CloudHosts] 开机复核：标记段在位（$(grep -c '^0\.0\.0\.0 ' /system/etc/hosts 2>/dev/null) 条 0.0.0.0）" >> "$CLOUD_LOG"
+        else
+            echo "[$(date '+%Y-%m-%d %H:%M:%S')] [CloudHosts] 开机复核：标记段丢失 → 重新合并覆盖" >> "$CLOUD_LOG"
+            cloud_hosts_apply
+        fi
+    fi
+fi
+
 # ===================== 去温控·boot_completed 补刀（⚠️ 高风险 · 可还原） =====================
 # 【实测 2026-10-05】service.sh 8c 开机禁 31 zone → 温控栈在 boot_completed 窗口把
 #   19 个 CPU zone 一次性回写 enabled（31→12）；此后补禁稳定 120 秒以上 → 该回写是

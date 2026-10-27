@@ -60,9 +60,10 @@ if [ ! -f "$CONFIG" ]; then
     log "[迁移] 未找到 config.json，尝试从旧 persist 属性迁移..."
     CONFIG_DIR="$(dirname "$CONFIG")"
     mkdir -p "$CONFIG_DIR"
-    # 全部 34 个开关 key（含 2 个总开关），与 WebUI FEATURES 一一对应
-    # v2.3.8：新增数据回传/遥测等 3 项（32 → 35）；v2.3.9 移除其中的 MGLRU 开关（35 → 34），原因见下方 8b 说明
-    ALL_KEYS="disable_logd block_ota lock_developer_options block_ads_and_tracking kill_redundant_processes system_prop_toggles memory_io_optimization extra_kernel_optimization disable_health_services disable_network_monitoring disable_gamespace disable_wallet_services disable_backup_services disable_ai_assistants disable_voice_assistants disable_theme_services disable_network_optimization disable_security_services disable_media_services disable_system_tools disable_speedview disable_quick_search disable_app_recover disable_notification_mgr disable_device_link disable_device_connect disable_remote_control disable_travel_engine disable_settings_related disable_screen_services disable_wifi_log disable_bluetooth_log disable_data_collection disable_telemetry_cloud disable_thermal_control"
+    # 全部 37 个开关 key（含 2 个总开关），与 WebUI FEATURES 一一对应
+    # 历史：v2.3.8 新增数据回传/遥测等 3 项（32 → 35）；v2.3.9 移除 MGLRU（35 → 34，注释未随实际计数更新）
+    # 本次：新增云控域名拦截 2 项（block_cloud_hosts / block_scene_hosts），以脚本实计 37 为准
+    ALL_KEYS="disable_logd block_ota lock_developer_options block_ads_and_tracking kill_redundant_processes system_prop_toggles memory_io_optimization extra_kernel_optimization disable_health_services disable_network_monitoring disable_gamespace disable_wallet_services disable_backup_services disable_ai_assistants disable_voice_assistants disable_theme_services disable_network_optimization disable_security_services disable_media_services disable_system_tools disable_speedview disable_quick_search disable_app_recover disable_notification_mgr disable_device_link disable_device_connect disable_remote_control disable_travel_engine disable_settings_related disable_screen_services disable_wifi_log disable_bluetooth_log disable_data_collection disable_telemetry_cloud disable_thermal_control block_cloud_hosts block_scene_hosts"
     # keep 白名单 key（有子包的功能）
     KEEP_KEYS="block_ota_keep block_ads_and_tracking_keep disable_health_services_keep disable_network_monitoring_keep disable_gamespace_keep disable_wallet_services_keep disable_backup_services_keep disable_ai_assistants_keep disable_voice_assistants_keep disable_theme_services_keep disable_network_optimization_keep disable_security_services_keep disable_media_services_keep disable_system_tools_keep disable_speedview_keep disable_quick_search_keep disable_app_recover_keep disable_notification_mgr_keep disable_device_link_keep disable_device_connect_keep disable_remote_control_keep disable_travel_engine_keep disable_telemetry_cloud_keep"
     {
@@ -108,7 +109,7 @@ if ! grep -q '"version"' "$CONFIG" 2>/dev/null; then
         {
             echo "{"
             echo "  \"version\": 2,"
-            ALL_KEYS="disable_logd block_ota lock_developer_options block_ads_and_tracking kill_redundant_processes system_prop_toggles memory_io_optimization extra_kernel_optimization disable_health_services disable_network_monitoring disable_gamespace disable_wallet_services disable_backup_services disable_ai_assistants disable_voice_assistants disable_theme_services disable_network_optimization disable_security_services disable_media_services disable_system_tools disable_speedview disable_quick_search disable_app_recover disable_notification_mgr disable_device_link disable_device_connect disable_remote_control disable_travel_engine disable_settings_related disable_screen_services disable_wifi_log disable_bluetooth_log disable_data_collection disable_telemetry_cloud disable_thermal_control"
+            ALL_KEYS="disable_logd block_ota lock_developer_options block_ads_and_tracking kill_redundant_processes system_prop_toggles memory_io_optimization extra_kernel_optimization disable_health_services disable_network_monitoring disable_gamespace disable_wallet_services disable_backup_services disable_ai_assistants disable_voice_assistants disable_theme_services disable_network_optimization disable_security_services disable_media_services disable_system_tools disable_speedview disable_quick_search disable_app_recover disable_notification_mgr disable_device_link disable_device_connect disable_remote_control disable_travel_engine disable_settings_related disable_screen_services disable_wifi_log disable_bluetooth_log disable_data_collection disable_telemetry_cloud disable_thermal_control block_cloud_hosts block_scene_hosts"
             first=1
             for key in $ALL_KEYS; do
                 [ $first -eq 0 ] && echo ","
@@ -119,6 +120,22 @@ if ! grep -q '"version"' "$CONFIG" 2>/dev/null; then
             echo "}"
         } > "$CONFIG.tmp" && mv "$CONFIG.tmp" "$CONFIG"
     fi
+fi
+
+# ===================== 云控域名阻断（hosts 合并覆盖） =====================
+# 【为什么在模块内做】社区用户多数没装 bindhosts，域名拦截不能依赖外部模块。
+# 【时序】post-fs-data 已挂过一次；这里延后 8 秒再合并一次，是为了排在
+#   bindhosts 等 hosts 模块的 service.sh 挂载【之后】——否则本模块的域名段
+#   会被对方的挂载层盖住（实测 bindhosts v2.1.5 在 service.sh 里做 bind）。
+# 【警告】被拦域名解析到 0.0.0.0：场景卡片（出行/快递/日程）与短信推广可能不再刷新；
+#   不影响通话/短信/网络/账号等核心功能。
+# 【回滚】WebUI 关闭对应开关后重启，或卸载模块（uninstall.sh 会卸载挂载层）。
+MODDIR=${0%/*}
+if [ -f "$MODDIR/cloud_hosts.sh" ]; then
+    . "$MODDIR/cloud_hosts.sh"
+    ( sleep 8; cloud_hosts_apply ) &
+else
+    log "[CloudHosts] ⚠️ 未找到 cloud_hosts.sh，跳过域名阻断"
 fi
 
 # ===================== 包归属基线（v2.3.19-fix 2026-10-12） =====================

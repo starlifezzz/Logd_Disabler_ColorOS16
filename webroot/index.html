@@ -694,6 +694,18 @@ var FEATURES = [
     detail: '原理：禁用 6 个常驻回传包——HeyTap 消息推送、oppo推送、设备互联云、灵犀泛在、运营商自动注册、三方能力服务。\n\n效果：这些通道的云回传与自动注册停止，减少后台流量与无谓唤醒。\n\n代价：欢太与部分系统消息通知可能收不到（连带影响详见卡片警告）。\n\n回滚：关闭本项后重启，或卸载模块即可恢复。',
     checkCmd: 'pm list packages -d --user 0 2>/dev/null | grep -qF "package:com.heytap.htms" && echo disabled || echo enabled',
     verifyCmd: 'for p in com.heytap.htms com.heytap.mcs com.heytap.mydevices com.oplus.pantanal.ums com.oppo.ctautoregist com.oplus.thirdkit; do if pm list packages -d --user 0 2>/dev/null | grep -qF "package:$p"; then echo "$p:disabled"; elif ! pm list packages --user 0 2>/dev/null | grep -qF "package:$p"; then echo "$p:missing"; else echo "$p:enabled"; fi; done; echo "== persistent 标记（persistent=1 的禁用后进程存活到重启，属正常）=="; for p in com.heytap.htms; do echo "  $p: $(dumpsys package $p 2>/dev/null | grep -m1 "flags=" | grep -o PERSISTENT || echo 非persistent)"; done; echo "== 残留进程 =="; ps -A -o PID,NAME 2>/dev/null | grep -E "heytap.htms|heytap.mcs|heytap.mydevices|pantanal.ums|ctautoregist|oplus.thirdkit" || echo "  (无残留)"'
+  },
+  { key: 'block_cloud_hosts', icon: 'cloud_off--outlined', title: '云控域名拦截',
+    desc: '模块自带 hosts 覆盖，拦掉云控配置下发域名（不依赖 bindhosts）',
+    detail: '原理：把 3 个云控域名写进 hosts 并解析到 0.0.0.0，再用 bind 挂载覆盖 /system/etc/hosts：\n• icosa-service-cn-01.allawntech.com —— 云控配置下发（游戏调度/温控/功能开关）\n• andesbrain-ai-cn.heytapmobi.com —— 云控 AI 配置\n• htms.heytapmobi.com —— HeyTap 数据上报通道\n\n合并而非替换：先读当前生效的 hosts，保留你已有的广告拦截规则（bindhosts / AdAway 等），只追加本模块的标记段。系统分区文件本身不会被改写。\n\n效果：云控配置拉取失败，服务端下发的调度参数与功能开关拿不到，只能用本地默认配置。\n\n代价：基本无感——对应的 cosa 应用已被「游戏空间」开关禁用，htms 也已被「消息推送与云通道」禁用；只有你重新启用它们时，才会看到请求失败后重试。\n\n回滚：关闭本项后重启（开机时自动卸载挂载层），或卸载模块。',
+    checkCmd: 'grep -qF "ColorOS16 云控域名" /system/etc/hosts 2>/dev/null && echo blocked || echo clean',
+    verifyCmd: 'echo "== 标记段（期望 2 行 = 开始+结束）=="; grep -cF "ColorOS16 云控域名" /system/etc/hosts 2>/dev/null; echo "== 域名（期望全部 blocked）=="; for d in icosa-service-cn-01.allawntech.com andesbrain-ai-cn.heytapmobi.com htms.heytapmobi.com; do if grep -q " $d$" /system/etc/hosts 2>/dev/null; then echo "$d:blocked"; else echo "$d:pass"; fi; done; echo "== 挂载层 =="; grep " /system/etc/hosts " /proc/mounts 2>/dev/null | head -2; echo "== 合并源文件 =="; ls -l /data/adb/logd_disabler/hosts.cloud 2>/dev/null || echo "(未生成)"'
+  },
+  { key: 'block_scene_hosts', icon: 'visibility_off--outlined', title: '场景与短信推广拦截',
+    desc: '拦掉场景卡片数据与短信推广域名（有取舍：卡片不再刷新）',
+    detail: '原理：在 hosts 里把两个域名解析到 0.0.0.0：\n• scene.dc.oppomobile.com —— 智能场景数据下发（出行/快递/日程卡片的内容来源）\n• sms.ads.heytapmobi.com —— 短信里的推广内容\n\n效果：场景服务拿不到服务端规则与卡片数据，这类桌面卡片与通知可能不再刷新；短信推广不再加载。\n\n代价：这是本组唯一有感的取舍——你如果在意出行/快递/日程卡片，就别开这一项。注意：负一屏（assistantscreen）是另一个应用，与本项无关，开了也不会把它恢复。\n\n回滚：关闭本项后重启，hosts 立即恢复原状（系统文件没被改写，只是挂载层被卸掉）。',
+    checkCmd: 'grep -q " scene.dc.oppomobile.com$" /system/etc/hosts 2>/dev/null && echo blocked || echo clean',
+    verifyCmd: 'echo "== 域名（期望全部 blocked）=="; for d in scene.dc.oppomobile.com sms.ads.heytapmobi.com; do if grep -q " $d$" /system/etc/hosts 2>/dev/null; then echo "$d:blocked"; else echo "$d:pass"; fi; done; echo "== 场景服务进程（被拦后仍会运行，只是拉不到数据）=="; pidof com.coloros.sceneservice 2>/dev/null || echo stopped'
   }
  ]},
 { group: '性能优化', groupIcon: 'rocket_launch--outlined', items: [

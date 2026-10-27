@@ -182,7 +182,16 @@ umount /data/vendor/wifi/cnss_diag.conf 2>/dev/null
 #   tmpfs 内容随 umount 一并消失；磁盘上原有的 bluetooth_*.log 因此重新可见
 #   （本模块从不删除它们，只是被遮蔽）。
 umount /data/misc/bluetooth/logs 2>/dev/null
-log "挂载卸载完成（含 WiFi conf / WiFi 写入目录 tmpfs / 蓝牙日志 tmpfs）"
+# --- 【新增】云控域名 hosts 覆盖：循环卸载本模块的挂载层 ---
+#   只卸"带本模块标记段"的顶层；其它 hosts 模块（bindhosts 等）的层保持不动。
+#   源文件 hosts.cloud 在卸载成功后删除；若被上层压住卸不掉，留给重启清理。
+MODDIR=${0%/*}
+[ -d "$MODDIR" ] || MODDIR="/data/adb/modules/Logd_Disabler_ColorOS16"
+if [ -f "$MODDIR/cloud_hosts.sh" ]; then
+    . "$MODDIR/cloud_hosts.sh"
+    cloud_hosts_remove
+fi
+log "挂载卸载完成（含 WiFi conf / WiFi 写入目录 tmpfs / 蓝牙日志 tmpfs / 云控 hosts）"
 
 # ===================== 3. 恢复系统属性 =====================
 ui_print "- 恢复系统属性..."
