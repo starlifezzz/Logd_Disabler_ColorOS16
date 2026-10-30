@@ -106,7 +106,7 @@ echo "═══ F. checkCmd P1-B 修复 ═══"
 NOLD=$(grep -c "checkCmd: 'pm list packages --user 0 2>/dev/null" $SRC/webroot/index.html)
 [ "$NOLD" = "0" ] && ok "旧写法残留 = 0" || no "旧写法残留 = $NOLD"
 NNEW=$(grep -c "checkCmd: 'pm list packages -d --user 0 2>/dev/null | grep -qF \"package:" $SRC/webroot/index.html)
-[ "$NNEW" = "21" ] && ok "新写法 = 21" || no "新写法 = $NNEW (期望 21)"
+[ "$NNEW" = "22" ] && ok "新写法 = 22" || no "新写法 = $NNEW (期望 22)"
 NJS=$(grep -c "pm list packages -d --user 0 2>/dev/null | grep -qF \"package:\\\$p\"" $SRC/webroot/index.html)
 [ "$NJS" -ge 1 ] && ok "动态生成器仍用 -d (=$NJS)" || no "动态生成器丢失"
 
@@ -716,6 +716,61 @@ grep -q "= \"0\" && echo locked" $SRC/webroot/index.html && no "WebUI checkCmd �
 # 7) 卸载侧不替用户改回来
 grep -nE 'development_settings_enabled' $SRC/uninstall.sh 2>/dev/null | grep -vE '^[0-9]+:[[:space:]]*#' \
   && no "uninstall.sh 仍在写 development_settings_enabled（应只清 lock）" || ok "uninstall.sh 不写 development_settings_enabled"
+
+echo "═══ K. 开关语义：关 = 出厂值，开 = 改默认（v2.3.20 全量审计）═══"
+# 背景：开发者选项那类 bug 的通用形态有三种——
+#   ① 真反向（关分支把出厂开着的东西关掉）
+#   ② 关分支写"看起来像默认"的猜测值（比出厂更激进/更保守）
+#   ③ 写根本没有读取方的属性（空转，开关看着有效其实什么都没做）
+# 本节把三类都钉死，防止回潮。
+# 1) 已实测"无此 sysctl / 整数文件写字符串必失败"的参数，脚本里不得再出现
+BADP=$(grep -nE 'debug_mask|dirty_background_ratio|printk_console_loglevel|khugepaged/defrag' $SRC/service.sh $SRC/uninstall.sh 2>/dev/null | grep -vE '^[^:]*:[0-9]+:[[:space:]]*#')
+[ -z "$BADP" ] && ok "无 debug_mask / dirty_background_ratio / printk_console_loglevel / khugepaged 写入" || { no "仍有已证伪的内核参数写入"; echo "$BADP" | sed 's/^/       /'; }
+# 2) extra_kernel 关闭分支必须写回实测出厂值
+KSEG=$(sed -n '/8\. 额外内核优化/,/^fi$/p' $SRC/service.sh)
+echo "$KSEG" | sed -n '/^else$/,$p' | grep -qE 'echo "4 6 1 7" > /proc/sys/kernel/printk' \
+  && ok "extra_kernel 关闭写回 printk \"4 6 1 7\"（init.qti.kernel.rc:44 出厂）" || no "extra_kernel 关闭分支 printk 不是出厂值"
+echo "$KSEG" | sed -n '/^else$/,$p' | grep -qE 'echo madvise > /sys/kernel/mm/transparent_hugepage/enabled' \
+  && ok "extra_kernel 关闭写回 THP=madvise（CONFIG_TRANSPARENT_HUGEPAGE_MADVISE=y）" || no "extra_kernel 关闭分支 THP 不是出厂值"
+echo "$KSEG" | grep -qE 'echo always' && no "extra_kernel 仍写 THP=always（比出厂更激进）" || ok "extra_kernel 无 always 写入"
+# 3) memory_io 关闭分支 5 项必须与实测出厂一致
+MSEG=$(sed -n '/7\. 内存\/IO 优化/,/^fi$/p' $SRC/service.sh)
+echo "$MSEG" | sed -n '/^else$/,$p' | grep -qE 'echo 1 > /proc/sys/kernel/sched_schedstats' && ok "memory_io 关闭 sched_schedstats=1" || no "memory_io 关闭 sched_schedstats 不符"
+echo "$MSEG" | sed -n '/^else$/,$p' | grep -qE 'echo 100 > /proc/sys/vm/swappiness' && ok "memory_io 关闭 swappiness=100" || no "memory_io 关闭 swappiness 不符"
+echo "$MSEG" | sed -n '/^else$/,$p' | grep -qE 'echo 20 > /proc/sys/vm/dirty_ratio' && ok "memory_io 关闭 dirty_ratio=20" || no "memory_io 关闭 dirty_ratio 不符"
+echo "$MSEG" | sed -n '/^else$/,$p' | grep -qE 'echo 100 > /proc/sys/vm/vfs_cache_pressure' && ok "memory_io 关闭 vfs_cache_pressure=100" || no "memory_io 关闭 vfs_cache_pressure 不符"
+# 4) 零读取方属性：service.sh 与 uninstall.sh 都不得再 setprop
+DEADPROPS='persist\.sys\.monitor|persist\.sys\.hotstart|persist\.debug\.kept|persist\.sys\.profiler_ms|persist\.sys\.strictmode|persist\.traced\.enable|persist\.traced_perf\.enable|persist\.sys\.assert\.panic'
+BADD=$(grep -nE "setprop[[:space:]]+($DEADPROPS)" $SRC/service.sh $SRC/uninstall.sh $SRC/post-fs-data.sh $SRC/boot-completed.sh 2>/dev/null | grep -vE '^[^:]*:[0-9]+:[[:space:]]*#')
+[ -z "$BADD" ] && ok "零读取方属性已全部停写（service/uninstall/post-fs-data/boot-completed）" || { no "仍有零读取方属性的 setprop（空转开关）"; echo "$BADD" | sed 's/^/       /'; }
+# 5) 一个属性只有一个主人：kill 段不得再写 preload
+sed -n '/5\. 进程查杀/,/^fi$/p' $SRC/service.sh | grep -n 'persist.sys.preload' | grep -vE '^[0-9]+:[[:space:]]*#' | grep -q 'persist.sys.preload' && no "kill_redundant 段仍写 preload（与「预加载」开关抢主）" || ok "preload 单主人：kill 段不再写"
+# 6) 唯一有效属性必须仍被写
+sed -n '/6\. 预加载/,/^fi$/p' $SRC/service.sh | grep -q 'setprop persist.sys.preload 0' && ok "预加载开关仍写 preload=0（唯一有读取方 /system_ext/bin/iopgp）" || no "预加载开关实现缺失"
+# 7) uninstall 内核回滚与 service 同源
+grep -qE 'echo "4 6 1 7" > /proc/sys/kernel/printk' $SRC/uninstall.sh && ok "uninstall 内核回滚 printk 与出厂一致" || no "uninstall printk 回滚值不是出厂值"
+grep -qE 'echo madvise > /sys/kernel/mm/transparent_hugepage' $SRC/uninstall.sh && ok "uninstall 内核回滚 THP=madvise" || no "uninstall THP 回滚值不是出厂值"
+# 8) WebUI 云控开关自检必须查自身域名（整段标记会让"只开 scene"误报）
+grep -q 'icosa-service-cn-01.allawntech.com\$' $SRC/webroot/index.html && ok "block_cloud_hosts checkCmd 用自身域名判定" || no "block_cloud_hosts checkCmd 未用自身域名"
+# 9) 第二批空转属性（block_ota / block_ads / disable_logd / 主题）必须停写
+#    取证：logd 系列是临时 umount 后 grep 真实二进制（bind 覆盖会导致假阴性）；
+#          其余为全机 APK dex（含 /my_*）+ lib64 + bin + init rc 全扫 0 命中。
+DEAD2='persist\.ota\.auto_download|persist\.sys\.recovery_update|persist\.sys\.ota\.disabled|persist\.sys\.oplus\.(ad_enable|personalized_ad)|persist\.ad\.track|persist\.sys\.usage_stat_enable|persist\.oppo\.collect|persist\.sys\.lockscreen_magazine|logd\.logpersistd|persist\.logd\.disabled'
+BADD2=$(grep -nE "setprop[[:space:]]+($DEAD2)" $SRC/*.sh 2>/dev/null | grep -vE '^[^:]*:[0-9]+:[[:space:]]*#')
+[ -z "$BADD2" ] && ok "第二批空转属性已停写（OTA/广告/logd/主题共 12 个）" || { no "仍有第二批空转属性的 setprop"; echo "$BADD2" | sed 's/^/       /'; }
+# 10) 广告相关 5 个 Settings 键同样不得再写
+BADS=$(grep -nE 'settings[[:space:]]+put[[:space:]]+(global|secure)[[:space:]]+(oppo_ad_enabled|oppo_ad_personalization|oppo_experience_plan|oppo_data_collection|device_experience_enabled)' $SRC/*.sh 2>/dev/null | grep -vE '^[^:]*:[0-9]+:[[:space:]]*#')
+[ -z "$BADS" ] && ok "广告相关 5 个 Settings 键已停写（全机 0 读取方）" || { no "仍在写广告 Settings 键"; echo "$BADS" | sed 's/^/       /'; }
+# 11) 真实机制不能被误删（删空转属性 ≠ 删功能）
+sed -n '/2\. OTA 阻断/,/^fi$/p' $SRC/service.sh | grep -q 'disable_pkg "com.oplus.ota" "block_ota"' \
+  && ok "block_ota 真实机制仍在（禁 5 包 + 停引擎）" || no "block_ota 功能被误删"
+sed -n '/4\. 广告与数据收集屏蔽/,/^fi$/p' $SRC/service.sh | grep -q 'disable_pkg "com.oplus.statistics.rom" "block_ads_and_tracking"' \
+  && ok "block_ads 真实机制仍在（禁 4 包）" || no "block_ads 功能被误删"
+sed -n '/1\. Logd/,/^fi$/p' $SRC/service.sh | grep -q 'setprop ctl.stop logd' \
+  && ok "disable_logd 真实机制仍在（ctl.stop，init 控制属性）" || no "disable_logd 机制被误删"
+grep -q 'mount -o bind "$DUMMY" "$TARGET"' $SRC/post-fs-data.sh && ok "logd 覆盖仍走 bind（post-fs-data）" || no "logd bind 覆盖丢失"
+# 12) 主题开关只由 PKG_TABLE 承担，不得再出现属性写入段
+sed -n '/17\. 主题/,/二级分组总开关/p' $SRC/service.sh | grep -nE '^[[:space:]]*setprop' && no "主题段仍有 setprop" || ok "主题开关纯包驱动（无属性写入）"
 
 echo "════════ 结果：$P 通过 / $F 失败 ════════"
 [ "$F" = "0" ] && echo "🎉 全部通过" || echo "⚠️ 有失败项"

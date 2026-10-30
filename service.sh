@@ -544,29 +544,35 @@ done
 # ===================== 1. Logd =====================
 # 【v2.3.1】mount 覆盖已由 post-fs-data.sh 在开机早期执行，
 # service.sh（late_start）仅负责杀进程 + 设置属性，不再重复 mount。
+# 【v2.3.20 审计：删掉 3 个 logd 属性写入】
+# 取证方式：这些属性原先的"零读取方"结论不可信 —— /system/bin/logd 已被 dummy(1 字节)
+#   bind 覆盖，grep 读到的是空文件（假阴性）。实测临时 umount 后 grep 真实二进制
+#   （logd 766224 字节，阳性对照 /dev/socket/logd 命中 1 次）：
+#   logd.logpersistd / logd.logpersistd.enable / persist.logd.disabled 均【0 命中】，
+#   且全机 lib64 与 init rc 也无读取方 → 属空转，删除。
+# 真正起作用的是：bind 覆盖二进制（post-fs-data）+ stop/pkill + ctl.stop（init 控制属性）。
 if is_on "disable_logd"; then
-    log "[Logd] 启用：杀进程 + 设置属性..."
+    log "[Logd] 启用：杀进程..."
     stop logd 2>/dev/null
+    # 警告：pkill -9 -x 为【精确进程名】匹配，不会误伤同名子串进程（区别于 -f 的整命令行匹配）
     pkill -9 -x logd 2>/dev/null
     pkill -9 -x logpersistd 2>/dev/null
     pkill -9 -x logcat 2>/dev/null
     pkill -9 -x logtagd 2>/dev/null
     setprop ctl.stop logd 2>/dev/null
-    setprop logd.logpersistd "" 2>/dev/null
-    setprop logd.logpersistd.enable false 2>/dev/null
     log "[Logd] 完成"
 else
-    log "[Logd] 关闭：恢复属性 + 启动进程..."
-    setprop logd.logpersistd.enable true 2>/dev/null
-    setprop persist.logd.disabled 0 2>/dev/null
+    log "[Logd] 关闭：启动进程..."
+    # 二进制恢复靠 post-fs-data.sh 的 umount（本项关闭时不再 bind）
     start logd 2>/dev/null
-    log "[Logd] 恢复完成"
+    log "[Logd] 恢复完成：init.svc.logd=$(getprop init.svc.logd)"
 fi
 
 # ===================== 2. OTA 阻断 =====================
 if is_on "block_ota"; then
     log "[OTA] 启用：杀进程 + 禁用包..."
     stop update_engine 2>/dev/null
+    # 警告：pkill -9 -x 精确名匹配，只终止 update_engine 本体；可还原（关闭开关即恢复）
     pkill -9 -x update_engine 2>/dev/null
     setprop ctl.stop update_engine 2>/dev/null
     # 依据 services.txt：一加Ace5 真实存在的 OTA 相关包
@@ -575,20 +581,17 @@ if is_on "block_ota"; then
     disable_pkg "com.oplus.cota" "block_ota"
     disable_pkg "com.oplus.romupdate" "block_ota"
     disable_pkg "com.oplus.upgradeguide" "block_ota"
-    setprop persist.ota.auto_download 0
-    setprop persist.sys.recovery_update 0
-    setprop persist.sys.ota.disabled 1
+    # 【v2.3.20 审计】删掉 persist.ota.auto_download / persist.sys.recovery_update /
+    #   persist.sys.ota.disabled 三个写入：全机 0 读取方（APK dex + lib64 + bin + init rc 全扫）。
+    #   真正挡住更新的是「禁包 + 停 update_engine + bind 覆盖二进制」，属性只是装饰。
     log "[OTA] 完成"
 else
-    log "[OTA] 关闭：启用包 + 恢复属性..."
+    log "[OTA] 关闭：启用包 + 启动引擎..."
     enable_pkg "com.oplus.ota"
     enable_pkg "com.oplus.sau"
     enable_pkg "com.oplus.cota"
     enable_pkg "com.oplus.romupdate"
     enable_pkg "com.oplus.upgradeguide"
-    setprop persist.ota.auto_download 1 2>/dev/null
-    setprop persist.sys.recovery_update 1 2>/dev/null
-    setprop persist.sys.ota.disabled 0 2>/dev/null
     # 解除 post-fs-data.sh 中挂载覆盖的二进制与 OTA 目录
     for bin in update_engine update_engine_client; do
         TARGET="/system/bin/$bin"
@@ -623,18 +626,15 @@ else
 fi
 
 # ===================== 4. 广告与数据收集屏蔽 =====================
+# 【v2.3.20 审计】删掉 5 个 Settings.Global/Secure 键 + 5 个 persist 属性写入：
+#   oppo_ad_enabled / oppo_ad_personalization / oppo_experience_plan /
+#   oppo_data_collection / device_experience_enabled
+#   persist.sys.oplus.ad_enable / persist.sys.oplus.personalized_ad /
+#   persist.ad.track / persist.sys.usage_stat_enable / persist.oppo.collect
+# 取证：全部 APK 的 dex（含 /my_*）、所有 lib64、所有 bin、所有 init rc —— 均 0 命中。
+# 真正生效的是下面 4 个包的 disable_pkg（统计/追踪宿主进程随之消失）。
 if is_on "block_ads_and_tracking"; then
-    log "[Ads] 启用：关闭广告与数据收集..."
-    settings put global oppo_ad_enabled 0 2>/dev/null
-    settings put secure oppo_ad_personalization 0 2>/dev/null
-    settings put global oppo_experience_plan 0 2>/dev/null
-    settings put global oppo_data_collection 0 2>/dev/null
-    settings put global device_experience_enabled 0 2>/dev/null
-    setprop persist.sys.oplus.ad_enable 0
-    setprop persist.sys.oplus.personalized_ad 0
-    setprop persist.ad.track 0
-    setprop persist.sys.usage_stat_enable 0
-    setprop persist.oppo.collect 0
+    log "[Ads] 启用：禁用统计与追踪宿主..."
       disable_pkg "com.oplus.statistics.rom" "block_ads_and_tracking"
       # 2026-10-02 标签审计：sceneservice=小布指令/场景服务后端（判定表归「小布系列」，非「用户体验计划」）
       # 涉安全支持组件 → 移出广告组，默认不禁（此前误列5包；真实用户体验计划=com.oplus.statistics.rom）
@@ -647,17 +647,7 @@ if is_on "block_ads_and_tracking"; then
       disable_pkg "com.oplus.qualityprotect" "block_ads_and_tracking"
       log "[Ads] 完成"
 else
-    log "[Ads] 关闭：恢复广告与数据收集..."
-    settings put global oppo_ad_enabled 1 2>/dev/null
-    settings put secure oppo_ad_personalization 1 2>/dev/null
-    settings put global oppo_experience_plan 1 2>/dev/null
-    settings put global oppo_data_collection 1 2>/dev/null
-    settings put global device_experience_enabled 1 2>/dev/null
-    setprop persist.sys.oplus.ad_enable 1
-    setprop persist.sys.oplus.personalized_ad 1
-    setprop persist.ad.track 1
-    setprop persist.sys.usage_stat_enable 1
-    setprop persist.oppo.collect 1
+    log "[Ads] 关闭：恢复统计与追踪宿主..."
       enable_pkg "com.oplus.statistics.rom"
       enable_pkg "com.oplus.onetrace"
       enable_pkg "com.oplus.midas"
@@ -666,92 +656,94 @@ else
 fi
 
 # ===================== 5. 进程查杀 =====================
+# 【v2.3.20 审计：本段不再写属性】
+# 原来这里也写 persist.sys.preload/monitor/hotstart，与「预加载」开关完全重叠：
+# 两个开关抢同一批属性，最终值取决于脚本先后顺序（本段在前、预加载在后），
+# 用户关掉其中一个根本不起作用。现按"一个属性只有一个主人"拆分：
+#   persist.sys.preload → 归「预加载」开关（system_prop_toggles）
+#   monitor / hotstart  → 实测全机零读取方，两边都不再写
+# 本段只负责杀进程。
+# 警告：pkill -9 -x 精确名匹配（不使用 -f），只杀名单内的 6 个进程名，不会误伤其它进程。
 if is_on "kill_redundant_processes"; then
     log "[Procs] 启用：查杀冗余进程..."
     KILL_LIST="smartscene preload sysmonitor hotstart daemondaemon oplusmemchecker"
     for proc in $KILL_LIST; do
         pkill -9 -x "$proc" 2>/dev/null
     done
-    setprop persist.sys.preload 0
-    setprop persist.sys.monitor 0
-    setprop persist.sys.hotstart 0
-    log "[Procs] 完成"
+    log "[Procs] 完成（只杀进程，属性由「预加载」开关管理）"
 else
-    log "[Procs] 关闭：恢复属性..."
-    setprop persist.sys.preload 1
-    setprop persist.sys.monitor 1
-    setprop persist.sys.hotstart 1
-    log "[Procs] 恢复完成"
+    log "[Procs] 关闭：不再杀进程（进程随下次开机自然恢复；本项不改任何属性）"
 fi
 
-# ===================== 6. 系统属性开关 =====================
+# ===================== 6. 预加载 =====================
+# 【v2.3.20 审计：9 个属性里只有 1 个有真实读取方】
+# 实测扫描范围：/system、/system_ext、/product、/my_* 全部 APK 的 dex
+#   + /system|/system_ext|/vendor|/odm 的 bin 与 lib64 + 全部 init rc。
+# 命中 0 的属性（写了也没人读，纯空转，已全部删除）：
+#   persist.sys.monitor / persist.sys.hotstart / persist.debug.kept /
+#   persist.sys.profiler_ms / persist.sys.strictmode.disable /
+#   persist.sys.strictmode.visual / persist.traced.enable / persist.traced_perf.enable
+# persist.sys.assert.panic 虽被 77 个组件引用，但 init rc 只匹配字面 "true"
+#   （/system_ext/etc/init/init.oplus.debug.rc:818），写 0/1 都不触发 → 同样删除。
+# 唯一有效：persist.sys.preload（读取方 /system_ext/bin/iopgp）。
+# 【原则】开关关闭写回 1（出厂默认），不留任何"看起来像默认"的猜测值。
 if is_on "system_prop_toggles"; then
-    log "[SysProps] 启用：设置系统属性..."
+    log "[SysProps] 启用：关闭预加载..."
     setprop persist.sys.preload 0
-    setprop persist.sys.monitor 0
-    setprop persist.sys.hotstart 0
-    setprop persist.sys.assert.panic 0
-    setprop persist.debug.kept 0
-    setprop persist.sys.profiler_ms 0
-    setprop persist.sys.strictmode.disable 1
-    setprop persist.sys.strictmode.visual 0
-    setprop persist.traced.enable 0
-    setprop persist.traced_perf.enable 0
-    log "[SysProps] 完成"
+    log "[SysProps] 完成：preload=$(getprop persist.sys.preload)"
 else
-    log "[SysProps] 关闭：恢复系统属性..."
+    log "[SysProps] 关闭：恢复预加载..."
     setprop persist.sys.preload 1
-    setprop persist.sys.monitor 1
-    setprop persist.sys.hotstart 1
-    setprop persist.sys.assert.panic 1
-    setprop persist.debug.kept 1
-    setprop persist.sys.profiler_ms 1
-    setprop persist.sys.strictmode.disable 0
-    setprop persist.sys.strictmode.visual 1
-    setprop persist.traced.enable 1
-    setprop persist.traced_perf.enable 1
-    log "[SysProps] 恢复完成"
+    log "[SysProps] 恢复完成：preload=$(getprop persist.sys.preload)"
 fi
 
 # ===================== 7. 内存/IO 优化 =====================
+# 【v2.3.20 审计：删掉 2 个"关≠出厂"的参数】
+# ① binder debug_mask：内核默认 0（AOSP drivers/android/binder.c），本机无 init rc 覆盖。
+#    原"开"写 0 = 空操作；原"关"写 255 = 打开【全部】Binder 调试日志（反向副作用）。
+#    → 两边都不再写，保持内核默认。
+# ② dirty_background_ratio：本机 init.rc:1896 固定写 5（实测出厂值）。
+#    原"开"写 5 = 空操作；原"关"写 10 反而把出厂 5 改成 10。→ 两边都不再写。
+# 【原则】开关关闭必须回到出厂值，不能写一个"看起来像默认"的猜测值。
 if is_on "memory_io_optimization"; then
     log "[MemIO] 启用：写入优化参数..."
     echo 0 > /proc/sys/kernel/sched_schedstats 2>/dev/null
-    echo 0 > /sys/module/binder/parameters/debug_mask 2>/dev/null
     echo 0 > /proc/sys/vm/compact_unevictable_allowed 2>/dev/null
     echo 30 > /proc/sys/vm/swappiness 2>/dev/null
     echo 10 > /proc/sys/vm/dirty_ratio 2>/dev/null
-    echo 5 > /proc/sys/vm/dirty_background_ratio 2>/dev/null
     echo 50 > /proc/sys/vm/vfs_cache_pressure 2>/dev/null
     log "[MemIO] 完成"
 else
-    log "[MemIO] 关闭：恢复默认参数..."
+    log "[MemIO] 关闭：恢复出厂参数..."
     echo 1 > /proc/sys/kernel/sched_schedstats 2>/dev/null
-    echo 255 > /sys/module/binder/parameters/debug_mask 2>/dev/null
     echo 1 > /proc/sys/vm/compact_unevictable_allowed 2>/dev/null
     echo 100 > /proc/sys/vm/swappiness 2>/dev/null
     echo 20 > /proc/sys/vm/dirty_ratio 2>/dev/null
-    echo 10 > /proc/sys/vm/dirty_background_ratio 2>/dev/null
     echo 100 > /proc/sys/vm/vfs_cache_pressure 2>/dev/null
     log "[MemIO] 恢复完成"
 fi
 
 # ===================== 8. 额外内核优化 =====================
+# 【v2.3.20 审计：删掉 3 个空转/写错的参数】
+# ① printk 出厂值不是 "4 4 1 7"：本机 /vendor/etc/init/hw/init.qti.kernel.rc:44
+#    实测写 "4 6 1 7"。原"关"写 4 4 1 7 = 把 console_loglevel 从 6 压到 4（改变了出厂行为）。
+#    → 关闭分支改为写回 "4 6 1 7"。
+# ② printk_console_loglevel：本机不存在该 sysctl（ls 报 No such file），写入静默失败 → 整段删除。
+# ③ transparent_hugepage/khugepaged/defrag 是【整数】文件（0/1），写 "never"/"always"
+#    实测退出码 1（EINVAL），原开关两向都是空转 → 整段删除。
+# ④ THP 出厂值不是 "always"：本机内核 CONFIG_TRANSPARENT_HUGEPAGE_MADVISE=y
+#    （/proc/config.gz 实测）→ 出厂 [madvise]。原"关"写 always = 比出厂更激进。
 if is_on "extra_kernel_optimization"; then
     log "[Kernel] 启用：写入内核参数..."
     echo "3 3 3 3" > /proc/sys/kernel/printk 2>/dev/null
-    echo 3 > /proc/sys/kernel/printk_console_loglevel 2>/dev/null
     echo never > /sys/kernel/mm/transparent_hugepage/enabled 2>/dev/null
     echo never > /sys/kernel/mm/transparent_hugepage/defrag 2>/dev/null
-    echo never > /sys/kernel/mm/transparent_hugepage/khugepaged/defrag 2>/dev/null
     log "[Kernel] 完成"
 else
-    log "[Kernel] 关闭：恢复默认参数..."
-    echo "4 4 1 7" > /proc/sys/kernel/printk 2>/dev/null
-    echo 4 > /proc/sys/kernel/printk_console_loglevel 2>/dev/null
-    echo always > /sys/kernel/mm/transparent_hugepage/enabled 2>/dev/null
-    echo always > /sys/kernel/mm/transparent_hugepage/defrag 2>/dev/null
-    echo always > /sys/kernel/mm/transparent_hugepage/khugepaged/defrag 2>/dev/null
+    log "[Kernel] 关闭：恢复出厂参数..."
+    echo "4 6 1 7" > /proc/sys/kernel/printk 2>/dev/null
+    echo madvise > /sys/kernel/mm/transparent_hugepage/enabled 2>/dev/null
+    echo madvise > /sys/kernel/mm/transparent_hugepage/defrag 2>/dev/null
     log "[Kernel] 恢复完成"
 fi
 
@@ -830,6 +822,7 @@ fi
 #        oplusmemchecker）经查均不在 onservices.txt 表内，无需豁免。
 if is_on "disable_data_collection"; then
     log "[DataCollection] 杀残留进程 + 复核..."
+    # 警告：pkill -9 -x 精确名匹配；目标仅限下列 6 个采集/转储进程，可还原（关闭开关重启即恢复）
     for dcproc in midasd ostatsd ostats_pullerd ostats_tpd criticallog subsystem_ramdump; do
         if pidof "$dcproc" >/dev/null 2>&1; then
             pkill -9 -x "$dcproc" 2>/dev/null
@@ -850,13 +843,12 @@ else
     log "[DataCollection] 恢复完成"
 fi
 
-# ===================== 17. 主题（附加属性） =====================
-# 主题服务的包已在 PKG_TABLE 处理，这里仅处理关联系统属性
-if is_on "disable_theme_services"; then
-    setprop persist.sys.lockscreen_magazine 0
-else
-    setprop persist.sys.lockscreen_magazine 1
-fi
+# ===================== 17. 主题 =====================
+# 【v2.3.20 审计：整段删除】
+# 原代码只写 persist.sys.lockscreen_magazine 0/1，实测该属性全机 0 读取方
+# （APK dex 含 /my_*、lib64、bin、init rc 全扫）。主题相关能力全部由 PKG_TABLE
+# 里的 8 个包（themestore / keyguard.clock.* / pictorial）承担，与属性无关。
+# 【原则】没有读取方的属性一律不写，避免开关"看起来做了很多事"。
 
 # ================================================================
 # 二级分组总开关（31-32）

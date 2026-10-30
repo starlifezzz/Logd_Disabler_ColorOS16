@@ -601,16 +601,16 @@ var FEATURES = [
 { group: '系统控制与日志', groupIcon: 'security--outlined', items: [
   { key: 'disable_logd', icon: 'article--outlined', title: '系统日志',
     desc: '停止记录日志',
-    detail: '原理：用空文件覆盖 /system/bin/logd，并强杀已运行的 logd 进程，让系统无法再写日志缓冲。\n\n效果：省下日志带来的 CPU 与磁盘写入，对日常使用无影响。\n\n代价：手机出问题时没有系统日志可查，排障会比较困难。\n\n回滚：在 WebUI 关闭本项后重启，或直接卸载模块即可恢复。',
+    detail: '原理：用空文件覆盖 /system/bin/logd，并强杀已运行的 logd 进程，让系统无法再写日志缓冲。\n\n效果：省下日志带来的 CPU 与磁盘写入，对日常使用无影响。\n\n代价：手机出问题时没有系统日志可查，排障会比较困难。\n\n回滚：在 WebUI 关闭本项后重启，或直接卸载模块即可恢复。\n\n注：v2.3.20 删掉了原先一并写入的 logd.logpersistd / logd.logpersistd.enable / persist.logd.disabled——实测（临时 umount 后 grep 真实 logd 二进制 + 全部 lib64 + init rc）零命中，属空转属性；本项只靠覆盖二进制 + 停服务生效。',
     checkCmd: 'pgrep -x logd >/dev/null 2>&1 && echo running || echo stopped',
     verifyCmd: 'echo "进程:"; pgrep -x logd >/dev/null 2>&1 && echo running || echo stopped; echo "文件:"; if [ -f /system/bin/logd ]; then sz=$(stat -c %s /system/bin/logd 2>/dev/null); echo "size=$sz"; else echo "notfound"; fi'
   },
   { key: 'block_ota', icon: 'system_update_alt--outlined', title: '系统更新',
     desc: '禁止自动更新',
-    detail: '原理：禁用 5 个更新相关应用（oplus.ota / sau / cota / romupdate / upgradeguide），并拦截 update_engine 更新引擎进程。\n\n效果：系统不会自动检查、下载或安装 OTA 更新，也不会在后台偷偷消耗流量。\n\n代价：需要手动升级系统时，要先关闭本项并重启一次。\n\n回滚：关闭本项后重启，或卸载模块即可恢复。',
+    detail: '原理：禁用 5 个更新相关应用（oplus.ota / sau / cota / romupdate / upgradeguide），停掉 update_engine 更新引擎进程，并用空文件覆盖其二进制。\n\n效果：系统不会自动检查、下载或安装 OTA 更新，也不会在后台偷偷消耗流量。\n\n代价：需要手动升级系统时，要先关闭本项并重启一次。\n\n回滚：关闭本项后重启，或卸载模块即可恢复。\n\n注：v2.3.20 删掉了原先一并写入的 3 个 OTA 属性（persist.ota.auto_download / persist.sys.recovery_update / persist.sys.ota.disabled）——实测全机零读取方，写它们不会产生任何效果；拦更新靠的是禁包 + 停引擎 + 覆盖二进制。',
     pkgs: ['com.oplus.ota', 'com.oplus.sau', 'com.oplus.cota', 'com.oplus.romupdate', 'com.oplus.upgradeguide'],
     checkCmd: 'pgrep -x update_engine >/dev/null 2>&1 && echo running || echo stopped',
-    verifyCmd: 'echo "进程:"; pgrep -x update_engine >/dev/null 2>&1 && echo running || echo stopped; echo "包:"; for p in com.oplus.ota com.oplus.sau com.oplus.cota com.oplus.romupdate com.oplus.upgradeguide; do if pm list packages -d --user 0 2>/dev/null | grep -qF "package:$p"; then echo "$p:disabled"; elif ! pm list packages --user 0 2>/dev/null | grep -qF "package:$p"; then echo "$p:missing"; else echo "$p:enabled"; fi; done; echo "属性:"; echo "ota_dl=$(getprop persist.ota.auto_download 2>/dev/null)"; echo "recovery=$(getprop persist.sys.recovery_update 2>/dev/null)"'
+    verifyCmd: 'echo "进程:"; pgrep -x update_engine >/dev/null 2>&1 && echo running || echo stopped; echo "包:"; for p in com.oplus.ota com.oplus.sau com.oplus.cota com.oplus.romupdate com.oplus.upgradeguide; do if pm list packages -d --user 0 2>/dev/null | grep -qF "package:$p"; then echo "$p:disabled"; elif ! pm list packages --user 0 2>/dev/null | grep -qF "package:$p"; then echo "$p:missing"; else echo "$p:enabled"; fi; done'
   },
   { key: 'lock_developer_options', icon: 'admin_panel_settings--outlined', title: '开发者选项',
     desc: '开机保持开发者选项开启（防被系统重置关闭）',
@@ -620,15 +620,15 @@ var FEATURES = [
   },
   { key: 'kill_redundant_processes', icon: 'memory--outlined', title: '后台进程',
     desc: '清理无用进程',
-    detail: '原理：清理 smartscene、sysmonitor、hotstart、preload 四个后台服务（ColorOS 的场景识别、系统监控、热启动与预加载），它们常驻后台但对日常使用帮助有限。\n\n效果：省下它们占用的内存与 CPU。\n\n代价：依赖智能场景识别的功能（如自动切换情景模式）可能不再生效。\n\n回滚：关闭本项后重启即可恢复。',
+    detail: '原理：清理 smartscene、sysmonitor、hotstart、preload 四个后台服务（ColorOS 的场景识别、系统监控、热启动与预加载），它们常驻后台但对日常使用帮助有限。\n\n效果：省下它们占用的内存与 CPU。\n\n代价：依赖智能场景识别的功能（如自动切换情景模式）可能不再生效。\n\n回滚：关闭本项后重启即可恢复。\n\n注：v2.3.20 起本项只杀进程，不再写 persist.sys.preload / monitor / hotstart——这三个属性原先由本项和「预加载」开关同时写，谁最后执行谁生效，导致关掉其中一个完全没反应。现按"一个属性只有一个主人"拆分：preload 归「预加载」，monitor / hotstart 实测无读取方，两边都不再写。',
     checkCmd: 'r="ok"; pgrep -x smartscene >/dev/null 2>&1 && r="running"; pgrep -x sysmonitor >/dev/null 2>&1 && r="running"; pgrep -x hotstart >/dev/null 2>&1 && r="running"; echo "$r"',
     verifyCmd: 'echo "smartscene:"; pgrep -x smartscene 2>/dev/null || echo stopped; echo "preload:"; pgrep -x preload 2>/dev/null || echo stopped; echo "sysmonitor:"; pgrep -x sysmonitor 2>/dev/null || echo stopped; echo "hotstart:"; pgrep -x hotstart 2>/dev/null || echo stopped'
   },
   { key: 'system_prop_toggles', icon: 'tune--outlined', title: '预加载',
     desc: '关闭预加载，应用改为用到时才加载',
-    detail: '原理：把 persist.sys.preload / monitor / hotstart 三个属性设为 0。\n\n效果：系统不再预加载、预热应用，减少后台内存与 CPU 占用。\n\n代价：首次冷启动某个应用可能略慢（因为不再提前预热）。\n\n回滚：关闭本项后重启即可恢复。',
+    detail: '原理：把 persist.sys.preload 设为 0，系统不再预取/预热应用。\n\n效果：减少后台预加载带来的内存与 CPU 占用。\n\n代价：首次冷启动某个应用可能略慢（因为不再提前预热）。\n\n回滚：关闭本项后重启，写回 1（出厂默认）。\n\n注：v2.3.20 审计发现本项原先还写 9 个属性（monitor / hotstart / assert.panic / debug.kept / profiler_ms / strictmode.disable / strictmode.visual / traced.enable / traced_perf.enable）。实测在本机全部零读取方（扫描全部 APK 的 dex、所有原生二进制与库、所有 init rc），写进去没有任何效果，只是让开关"看起来做了很多事"。现已全部删除，只保留唯一有真实读取方的 persist.sys.preload（读取方 /system_ext/bin/iopgp）。',
     checkCmd: 'test "$(getprop persist.sys.preload)" = "0" && echo set || echo unset',
-    verifyCmd: 'echo "preload=$(getprop persist.sys.preload 2>/dev/null)"; echo "monitor=$(getprop persist.sys.monitor 2>/dev/null)"; echo "hotstart=$(getprop persist.sys.hotstart 2>/dev/null)"'
+    verifyCmd: 'echo "preload=$(getprop persist.sys.preload 2>/dev/null)"'
   },
   { key: 'disable_wifi_log', icon: 'wifi--outlined', title: 'WiFi日志',
     desc: '日志只留内存，不写入磁盘',
@@ -666,9 +666,9 @@ var FEATURES = [
         '原理：禁用该声明方后，统计共享进程不再由本包作为入口拉起，仅剩 qualityprotect 一个宿主。\n\n代价：无独立功能，禁用无感。',
         '原理：禁用宿主后，140MB 的统计共享进程无处可依（真机实测 0 崩溃、0 外部绑定，且非常驻进程）。\n\n代价：质量保护后台检测停止；统计共享进程整体消失，省内存。'
       ],
-      detail: '原理：禁用 4 个统计包（用户体验计划、OneTrace 追踪、Midas 统计进程、质量保护服务），并把广告与统计相关属性（ad_enable、personalized_ad、track 等）置 0。其中 com.oplus.midas 本身不是可禁用的包，而是共享进程名（onetrace/obrain/qualityprotect 三个包共用）；质量保护服务是其唯一存活宿主，禁用宿主即可让该 140MB 统计进程无处可依（真机实测 0 崩溃、0 外部绑定）。\n\n效果：个性化广告、用户体验计划与后台数据统计停止，不再上报使用数据。\n\n代价：广告不再个性化（仍会显示通用广告），系统失去使用情况统计。\n\n回滚：关闭本项后重启，或卸载模块即可恢复。',
-      checkCmd: 'test "$(getprop persist.sys.oplus.ad_enable 2>/dev/null)" = "0" && echo disabled || echo enabled',
-      verifyCmd: 'echo "包:"; for p in com.oplus.statistics.rom com.oplus.onetrace com.oplus.midas com.oplus.qualityprotect; do if pm list packages -d --user 0 2>/dev/null | grep -qF "package:$p"; then echo "$p:disabled"; elif ! pm list packages --user 0 2>/dev/null | grep -qF "package:$p"; then echo "$p:missing"; else echo "$p:enabled"; fi; done; echo "属性:"; echo "ad=$(getprop persist.sys.oplus.ad_enable 2>/dev/null)"; echo "pad=$(getprop persist.sys.oplus.personalized_ad 2>/dev/null)"; echo "track=$(getprop persist.ad.track 2>/dev/null)"; echo "usage=$(getprop persist.sys.usage_stat_enable 2>/dev/null)"; echo "collect=$(getprop persist.oppo.collect 2>/dev/null)"'
+      detail: '原理：禁用 4 个统计包（用户体验计划、OneTrace 追踪、Midas 统计进程、质量保护服务）。其中 com.oplus.midas 本身不是可禁用的包，而是共享进程名（onetrace/obrain/qualityprotect 三个包共用）；质量保护服务是其唯一存活宿主，禁用宿主即可让该 140MB 统计进程无处可依（真机实测 0 崩溃、0 外部绑定）。\n\n效果：个性化广告、用户体验计划与后台数据统计停止，不再上报使用数据。\n\n代价：广告不再个性化（仍会显示通用广告），系统失去使用情况统计。\n\n回滚：关闭本项后重启，或卸载模块即可恢复。\n\n注：v2.3.20 删掉了原先一并写入的 10 个空转项（5 个 Settings 键 oppo_ad_enabled / oppo_ad_personalization / oppo_experience_plan / oppo_data_collection / device_experience_enabled，5 个 persist 属性 ad_enable / personalized_ad / ad.track / usage_stat_enable / oppo.collect）——实测全机零读取方，写它们不产生任何效果。',
+      checkCmd: 'pm list packages -d --user 0 2>/dev/null | grep -qF "package:com.oplus.statistics.rom" && echo disabled || echo enabled',
+      verifyCmd: 'echo "包:"; for p in com.oplus.statistics.rom com.oplus.onetrace com.oplus.midas com.oplus.qualityprotect; do if pm list packages -d --user 0 2>/dev/null | grep -qF "package:$p"; then echo "$p:disabled"; elif ! pm list packages --user 0 2>/dev/null | grep -qF "package:$p"; then echo "$p:missing"; else echo "$p:enabled"; fi; done'
   },
   { key: 'disable_telemetry_cloud', icon: 'cloud_sync--outlined', title: '消息推送与云通道',
     desc: '禁用 HeyTap 消息推送、oppo推送、灵犀泛在、运营商自动注册等 6 个常驻数据回传包',
@@ -698,7 +698,7 @@ var FEATURES = [
   { key: 'block_cloud_hosts', icon: 'cloud_off--outlined', title: '云控域名拦截',
     desc: '模块自带 hosts 覆盖，拦掉云控配置下发域名（不依赖 bindhosts）',
     detail: '原理：把 3 个云控域名写进 hosts 并解析到 0.0.0.0，再用 bind 挂载覆盖 /system/etc/hosts：\n• icosa-service-cn-01.allawntech.com —— 云控配置下发（游戏调度/温控/功能开关）\n• andesbrain-ai-cn.heytapmobi.com —— 云控 AI 配置\n• htms.heytapmobi.com —— HeyTap 数据上报通道\n\n合并而非替换：先读当前生效的 hosts，保留你已有的广告拦截规则（bindhosts / AdAway 等），只追加本模块的标记段。系统分区文件本身不会被改写。\n\n效果：云控配置拉取失败，服务端下发的调度参数与功能开关拿不到，只能用本地默认配置。\n\n代价：基本无感——对应的 cosa 应用已被「游戏空间」开关禁用，htms 也已被「消息推送与云通道」禁用；只有你重新启用它们时，才会看到请求失败后重试。\n\n回滚：关闭本项后重启（开机时自动卸载挂载层），或卸载模块。',
-    checkCmd: 'grep -qF "ColorOS16 云控域名" /system/etc/hosts 2>/dev/null && echo blocked || echo clean',
+    checkCmd: 'grep -q " icosa-service-cn-01.allawntech.com$" /system/etc/hosts 2>/dev/null && echo blocked || echo clean',
     verifyCmd: 'echo "== 标记段（期望 2 行 = 开始+结束）=="; grep -cF "ColorOS16 云控域名" /system/etc/hosts 2>/dev/null; echo "== 域名（期望全部 blocked）=="; for d in icosa-service-cn-01.allawntech.com andesbrain-ai-cn.heytapmobi.com htms.heytapmobi.com; do if grep -q " $d$" /system/etc/hosts 2>/dev/null; then echo "$d:blocked"; else echo "$d:pass"; fi; done; echo "== 挂载层 =="; grep " /system/etc/hosts " /proc/mounts 2>/dev/null | head -2; echo "== 合并源文件 =="; ls -l /data/adb/logd_disabler/hosts.cloud 2>/dev/null || echo "(未生成)"'
   },
   { key: 'block_scene_hosts', icon: 'visibility_off--outlined', title: '场景与短信推广拦截',
@@ -711,13 +711,13 @@ var FEATURES = [
 { group: '性能优化', groupIcon: 'rocket_launch--outlined', items: [
   { key: 'memory_io_optimization', icon: 'speed--outlined', title: '内存优化',
     desc: '调整内存参数，减少后台写入',
-    detail: '原理：一次调整 7 项内核参数 —— 关闭调度统计(sched_schedstats)、Binder 调试(debug_mask)、不可回收内存压缩(compact_unevictable_allowed)，并把 swappiness 100→30、dirty_ratio 20→10、dirty_background_ratio 10→5、vfs_cache_pressure 100→50。\n\n效果：后台写盘与内存回收更克制，可用内存更宽裕，减少周期性卡顿。\n\n代价：调度统计归零后，性能分析类工具读不到数据；swap 不再积极，极端内存压力下后台应用可能被更早回收。\n\n回滚：WebUI 关闭本项后重启，service.sh 会写回恢复值（1 / 255 / 1 / 100 / 20 / 10 / 100）。',
+    detail: '原理：一次调整 5 项内核参数 —— 关闭调度统计(sched_schedstats)、不可回收内存压缩(compact_unevictable_allowed)，并把 swappiness 100→30、dirty_ratio 20→10、vfs_cache_pressure 100→50。\n\n效果：后台写盘与内存回收更克制，可用内存更宽裕，减少周期性卡顿。\n\n代价：调度统计归零后，性能分析类工具读不到数据；swap 不再积极，极端内存压力下后台应用可能被更早回收。\n\n回滚：WebUI 关闭本项后重启，service.sh 会写回出厂值（1 / 1 / 100 / 20 / 100）。\n\n注：v2.3.20 删掉两项——binder debug_mask（内核默认就是 0，写 0 是空操作；旧版"关闭"却写 255，等于打开全部 Binder 调试日志）与 dirty_background_ratio（本机 init.rc 固定为 5，旧版"关闭"写 10，反而把出厂值改掉了）。',
     checkCmd: 'v=$(cat /proc/sys/kernel/sched_schedstats 2>/dev/null); test "$v" = "0" && echo ok || echo "fail($v)"',
     verifyCmd: 'echo "schedstats=$(cat /proc/sys/kernel/sched_schedstats 2>/dev/null)"; echo "binder=$(cat /sys/module/binder/parameters/debug_mask 2>/dev/null)"; echo "compact=$(cat /proc/sys/vm/compact_unevictable_allowed 2>/dev/null)"; echo "swappiness=$(cat /proc/sys/vm/swappiness 2>/dev/null)"; echo "dirty_ratio=$(cat /proc/sys/vm/dirty_ratio 2>/dev/null)"; echo "dirty_bg_ratio=$(cat /proc/sys/vm/dirty_background_ratio 2>/dev/null)"; echo "vfs_cache_pressure=$(cat /proc/sys/vm/vfs_cache_pressure 2>/dev/null)"'
   },
   { key: 'extra_kernel_optimization', icon: 'bolt--outlined', title: '内核优化',
     desc: '降低内核日志噪音，关闭透明大页',
-    detail: '原理：把内核日志级别 printk 由 "4 4 1 7" 降到 "3 3 3 3"（console_loglevel 同步设为 3），并把透明大页(THP)的 enabled / defrag / khugepaged/defrag 全部设为 never。\n\n效果：减少内核日志刷屏与大页合并带来的 CPU 开销，内存分配更平稳。\n\n代价：内核 WARNING / OOPS 不再打印到控制台，排障需要改看 dmesg 或 pstore；个别超大内存应用的分配可能略慢。\n\n回滚：WebUI 关闭本项后重启，service.sh 会写回恢复值（printk "4 4 1 7"、THP 设为 always）。',
+    detail: '原理：把内核日志级别 printk 由出厂的 "4 6 1 7" 降到 "3 3 3 3"，并把透明大页(THP)的 enabled / defrag 设为 never。\n\n效果：减少内核日志刷屏与大页合并带来的 CPU 开销，内存分配更平稳。\n\n代价：内核 WARNING / OOPS 不再打印到控制台，排障需要改看 dmesg 或 pstore；个别超大内存应用的分配可能略慢。\n\n回滚：WebUI 关闭本项后重启，service.sh 会写回出厂值（printk "4 6 1 7"、THP 设为 madvise）。\n\n注：v2.3.20 修正了三处——① 出厂 printk 是 "4 6 1 7"（本机 init.qti.kernel.rc:44），旧版"关闭"写的是 "4 4 1 7"，会把控制台日志级别从 6 压到 4；② THP 出厂是 madvise（内核 CONFIG_TRANSPARENT_HUGEPAGE_MADVISE=y），旧版"关闭"写 always，比出厂更激进；③ printk_console_loglevel 在本机不存在（写入静默失败）、khugepaged/defrag 是 0/1 整数文件（写 never/always 直接报错），两项已删除。',
     checkCmd: 'p=$(cat /proc/sys/kernel/printk 2>/dev/null); echo "$p"',
     verifyCmd: 'echo "printk=$(cat /proc/sys/kernel/printk 2>/dev/null)"; echo "console_loglevel=$(cat /proc/sys/kernel/printk_console_loglevel 2>/dev/null)"; echo "thp_enabled=$(cat /sys/kernel/mm/transparent_hugepage/enabled 2>/dev/null)"; echo "thp_defrag=$(cat /sys/kernel/mm/transparent_hugepage/defrag 2>/dev/null)"; echo "thp_khugepaged=$(cat /sys/kernel/mm/transparent_hugepage/khugepaged/defrag 2>/dev/null)"'
   },
@@ -877,7 +877,7 @@ var FEATURES = [
       '原理：禁用后锁屏样式与快捷部件资源下线。\n\n代价：锁屏快捷部件消失，存在样式切换异常风险（见卡片警示）。',
       '原理：禁用后乐划内容流拉取与展示停止，锁屏不再推送资讯。\n\n代价：锁屏资讯流消失（界面更清爽）；锁屏基础功能不受影响。'
     ],
-    detail: '原理：禁用主题商店与锁屏时钟杂志等 9 个主题/个性化包。\n\n效果：主题下载与杂志锁屏更新停止。\n\n代价：锁屏时钟与主题组件相互依赖，可能出现锁屏样式异常（连带影响详见卡片警告）。\n\n回滚：关闭本项后重启，或卸载模块即可恢复。',
+    detail: '原理：禁用主题商店与锁屏时钟杂志等 8 个主题/个性化包。\n\n效果：主题下载与杂志锁屏更新停止。\n\n代价：锁屏时钟与主题组件相互依赖，可能出现锁屏样式异常（连带影响详见卡片警告）。\n\n回滚：关闭本项后重启，或卸载模块即可恢复。\n\n注：v2.3.20 删掉了原先一并写入的 persist.sys.lockscreen_magazine——实测全机零读取方（APK dex 含 /my_*、lib64、bin、init rc 全扫），写它不产生任何效果；本项的能力完全由这 8 个包承担。',
     checkCmd: 'pm list packages -d --user 0 2>/dev/null | grep -qF "package:com.oplus.themestore" && echo disabled || echo enabled',
     verifyCmd: 'for p in com.oplus.themestore com.heytap.themestore com.oplus.keyguard.clock.magazine com.oplus.keyguard.clock.gallery com.oplus.keyguard.clock.graffiti com.oplus.keyguard.personality.clocks com.oplus.keyguard.style.widgets com.heytap.pictorial; do if pm list packages -d --user 0 2>/dev/null | grep -qF "package:$p"; then echo "$p:disabled"; elif ! pm list packages --user 0 2>/dev/null | grep -qF "package:$p"; then echo "$p:missing"; else echo "$p:enabled"; fi; done; echo "属性:"; echo "mag=$(getprop persist.sys.lockscreen_magazine 2>/dev/null)"'
   },

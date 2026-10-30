@@ -131,9 +131,9 @@ if is_on "disable_logd"; then
             log "  覆盖 xbin: $TARGET"
         fi
     done
-    setprop logd.logpersistd "" 2>/dev/null
-    setprop logd.logpersistd.enable false 2>/dev/null
-    setprop persist.logd.disabled 1
+    # 【v2.3.20 审计】不再写 logd.logpersistd / logd.logpersistd.enable /
+    #   persist.logd.disabled —— 临时 umount 后 grep 真实 logd(766224B) 与 lib64、
+    #   全部 init rc 均 0 命中，属空转属性。禁用效果只依赖上面的 bind 覆盖。
     log "[Logd] mount 覆盖完成"
 else
     log "[Logd] 未启用，跳过"
@@ -177,8 +177,8 @@ if is_on "block_ota"; then
     rm -rf /data/data/com.oplus.ota/cache/* 2>/dev/null
     rm -rf /data/data/com.coloros.ota/cache/* 2>/dev/null
     rm -rf /data/ota_package/* 2>/dev/null
-    setprop persist.sys.ota.disabled 1
-    setprop persist.ota.auto_download 0
+    # 【v2.3.20 审计】不再写 persist.sys.ota.disabled / persist.ota.auto_download
+    #   （全机 0 读取方）；拦更新只靠禁包 + 停引擎 + bind 覆盖。
     log "[OTA] 覆盖完成"
 else
     log "[OTA] 未启用，跳过"

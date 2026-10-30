@@ -195,38 +195,26 @@ log "挂载卸载完成（含 WiFi conf / WiFi 写入目录 tmpfs / 蓝牙日志
 
 # ===================== 3. 恢复系统属性 =====================
 ui_print "- 恢复系统属性..."
-# Logd
-setprop logd.logpersistd.enable true 2>/dev/null
-setprop persist.logd.disabled 0 2>/dev/null
-setprop logd.logpersistd "" 2>/dev/null
-# OTA
-setprop persist.ota.auto_download 1 2>/dev/null
-setprop persist.sys.recovery_update 1 2>/dev/null
-setprop persist.sys.ota.disabled 0 2>/dev/null
+# 【v2.3.20 审计】本段只保留「模块真的改过 + 有真实读取方」的属性。
+# 已删（全机 0 读取方，模块也不再写，卸载无需"恢复"）：
+#   logd.logpersistd.enable / persist.logd.disabled / logd.logpersistd
+#   persist.ota.auto_download / persist.sys.recovery_update / persist.sys.ota.disabled
+#   persist.sys.oplus.ad_enable / personalized_ad / ad.track / usage_stat_enable / oppo.collect
+#   persist.sys.lockscreen_magazine
+# 旧版本写进去的残留值都是惰性的（无读取方），卸载时不再折腾，避免"看起来恢复了"的假象。
 # DevLock
 # 【注意】只清历史遗留的空属性 persist.dev.option.lock（ColorOS16 无读取方）。
 #   不回写 development_settings_enabled —— 那是用户自己的开关选择，
 #   卸载模块不应替用户改回来（旧版"锁定"语义已废弃，见 service.sh 第 3 节）。
 setprop persist.dev.option.lock 0 2>/dev/null
-# Ads
-setprop persist.sys.oplus.ad_enable 1 2>/dev/null
-setprop persist.sys.oplus.personalized_ad 1 2>/dev/null
-setprop persist.ad.track 1 2>/dev/null
-setprop persist.sys.usage_stat_enable 1 2>/dev/null
-setprop persist.oppo.collect 1 2>/dev/null
-# Procs / SysProps
+# 预加载
+# 【v2.3.20 审计】只保留 persist.sys.preload（唯一有真实读取方 /system_ext/bin/iopgp）。
+#   以下 9 个属性全机零读取方（已扫全部 APK dex + 原生 bin/lib64 + init rc），
+#   模块也不再写它们，卸载时自然无需"恢复"：
+#   monitor / hotstart / assert.panic / debug.kept / profiler_ms /
+#   strictmode.disable / strictmode.visual / traced.enable / traced_perf.enable
+# 【原则】不写没有读取方的属性，避免制造"看起来恢复了"的假象。
 setprop persist.sys.preload 1 2>/dev/null
-setprop persist.sys.monitor 1 2>/dev/null
-setprop persist.sys.hotstart 1 2>/dev/null
-setprop persist.sys.assert.panic 1 2>/dev/null
-setprop persist.debug.kept 1 2>/dev/null
-setprop persist.sys.profiler_ms 1 2>/dev/null
-setprop persist.sys.strictmode.disable 0 2>/dev/null
-setprop persist.sys.strictmode.visual 1 2>/dev/null
-setprop persist.traced.enable 1 2>/dev/null
-setprop persist.traced_perf.enable 1 2>/dev/null
-# 主题
-setprop persist.sys.lockscreen_magazine 1 2>/dev/null
 # 重启 logd（若有）
 start logd 2>/dev/null
 start update_engine 2>/dev/null
@@ -239,18 +227,22 @@ start mediametrics 2>/dev/null
 
 # ===================== 4. 恢复内核参数 =====================
 ui_print "- 恢复内核参数..."
+# 【v2.3.20 审计】只回写模块真正改过、且"关闭值"已验证为出厂的 5+3 项。
+# 删掉的三类（原样写回反而会破坏出厂状态）：
+#   ① binder debug_mask 255：内核默认 0，写 255 = 打开全部 Binder 调试
+#   ② dirty_background_ratio 10：本机 init.rc:1896 出厂 5
+#   ③ printk_console_loglevel：本机无此 sysctl（写入静默失败）
+#      khugepaged/defrag：0/1 整数文件，写 always 报 EINVAL
 echo 1 > /proc/sys/kernel/sched_schedstats 2>/dev/null
-echo 255 > /sys/module/binder/parameters/debug_mask 2>/dev/null
 echo 1 > /proc/sys/vm/compact_unevictable_allowed 2>/dev/null
 echo 100 > /proc/sys/vm/swappiness 2>/dev/null
 echo 20 > /proc/sys/vm/dirty_ratio 2>/dev/null
-echo 10 > /proc/sys/vm/dirty_background_ratio 2>/dev/null
 echo 100 > /proc/sys/vm/vfs_cache_pressure 2>/dev/null
-echo "4 4 1 7" > /proc/sys/kernel/printk 2>/dev/null
-echo 4 > /proc/sys/kernel/printk_console_loglevel 2>/dev/null
-echo always > /sys/kernel/mm/transparent_hugepage/enabled 2>/dev/null
-echo always > /sys/kernel/mm/transparent_hugepage/defrag 2>/dev/null
-echo always > /sys/kernel/mm/transparent_hugepage/khugepaged/defrag 2>/dev/null
+# printk 出厂 "4 6 1 7"（/vendor/etc/init/hw/init.qti.kernel.rc:44 实测）
+echo "4 6 1 7" > /proc/sys/kernel/printk 2>/dev/null
+# THP 出厂 madvise（内核 CONFIG_TRANSPARENT_HUGEPAGE_MADVISE=y，/proc/config.gz 实测）
+echo madvise > /sys/kernel/mm/transparent_hugepage/enabled 2>/dev/null
+echo madvise > /sys/kernel/mm/transparent_hugepage/defrag 2>/dev/null
 # --- 【v2.3.9】MGLRU：写回出厂值 0x0003（本模块已移除 MGLRU 开关，此行为升级兜底）---
 # 【背景】实测 /proc/config.gz: CONFIG_LRU_GEN=y + CONFIG_LRU_GEN_ENABLED=y
 #   → 该内核出厂 MGLRU 即为【开启】(0x0003)，post-fs-data.sh 基线日志也实测 =0x0003。
