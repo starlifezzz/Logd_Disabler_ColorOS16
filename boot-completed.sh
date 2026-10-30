@@ -37,6 +37,14 @@ if ! pidof system_server >/dev/null 2>&1; then
     start update_engine 2>/dev/null
 fi
 
+# ===================== 配置读取（本文件多节共用） =====================
+# 【为什么单列】原 is_on 定义在 hosts 段内部，新增的开发者选项兜底也要用；
+#   提到公共段，避免两处各写一份判定逻辑导致不一致。
+CONFIG_FILE="/data/adb/Logd_Disabler_ColorOS16/config.json"
+is_on() {
+    grep -qE "[\"']$1[\"'][[:space:]]*:[[:space:]]*true" "$CONFIG_FILE" 2>/dev/null
+}
+
 # ===================== 云控域名 hosts 最终复核 =====================
 # 【为什么还要复核】post-fs-data / service.sh 都挂过，但 bindhosts 等 hosts 模块
 #   若在之后重新挂载，本模块的域名段会被盖住。boot_completed 是最后一道保险：
@@ -44,9 +52,6 @@ fi
 # 【警告】被拦域名解析到 0.0.0.0：场景卡片与短信推广可能不再刷新。
 # 【回滚】关闭 WebUI 对应开关后重启，或卸载模块即恢复。
 CLOUD_LOG="/data/adb/logd_disabler/service.log"
-is_on() {
-    grep -qE "[\"']$1[\"'][[:space:]]*:[[:space:]]*true" "/data/adb/Logd_Disabler_ColorOS16/config.json" 2>/dev/null
-}
 if [ -f "$MODDIR/cloud_hosts.sh" ]; then
     . "$MODDIR/cloud_hosts.sh"
     if is_on "block_cloud_hosts" || is_on "block_scene_hosts"; then
@@ -56,6 +61,23 @@ if [ -f "$MODDIR/cloud_hosts.sh" ]; then
             echo "[$(date '+%Y-%m-%d %H:%M:%S')] [CloudHosts] 开机复核：标记段丢失 → 重新合并覆盖" >> "$CLOUD_LOG"
             cloud_hosts_apply
         fi
+    fi
+fi
+
+# ===================== 开发者选项兜底（防被系统/OTA 重置关闭） =====================
+# 【为什么还要兜底】service.sh 在 late_start 已把 development_settings_enabled 拉回 1，
+#   但 ColorOS 的 SettingsProvider / OTA 流程在 boot_completed 窗口仍可能再写一次 0
+#   （社区反馈"开发者模式重启后总失效"）。这里是最后一次机会，晚于 service.sh。
+# 【语义修正】本项 = "保持开启"，不是"上锁"：只写 1，不再写 0。
+#   旧版写反（enabled=0 + lock=1）才是重启后失效的真凶，详见 service.sh 第 3 节注释。
+# 【警告】写 Settings.Global 数据库，不改系统分区；关闭本项后模块不再干预该值。
+# 【回滚】WebUI 关闭本项重启即可，用户自己关开发者选项不会被模块改回来。
+if is_on "lock_developer_options"; then
+    _dev=$(settings get global development_settings_enabled 2>/dev/null | tr -d '[:space:]')
+    if [ "$_dev" != "1" ]; then
+        settings put global development_settings_enabled 1 2>/dev/null
+        _dev2=$(settings get global development_settings_enabled 2>/dev/null | tr -d '[:space:]')
+        echo "[$(date '+%Y-%m-%d %H:%M:%S')] [DevLock] 开机兜底：$_dev → $_dev2" >> "$CLOUD_LOG"
     fi
 fi
 

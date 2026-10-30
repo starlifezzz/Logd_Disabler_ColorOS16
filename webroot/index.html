@@ -613,10 +613,10 @@ var FEATURES = [
     verifyCmd: 'echo "进程:"; pgrep -x update_engine >/dev/null 2>&1 && echo running || echo stopped; echo "包:"; for p in com.oplus.ota com.oplus.sau com.oplus.cota com.oplus.romupdate com.oplus.upgradeguide; do if pm list packages -d --user 0 2>/dev/null | grep -qF "package:$p"; then echo "$p:disabled"; elif ! pm list packages --user 0 2>/dev/null | grep -qF "package:$p"; then echo "$p:missing"; else echo "$p:enabled"; fi; done; echo "属性:"; echo "ota_dl=$(getprop persist.ota.auto_download 2>/dev/null)"; echo "recovery=$(getprop persist.sys.recovery_update 2>/dev/null)"'
   },
   { key: 'lock_developer_options', icon: 'admin_panel_settings--outlined', title: '开发者选项',
-    desc: '锁定开发者选项，防止被系统自动关闭',
-    detail: '原理：写入属性 persist.dev.option.lock，并把 development_settings_enabled 保持在锁定状态。\n\n效果：开发者选项不会被系统自动重置、隐藏或关闭。\n\n代价：无。\n\n回滚：关闭本项后重启即可恢复。',
-    checkCmd: 'test "$(settings get global development_settings_enabled 2>/dev/null)" = "0" && echo locked || echo unlocked',
-    verifyCmd: 'echo "dev=$(settings get global development_settings_enabled 2>/dev/null)"; echo "lock=$(getprop persist.dev.option.lock 2>/dev/null)"'
+    desc: '开机保持开发者选项开启（防被系统重置关闭）',
+    detail: '原理：每次开机把 Settings.Global 里的 development_settings_enabled 重新写成 1（系统设置数据库，不改系统分区）。\n\n效果：开发者选项不会被系统/OTA 悄悄关掉，重启后不用再手动重开。\n\n代价：无。只有本项开启时模块才写这个值；关掉本项后模块完全不干预，你自己关开发者选项也不会被改回来。\n\n注意：旧版本这一项写反了——它开机把 development_settings_enabled 写成 0，再设一个系统根本不读的 persist.dev.option.lock=1，所以表现成"每次重启开发者选项都被关掉"。该问题已修复。\n\n回滚：关闭本项后重启即可。',
+    checkCmd: 'test "$(settings get global development_settings_enabled 2>/dev/null)" = "1" && echo on || echo off',
+    verifyCmd: 'echo "dev=$(settings get global development_settings_enabled 2>/dev/null)"; echo "lock=$(getprop persist.dev.option.lock 2>/dev/null)（历史遗留属性，ColorOS16 无读取方，仅作残留检查）"; echo "adb=$(settings get global adb_enabled 2>/dev/null)"'
   },
   { key: 'kill_redundant_processes', icon: 'memory--outlined', title: '后台进程',
     desc: '清理无用进程',

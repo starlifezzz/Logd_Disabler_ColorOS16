@@ -693,6 +693,30 @@ BADW=$(grep -nE '(>>?[[:space:]]*"?/system/etc/hosts|cp[^|;&]*[[:space:]]+/syste
 [ -z "$BADW" ] && ok "只 bind 不改写系统 hosts 文件" || { no "存在直接改写 /system/etc/hosts 的写法（必须只 bind）"; echo "$BADW" | sed 's/^/       /'; }
 grep -q 'localhost' $SRC/cloud_hosts.sh && ok "合并结果带 localhost 安全闸（防空 hosts 断解析）" || no "缺 localhost 安全闸"
 
+echo "═══ J. 开发者选项语义（v2.3.19-fix：旧版参数写反，重启即失效）═══"
+# 1) 禁止再出现"把开发者选项关掉"的写法（旧 bug 本体）
+BADDEV=$(grep -nE 'settings[[:space:]]+put[[:space:]]+global[[:space:]]+development_settings_enabled[[:space:]]+0' $SRC/service.sh $SRC/boot-completed.sh $SRC/post-fs-data.sh 2>/dev/null | grep -vE ':[0-9]+:[[:space:]]*#')
+[ -z "$BADDEV" ] && ok "无 development_settings_enabled 0 写入（重启失效的根因已消除）" || { no "仍有把开发者选项关掉的写入"; echo "$BADDEV" | sed 's/^/       /'; }
+# 2) 禁止再写 lock=1（该属性在 ColorOS16 无读取方，写了只会误导）
+BADLOCK=$(grep -nE 'setprop[[:space:]]+persist\.dev\.option\.lock[[:space:]]+1' $SRC/*.sh 2>/dev/null | grep -vE ':[0-9]+:[[:space:]]*#')
+[ -z "$BADLOCK" ] && ok "无 persist.dev.option.lock 1 写入" || { no "仍在写 lock=1"; echo "$BADLOCK" | sed 's/^/       /'; }
+# 3) 开启分支必须写 1
+sed -n '/3\. 开发者选项保持开启/,/^fi$/p' $SRC/service.sh | grep -qE 'development_settings_enabled[[:space:]]+1' \
+  && ok "service.sh 开启分支写 enabled=1（保持开启语义）" || no "service.sh 未写 enabled=1"
+# 4) 关闭分支不得改用户选择
+sed -n '/3\. 开发者选项保持开启/,/^fi$/p' $SRC/service.sh | sed -n '/^else$/,$p' | grep -qE 'settings[[:space:]]+put[[:space:]]+global[[:space:]]+development_settings_enabled' \
+  && no "service.sh 关闭分支仍写 development_settings_enabled（应只清 lock）" || ok "service.sh 关闭分支不碰用户选择（只清 lock）"
+# 5) boot-completed 兜底存在
+grep -q 'DevLock' $SRC/boot-completed.sh && grep -q 'development_settings_enabled 1' $SRC/boot-completed.sh \
+  && ok "boot-completed.sh 有开机兜底（拉回 enabled=1）" || no "boot-completed.sh 缺开机兜底"
+# 6) WebUI 自检方向必须与语义同向：=1 判 on
+grep -q "development_settings_enabled 2>/dev/null)\" = \"1\" && echo on" $SRC/webroot/index.html \
+  && ok "WebUI checkCmd 以 =1 判 on（与语义同向）" || no "WebUI checkCmd 方向仍是反的"
+grep -q "= \"0\" && echo locked" $SRC/webroot/index.html && no "WebUI checkCmd 仍以 =0 判 locked（旧 bug 残留）" || ok "WebUI 无 =0 判 locked 残留"
+# 7) 卸载侧不替用户改回来
+grep -nE 'development_settings_enabled' $SRC/uninstall.sh 2>/dev/null | grep -vE '^[0-9]+:[[:space:]]*#' \
+  && no "uninstall.sh 仍在写 development_settings_enabled（应只清 lock）" || ok "uninstall.sh 不写 development_settings_enabled"
+
 echo "════════ 结果：$P 通过 / $F 失败 ════════"
 [ "$F" = "0" ] && echo "🎉 全部通过" || echo "⚠️ 有失败项"
 exit $F

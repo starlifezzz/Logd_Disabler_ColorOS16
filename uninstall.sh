@@ -204,6 +204,9 @@ setprop persist.ota.auto_download 1 2>/dev/null
 setprop persist.sys.recovery_update 1 2>/dev/null
 setprop persist.sys.ota.disabled 0 2>/dev/null
 # DevLock
+# 【注意】只清历史遗留的空属性 persist.dev.option.lock（ColorOS16 无读取方）。
+#   不回写 development_settings_enabled —— 那是用户自己的开关选择，
+#   卸载模块不应替用户改回来（旧版"锁定"语义已废弃，见 service.sh 第 3 节）。
 setprop persist.dev.option.lock 0 2>/dev/null
 # Ads
 setprop persist.sys.oplus.ad_enable 1 2>/dev/null

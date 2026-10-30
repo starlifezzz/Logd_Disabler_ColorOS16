@@ -601,17 +601,25 @@ else
     log "[OTA] 恢复完成"
 fi
 
-# ===================== 3. 开发者选项锁定 =====================
+# ===================== 3. 开发者选项保持开启 =====================
+# 【参数写反修复】旧实现是 development_settings_enabled=0 + persist.dev.option.lock=1，
+#   效果与文案完全相反：每次开机把开发者选项【关掉】再"上锁"
+#   → 用户重启后必须手动重开（社区反馈"开发者模式重启总失效"即此因）。
+# 【实测证据】本机 /system/framework/*.jar 全部、/system|system_ext|product 的 129 个
+#   priv-app APK 均搜不到 "dev.option.lock" 字样，build.prop 也无此键
+#   → 该属性在 ColorOS16 上是【无人读取的空属性】，真正生效的只有 settings put 那句。
+# 【修正后语义】开启 = 开机确保 development_settings_enabled=1（被系统/OTA 重置后自动拉回），
+#   并把历史版本可能留下的 lock=1 清成 0；关闭 = 只清 lock，不碰用户自己的选择。
+# 【警告】写的是 Settings.Global（数据库），不改系统分区，随时可还原。
 if is_on "lock_developer_options"; then
-    log "[DevLock] 启用：锁定开发者选项..."
-    settings put global development_settings_enabled 0 2>/dev/null
-    setprop persist.dev.option.lock 1
-    log "[DevLock] 完成"
-else
-    log "[DevLock] 关闭：解锁开发者选项..."
+    log "[DevLock] 启用：保持开发者选项开启..."
     settings put global development_settings_enabled 1 2>/dev/null
     setprop persist.dev.option.lock 0
-    log "[DevLock] 恢复完成"
+    log "[DevLock] 完成：dev_enabled=$(settings get global development_settings_enabled 2>/dev/null) lock=$(getprop persist.dev.option.lock)"
+else
+    log "[DevLock] 关闭：仅清理旧版遗留的 lock 属性（不改用户选择）"
+    setprop persist.dev.option.lock 0
+    log "[DevLock] 完成：dev_enabled=$(settings get global development_settings_enabled 2>/dev/null)（用户自行设置，本项不干预）"
 fi
 
 # ===================== 4. 广告与数据收集屏蔽 =====================
