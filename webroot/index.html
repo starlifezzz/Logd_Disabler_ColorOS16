@@ -715,12 +715,6 @@ var FEATURES = [
     checkCmd: 'v=$(cat /proc/sys/kernel/sched_schedstats 2>/dev/null); test "$v" = "0" && echo ok || echo "fail($v)"',
     verifyCmd: 'echo "schedstats=$(cat /proc/sys/kernel/sched_schedstats 2>/dev/null)"; echo "vfs_cache_pressure=$(cat /proc/sys/vm/vfs_cache_pressure 2>/dev/null)"'
   },
-  { key: 'extra_kernel_optimization', icon: 'bolt--outlined', title: '内核优化',
-    desc: '关闭透明大页(THP)',
-    detail: '原理：把透明大页(THP)的 enabled 设为 never。\n\n效果：⚠️ 已实测为空转 —— 厂商 /vendor/bin/init.kernel.post_boot.sh:261 自己就写 never（该段注释原文 "# We do not use THP"），且该脚本在 service.sh 之后执行，会把本项覆盖成同一个值 → 开关开与关对系统实际行为没有区别（"关"分支写 madvise 也会被随后的厂商脚本改成 never）。\n\n代价：无（不改变任何实际参数）。保留本开关只为保证不把 THP 打开（真正有内存膨胀风险的是 always，模块从不写 always）。\n\n回滚：WebUI 关闭本项后重启，service.sh 写 madvise，但厂商脚本随后仍写 never → 最终值仍是出厂 never。\n\n注：v2.3.20 修正两处（THP 出厂不是 always；printk_console_loglevel 与 khugepaged/defrag 写不进去）。v2.3.21 又删 2 项——printk（本机 console=ttynull，没有控制台，改它收益为 0；且写 "3 3 3 3" 会把 minimum_console_loglevel 从 1 抬到 3）与 THP defrag（厂商 post_boot.sh:263 本就写 never，模块再写纯冗余）。另更正：printk 出厂终值不是 init.qti.kernel.rc:44 的 "4 6 1 7"，而是 /vendor/bin/init.qcom.sh:455-465 按 build.type 覆盖后的值（user → "4 3 1 4"）。',
-    checkCmd: 'v=$(cat /sys/kernel/mm/transparent_hugepage/enabled 2>/dev/null); case "$v" in *"[never]"*) echo ok;; *) echo "fail($v)";; esac',
-    verifyCmd: 'echo "thp_enabled=$(cat /sys/kernel/mm/transparent_hugepage/enabled 2>/dev/null)"; echo "thp_defrag=$(cat /sys/kernel/mm/transparent_hugepage/defrag 2>/dev/null)"'
-  },
   { key: 'disable_thermal_control', icon: 'sports_esports--outlined', title: '去温控',
     desc: '解除 CPU/GPU 内核温控与 oiface 性能调度限制',
     detail: '原理：每次开机将 31 个 CPU/GPU/表面温感内核温控 zone 置为 disabled，41 个限频/降亮阀门先快照后清零，并把 oiface 性能调度属性软抑制（persist.sys.oiface.enable=0）。电池、充电、PMIC、Modem、相机等 73 个安全温控 zone 与芯片临界硬件断电全部保留。\n\n效果：游戏与重载场景不降频、不锁帧、不降亮度，长时间维持峰值性能（首次开启重启后生效）。\n\n代价：⚠️高风险——机身与电池持续高温，加速电池老化，长期使用存在鼓包风险；除硬件最后一道保护外无任何软件降温手段。\n\n回滚：WebUI 关闭本项重启即恢复（sysfs 开机重置 + oiface 属性回写原值）；卸载模块立即恢复（zone 回 enabled、阀门按快照还原、属性回写）。',
@@ -1406,7 +1400,7 @@ var app = Vue.createApp({
     // 导入配置（带二次确认，防误触）——导入会覆盖当前配置并立即批量改 pm，确认后才执行
     importConfig: function() {
       var self = this;
-      this.showConfirm('导入配置', '将用备份文件【覆盖当前全部开关与白名单】，并立即按备份重新执行全部 pm 同步（当前未备份的改动会丢失）。确认导入？', function() {
+      this.showConfirm('导入配置', '将用备份文件【覆盖同名开关与白名单】，并立即按备份重新执行全部 pm 同步。\n\n· 备份里没有的开关（新版新增项）保持当前值，不会被关掉\n· 备份里已不存在的旧键会被忽略（日志会列出）\n· 当前未备份的改动会丢失\n\n确认导入？', function() {
         self._doImportConfig();
       });
     },
@@ -1434,8 +1428,26 @@ var app = Vue.createApp({
           self.showSnack('❌ 备份文件格式无效');
           return;
         }
-        // 1) 覆盖内存配置
-        self.config = cfg;
+        // 1) 先清洗备份（丢弃未知键/非法值），再以【当前配置】为底合并：
+        //    · 备份里有的已知键 → 用备份值覆盖（还原语义不变）
+        //    · 备份里没有的已知键（新版新增开关）→ 保持当前值，不被静默关闭
+        //      （旧版备份导入后把新开关全关 = 会立刻 pm enable 那批包，这是真实事故形态）
+        var sc = self.sanitizeConfig(cfg);
+        var cur = self.config || {};
+        var merged = {};
+        Object.keys(cur).forEach(function(k) { merged[k] = cur[k]; });
+        Object.keys(sc.cfg).forEach(function(k) { merged[k] = sc.cfg[k]; });
+        var notInBackup = Object.keys(cur).filter(function(k) {
+          return k !== 'version' && !k.endsWith('_keep')
+            && !Object.prototype.hasOwnProperty.call(sc.cfg, k);
+        });
+        self.config = merged;
+        if (sc.dropped.length) {
+          self.addLog('🧹 备份含 ' + sc.dropped.length + ' 个当前版本不存在的键，已忽略：' + sc.dropped.join(', '), 'warn');
+        }
+        if (notInBackup.length) {
+          self.addLog('ℹ️ 备份不含 ' + notInBackup.length + ' 个开关（保持当前值，不覆盖）：' + notInBackup.join(', '), 'info');
+        }
         // 2) 原子写回 config.json（持久化，重启由 service.sh 兜底）
         self.writeConfig().then(function(ok) {
           if (!ok) {
@@ -2034,6 +2046,47 @@ var app = Vue.createApp({
     // 读取整个 config.json 到内存 this.config。
     // 若文件不存在（如升级后首次打开），回退读取旧 persist 属性生成
     // 初始状态，保证 UI 显示与已生效的开关一致。
+    // ---------- 配置清洗（v2.3.22）----------
+    // 【为什么需要】config.json 是"用户配置 + 历史遗留"的混合体，会积累三类死数据：
+    //   ① 旧版本有、新版本已删除的开关（如 v2.3.22 删掉的 extra_kernel_optimization）
+    //   ② 旧备份导入进来的未知键
+    //   ③ _keep 里已不在本组 pkgs 的包名（功能裁剪后残留）
+    // 这些键 service.sh 读不到（它按已知键 grep），但会永久留在文件里：污染 config、
+    // 让 audit11 的"孤儿键"检查报红，将来同名复用还会突然生效。
+    // 本函数把它们清掉，返回 { cfg, dropped, trimmed } 供调用方记日志。
+    sanitizeConfig: function(cfg) {
+      var allowed = {}, pkgOf = {};
+      FEATURES.forEach(function(g) {
+        (g.items || []).forEach(function(i) {
+          allowed[i.key] = true;
+          if (i.subGroupKey) allowed[i.subGroupKey] = true;
+          if (i.pkgs && i.pkgs.length) pkgOf[i.key] = i.pkgs;
+        });
+      });
+      var out = { version: 2 }, dropped = [], trimmed = [];
+      if (!cfg || typeof cfg !== 'object') return { cfg: out, dropped: dropped, trimmed: trimmed };
+      Object.keys(cfg).forEach(function(k) {
+        if (k === 'version') return;
+        var m = /^([a-z0-9_]+)_keep$/.exec(k);
+        if (m) {
+          var list = pkgOf[m[1]];
+          if (!list) { dropped.push(k); return; }          // 主键已不存在 → 白名单一起删
+          var raw = String(cfg[k] || '').split(',').filter(function(x) { return x.trim(); });
+          var kept = raw.map(function(x) { return x.trim(); }).filter(function(x) { return list.indexOf(x) >= 0; });
+          if (kept.length !== raw.length) trimmed.push(k);
+          if (kept.length) out[k] = kept.join(',');
+          return;
+        }
+        if (!allowed[k]) { dropped.push(k); return; }       // 未知键 → 丢弃
+        var v = cfg[k];
+        // 【v2.3.22】兼容历史/手改的字符串布尔：service.sh 的 is_on 只认裸 true，
+        // 字符串 "true" 会被静默当成"关"→ 这里归一为布尔，避免开关假关闭。
+        if (v === true || v === 'true' || v === '1' || v === 1) out[k] = true;
+        else if (v === false || v === 'false' || v === '0' || v === 0) out[k] = false;
+        else dropped.push(k + '(值非法)');                  // 其余 → 丢弃，避免静默当成关
+      });
+      return { cfg: out, dropped: dropped, trimmed: trimmed };
+    },
     readConfig: function() {
       var self = this;
       return sh('cat "' + CONFIG_PATH + '" 2>/dev/null').then(function(r) {
@@ -2043,8 +2096,15 @@ var app = Vue.createApp({
         // 避免落到旧属性迁移/重置分支把用户配置洗掉；仅空文件/坏 JSON 才走迁移。
         if (cfg && typeof cfg === 'object' && Object.keys(cfg).length) {
           if (!cfg.version) cfg.version = 2;
-          self.config = cfg;
-          return cfg;
+          // 【v2.3.22】加载即清洗：旧版残留的已删开关/非法值不进入内存，并回写落盘
+          var sc = self.sanitizeConfig(cfg);
+          self.config = sc.cfg;
+          if (sc.dropped.length || sc.trimmed.length) {
+            self.addLog('🧹 配置已清洗：删除未知键 [' + (sc.dropped.join(', ') || '无') + ']'
+              + (sc.trimmed.length ? '，裁剪白名单 [' + sc.trimmed.join(', ') + ']' : ''), 'warn');
+            self.writeConfig();
+          }
+          return sc.cfg;
         }
         // 回退：从旧 persist 属性读取（迁移场景）
         self.addLog('config.json 不存在，从旧属性读取初始状态...', 'info');

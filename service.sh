@@ -63,7 +63,7 @@ if [ ! -f "$CONFIG" ]; then
     # 全部 37 个开关 key（含 2 个总开关），与 WebUI FEATURES 一一对应
     # 历史：v2.3.8 新增数据回传/遥测等 3 项（32 → 35）；v2.3.9 移除 MGLRU（35 → 34，注释未随实际计数更新）
     # 本次：新增云控域名拦截 2 项（block_cloud_hosts / block_scene_hosts），以脚本实计 37 为准
-    ALL_KEYS="disable_logd block_ota lock_developer_options block_ads_and_tracking kill_redundant_processes system_prop_toggles memory_io_optimization extra_kernel_optimization disable_health_services disable_network_monitoring disable_gamespace disable_wallet_services disable_backup_services disable_ai_assistants disable_voice_assistants disable_theme_services disable_network_optimization disable_security_services disable_media_services disable_system_tools disable_speedview disable_quick_search disable_app_recover disable_notification_mgr disable_device_link disable_device_connect disable_remote_control disable_travel_engine disable_settings_related disable_screen_services disable_wifi_log disable_bluetooth_log disable_data_collection disable_telemetry_cloud disable_thermal_control block_cloud_hosts block_scene_hosts"
+    ALL_KEYS="disable_logd block_ota lock_developer_options block_ads_and_tracking kill_redundant_processes system_prop_toggles memory_io_optimization disable_health_services disable_network_monitoring disable_gamespace disable_wallet_services disable_backup_services disable_ai_assistants disable_voice_assistants disable_theme_services disable_network_optimization disable_security_services disable_media_services disable_system_tools disable_speedview disable_quick_search disable_app_recover disable_notification_mgr disable_device_link disable_device_connect disable_remote_control disable_travel_engine disable_settings_related disable_screen_services disable_wifi_log disable_bluetooth_log disable_data_collection disable_telemetry_cloud disable_thermal_control block_cloud_hosts block_scene_hosts"
     # keep 白名单 key（有子包的功能）
     KEEP_KEYS="block_ota_keep block_ads_and_tracking_keep disable_health_services_keep disable_network_monitoring_keep disable_gamespace_keep disable_wallet_services_keep disable_backup_services_keep disable_ai_assistants_keep disable_voice_assistants_keep disable_theme_services_keep disable_network_optimization_keep disable_security_services_keep disable_media_services_keep disable_system_tools_keep disable_speedview_keep disable_quick_search_keep disable_app_recover_keep disable_notification_mgr_keep disable_device_link_keep disable_device_connect_keep disable_remote_control_keep disable_travel_engine_keep disable_telemetry_cloud_keep"
     {
@@ -109,7 +109,7 @@ if ! grep -q '"version"' "$CONFIG" 2>/dev/null; then
         {
             echo "{"
             echo "  \"version\": 2,"
-            ALL_KEYS="disable_logd block_ota lock_developer_options block_ads_and_tracking kill_redundant_processes system_prop_toggles memory_io_optimization extra_kernel_optimization disable_health_services disable_network_monitoring disable_gamespace disable_wallet_services disable_backup_services disable_ai_assistants disable_voice_assistants disable_theme_services disable_network_optimization disable_security_services disable_media_services disable_system_tools disable_speedview disable_quick_search disable_app_recover disable_notification_mgr disable_device_link disable_device_connect disable_remote_control disable_travel_engine disable_settings_related disable_screen_services disable_wifi_log disable_bluetooth_log disable_data_collection disable_telemetry_cloud disable_thermal_control block_cloud_hosts block_scene_hosts"
+            ALL_KEYS="disable_logd block_ota lock_developer_options block_ads_and_tracking kill_redundant_processes system_prop_toggles memory_io_optimization disable_health_services disable_network_monitoring disable_gamespace disable_wallet_services disable_backup_services disable_ai_assistants disable_voice_assistants disable_theme_services disable_network_optimization disable_security_services disable_media_services disable_system_tools disable_speedview disable_quick_search disable_app_recover disable_notification_mgr disable_device_link disable_device_connect disable_remote_control disable_travel_engine disable_settings_related disable_screen_services disable_wifi_log disable_bluetooth_log disable_data_collection disable_telemetry_cloud disable_thermal_control block_cloud_hosts block_scene_hosts"
             first=1
             for key in $ALL_KEYS; do
                 [ $first -eq 0 ] && echo ","
@@ -738,42 +738,18 @@ else
     log "[MemIO] 恢复完成：sched_schedstats=$(cat /proc/sys/kernel/sched_schedstats 2>/dev/null) vfs_cache_pressure=$(cat /proc/sys/vm/vfs_cache_pressure 2>/dev/null)（期望 1 / 100）"
 fi
 
-# ===================== 8. 额外内核优化 =====================
-# 【v2.3.20 审计：删掉 3 个空转/写错的参数】
-# ① printk：旧版"关"写 "4 4 1 7"，与任何真实值都不符 → 删除。
-#    【v2.3.21 纠正】真终值也不是 init.qti.kernel.rc:44 的 "4 6 1 7"：该行之后
-#    /vendor/bin/init.qcom.sh:455-465 会按 build.type 再写一次
-#    （userdebug/eng → "6 6 1 7"；user → "4 3 1 4"；本机实测 ro.build.type=user，
-#    终值 "4 3 1 4"）。旧版把它当出厂值写回是错的。
-# ② printk_console_loglevel：本机不存在该 sysctl（ls 报 No such file），写入静默失败 → 整段删除。
-# ③ transparent_hugepage/khugepaged/defrag 是【整数】文件（0/1），写 "never"/"always"
-#    实测退出码 1（EINVAL），原开关两向都是空转 → 整段删除。
-# ④ THP 出厂值不是 "always"：原"关"写 always = 比出厂更激进 → 已删。
-# 【v2.3.21 审计：再删 2 项】
-# ⑤ printk "3 3 3 3" → 删。本机 /proc/cmdline 实测 console=ttynull —— 内核控制台
-#    输出直接丢弃，而 console_loglevel 只决定"哪些消息送往 console"，不影响 ring
-#    buffer 与 dmesg → 收益 = 0。且写 "3 3 3 3" 会把 minimum_console_loglevel 从
-#    出厂 1 抬到 3（自锁：后续调试没法把 console 调到 3 以下）。
-#    另外厂商脚本在模块之后还会改首字段（实测旧版最终值 "4 3 3 3" ≠ 模块目标
-#    "3 3 3 3"）→ 原"完成"日志是假绿灯。
-# ⑥ THP defrag never → 删。厂商 /vendor/bin/init.kernel.post_boot.sh:263 本来就写
-#    never，模块再写一遍属纯冗余；且 enabled=never 时 defrag 本就无作用对象。
-# 【保留 1 项 · ⚠️ 已实测为空转，是否保留待定】
-#    THP enabled=never：厂商 /vendor/bin/init.kernel.post_boot.sh:261 自己就写 never
-#    （该段注释原文 "# We do not use THP"），且该脚本在 service.sh 之后执行
-#    → 本项与厂商同值且被覆盖 = 不改变任何实际行为。
-#    保留理由：零风险、不会把 THP 打开（真正危险的是 always）；不是"有效优化"。
-#    注意"关闭"分支写 madvise 与厂商相反（厂商是 never）——同样被厂商脚本覆盖，
-#    最终仍是 never，但语义上属"关分支比出厂更激进"，是否移除整个开关待决定。
-if is_on "extra_kernel_optimization"; then
-    log "[Kernel] 启用：关闭透明大页..."
-    echo never > /sys/kernel/mm/transparent_hugepage/enabled 2>/dev/null
-    log "[Kernel] 完成：THP enabled=$(cat /sys/kernel/mm/transparent_hugepage/enabled 2>/dev/null)（期望含 [never]）"
-else
-    log "[Kernel] 关闭：恢复出厂参数..."
-    echo madvise > /sys/kernel/mm/transparent_hugepage/enabled 2>/dev/null
-    log "[Kernel] 恢复完成：THP enabled=$(cat /sys/kernel/mm/transparent_hugepage/enabled 2>/dev/null)（期望含 [madvise]）"
-fi
+# ===================== 8. 额外内核优化（v2.3.22 已移除该开关） =====================
+# 【为什么删】v2.3.21 实测证实本段唯一写入（THP enabled=never）是空转：
+#   厂商 /vendor/bin/init.kernel.post_boot.sh:261 自己就写 never（注释原文
+#   "# We do not use THP"），且该脚本在 service.sh 之后执行 → 模块写同值又被覆盖，
+#   开关开/关对系统实际行为没有任何区别（关分支写 madvise 也会被厂商改回 never）。
+#   实证：把开关关掉重启，终值仍是 [never]。
+# 【已删的两项】printk（console=ttynull，零收益且抬高 minimum_loglevel）与
+#   THP defrag（厂商 post_boot.sh:263 已写 never）。
+# 【不再写入任何内核参数】本模块现只保留「内存优化」开关的 2 项。
+# 【旧配置兼容】老版本 config.json 里的 extra_kernel_optimization 键由 WebUI 的
+#   sanitizeConfig() 在加载/导入时自动清除；service.sh 不读它，留着也无副作用。
+# 【回滚】uninstall.sh 仍写回 THP=never（旧版残留兜底，幂等，never 即出厂终值）。
 
 # ===================== 8b.（已移除）=====================
 # 【v2.3.9 移除 MGLRU 开关】实测 /proc/config.gz 带 CONFIG_LRU_GEN=y + CONFIG_LRU_GEN_ENABLED=y，

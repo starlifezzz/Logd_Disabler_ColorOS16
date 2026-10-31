@@ -47,7 +47,7 @@ grep -n 'echo 0x' $SRC/service.sh $SRC/post-fs-data.sh $SRC/customize.sh $SRC/bo
 echo "═══ C. 开关数量与同步 ═══"
 AK=$(grep -m1 'ALL_KEYS="' $SRC/service.sh | sed 's/.*ALL_KEYS="//;s/".*//')
 N=$(echo $AK | wc -w)
-[ "$N" = "37" ] && ok "ALL_KEYS 数量 = 37" || no "ALL_KEYS = $N (期望 37)"
+[ "$N" = "36" ] && ok "ALL_KEYS 数量 = 36" || no "ALL_KEYS = $N (期望 36)"
 AK2=$(grep -m1 -A0 'ALL_KEYS="' $SRC/service.sh | head -1)
 C1=$(grep -c 'ALL_KEYS="' $SRC/service.sh); [ "$C1" = "2" ] && ok "ALL_KEYS 出现 2 处" || no "ALL_KEYS 出现 $C1 处"
 grep -m1 'ALL_KEYS="' $SRC/service.sh | grep -q enable_mglru && no "ALL_KEYS 仍含 enable_mglru" || ok "ALL_KEYS 已无 enable_mglru"
@@ -68,13 +68,13 @@ extra=[k for k in feats if k not in ak]
 missing=[k for k in ak if k not in feats]
 open(f'{tmp}/feat.txt','w').write("%d\n%s\n%s\n" % (len(feats), ','.join(extra), ','.join(missing)))
 print(f"  FEATURES keys = {len(feats)}")
-if not extra and not missing and len(feats)==37:
-    print(f"  ✅ FEATURES == ALL_KEYS == 37，无缺无多")
+if not extra and not missing and len(feats)==36:
+    print(f"  ✅ FEATURES == ALL_KEYS == 36，无缺无多")
 else:
     print(f"  ❌ extra={extra} missing={missing}")
 PY
-[ "$(sed -n 1p $T/feat.txt)" = "37" ] && [ -z "$(sed -n 2p $T/feat.txt)" ] && [ -z "$(sed -n 3p $T/feat.txt)" ] \
-  && ok "FEATURES ↔ ALL_KEYS 一致(37)" || no "FEATURES ↔ ALL_KEYS 不一致"
+[ "$(sed -n 1p $T/feat.txt)" = "36" ] && [ -z "$(sed -n 2p $T/feat.txt)" ] && [ -z "$(sed -n 3p $T/feat.txt)" ] \
+  && ok "FEATURES ↔ ALL_KEYS 一致(36)" || no "FEATURES ↔ ALL_KEYS 不一致"
 
 echo "═══ E. 核心功能仍完整 ═══"
 BINS="midasd ostatsd ostats_pullerd ostats_tpd criticallog subsystem_ramdump"
@@ -180,8 +180,8 @@ echo "═══ H. 版本一致性 ═══"
 V=$(grep '^version=' $SRC/module.prop|cut -d= -f2); VC=$(grep '^versionCode=' $SRC/module.prop|cut -d= -f2)
 JV=$(python3 -c "import json;print(json.load(open('$SRC/update.json'))['version'])")
 JVC=$(python3 -c "import json;print(json.load(open('$SRC/update.json'))['versionCode'])")
-[ "$V" = "v2.3.21" ] && ok "module.prop version=$V" || no "version=$V"
-[ "$VC" = "54" ] && ok "module.prop versionCode=$VC" || no "versionCode=$VC"
+[ "$V" = "v2.3.22" ] && ok "module.prop version=$V" || no "version=$V"
+[ "$VC" = "55" ] && ok "module.prop versionCode=$VC" || no "versionCode=$VC"
 [ "$JV" = "$V" ] && ok "update.json version=$JV 一致" || no "update.json $JV != $V"
 [ "$JVC" = "$VC" ] && ok "update.json versionCode=$JVC 一致" || no "update.json $JVC != $VC"
 
@@ -211,7 +211,7 @@ process.exit(g>0&&m===0&&scr===2&&sp===2&&union.size===3?0:1);" && ok "所有带
 
 echo "═══ F7. 命令 ↔ WebUI 全量对拍（脚本 xmap2 / xmap3）═══"
 node "$CI/xmap2.js" >/dev/null 2>&1 && ok "PKG_TABLE+特殊块 23 个键逐包一致、keep 传参齐全" || { no "xmap2 对拍失败"; node "$CI/xmap2.js" 2>&1 | grep '❌' | sed 's/^/       /'; }
-node "$CI/xmap3.js" >/dev/null 2>&1 && ok "37 键双向覆盖 / verifyCmd 可解析 / 方向同向 / 特殊块有实现" || { no "xmap3 对拍失败"; node "$CI/xmap3.js" 2>&1 | grep '❌' | sed 's/^/       /'; }
+node "$CI/xmap3.js" >/dev/null 2>&1 && ok "36 键双向覆盖 / verifyCmd 可解析 / 方向同向 / 特殊块有实现" || { no "xmap3 对拍失败"; node "$CI/xmap3.js" 2>&1 | grep '❌' | sed 's/^/       /'; }
 # 不变量：KEEP_KEYS 必须等于「所有 ≥2 包的功能」+「block_ota/block_ads 特殊块」
 node -e "
 const fs=require('fs');
@@ -736,17 +736,16 @@ BADP=$(grep -nE 'debug_mask|dirty_background_ratio|printk_console_loglevel|khuge
 #     compact_unevictable_allowed（禁止压缩 mlocked 页，反作用）/
 #     dirty_ratio（bg=5% 抢先，实测空转）/ THP-defrag（enabled=never 时无意义）。
 #     uninstall.sh 仍保留它们作"旧版升级残留"回滚，故本断言只查 service.sh。
-GONE=$(grep -nE 'swappiness|compact_unevictable_allowed|dirty_ratio|kernel/printk|transparent_hugepage/defrag' $SRC/service.sh 2>/dev/null | grep -vE '^[0-9]+:[[:space:]]*#')
-[ -z "$GONE" ] && ok "service.sh 已停写 swappiness / compact_unevictable_allowed / dirty_ratio / printk / THP-defrag（v2.3.21）" || { no "service.sh 仍在写已删除的内核参数"; echo "$GONE" | sed 's/^/       /'; }
-# 2) extra_kernel：关闭分支只回写 THP=madvise；代码行里不得再出现 printk / defrag
-#    （注释里会提到这些参数名，故必须先剥掉注释行，否则假红）
-KSEG=$(sed -n '/8\. 额外内核优化/,/^fi$/p' $SRC/service.sh)
-KCODE=$(printf '%s\n' "$KSEG" | grep -vE '^[[:space:]]*#')
-echo "$KCODE" | sed -n '/^else$/,$p' | grep -qE 'echo madvise > /sys/kernel/mm/transparent_hugepage/enabled' \
-  && ok "extra_kernel 关闭分支写 THP=madvise（内核 CONFIG_TRANSPARENT_HUGEPAGE_MADVISE 默认；⚠️厂商 post_boot.sh:261 随后写 never，最终仍是 never）" || no "extra_kernel 关闭分支 THP 写入缺失"
-echo "$KCODE" | grep -qE 'echo always' && no "extra_kernel 仍写 THP=always（比出厂更激进）" || ok "extra_kernel 无 always 写入"
-echo "$KCODE" | grep -qE 'transparent_hugepage/defrag' && no "extra_kernel 仍写 THP defrag（enabled=never 时无意义）" || ok "extra_kernel 不再写 THP defrag（被 enabled=never 完全覆盖）"
-echo "$KCODE" | grep -qE 'kernel/printk' && no "extra_kernel 仍写 printk（console=ttynull，零收益）" || ok "extra_kernel 不再写 printk（本机 console=ttynull）"
+GONE=$(grep -nE 'swappiness|compact_unevictable_allowed|dirty_ratio|kernel/printk|transparent_hugepage' $SRC/service.sh 2>/dev/null | grep -vE '^[0-9]+:[[:space:]]*#')
+[ -z "$GONE" ] && ok "service.sh 已停写 swappiness / compact_unevictable_allowed / dirty_ratio / printk / THP（v2.3.21~22）" || { no "service.sh 仍在写已删除的内核参数"; echo "$GONE" | sed 's/^/       /'; }
+# 2) 【v2.3.22】extra_kernel_optimization 整个开关已删除（实测空转），三处必须同步无残留
+#    （注释里会提到这些名字，故判定前先剥注释行）
+grep -m1 'ALL_KEYS="' $SRC/service.sh | grep -q extra_kernel_optimization \
+  && no "ALL_KEYS 仍含 extra_kernel_optimization" || ok "ALL_KEYS 已无 extra_kernel_optimization"
+grep -q "key: 'extra_kernel_optimization'" $SRC/webroot/index.html \
+  && no "WebUI 仍有 extra_kernel_optimization 开关" || ok "WebUI 已无 extra_kernel_optimization 开关"
+grep -n 'extra_kernel_optimization' $SRC/service.sh 2>/dev/null | grep -vE '^[0-9]+:[[:space:]]*#' | grep -q . \
+  && no "service.sh 代码行仍引用 extra_kernel_optimization" || ok "service.sh 仅在注释中提及该开关（无代码引用）"
 # 3) memory_io 关闭分支必须与实测出厂一致（v2.3.21 后只剩 2 项）
 MSEG=$(sed -n '/7\. 内存\/IO 优化/,/^fi$/p' $SRC/service.sh)
 MCODE=$(printf '%s\n' "$MSEG" | grep -vE '^[[:space:]]*#')

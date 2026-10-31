@@ -246,6 +246,8 @@ echo 100 > /proc/sys/vm/vfs_cache_pressure 2>/dev/null
 #   之后执行（实测：模块写 madvise，重启后终值仍是 never）。
 #   ⚠️ 卸载要还原的是"出厂终值"：写 madvise 会让 ON 用户（THP 已是 never）卸载后
 #   不重启的窗口里 THP 被错误打开 —— 这正是 v2.3.21 修掉的回滚 bug。
+#   【v2.3.22】模块已彻底不写 THP（该开关删除），以下两行只服务旧版（≤v2.3.21）
+#   残留：旧版"关"分支写过 madvise，卸载时拉回 never。写 never 幂等、零副作用。
 echo never > /sys/kernel/mm/transparent_hugepage/enabled 2>/dev/null
 echo never > /sys/kernel/mm/transparent_hugepage/defrag 2>/dev/null
 # --- 以下 3 项为 v2.3.21 删除的写入，仅作旧版升级残留的回滚 ---
