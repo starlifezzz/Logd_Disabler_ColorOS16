@@ -177,3 +177,102 @@
    （连 `sleep 20` 都停 13 分钟）+ FUSE 存储抖动（连读 10 次 index.html 耗时 **6m17s**，
    verify 几百次小读被放大成 5 分钟跑不完）；跑门禁前先 `termux-wake-lock`，
    正常 verify 仅 10-60s；CPU 全程 idle 的"卡死"是存储层，不是死锁
+
+## ColorOS16 后台管控与网络入站实测（2026-10-31）
+
+排查对象：KDE Connect（`org.kde.kdeconnect_tp`，uid 10410）在熄屏/重启后 PC 连不上。
+**与本模块无关**（v2.3.21 时代同样不通，且对照机 mi2s / MoKee Android 10 同网络同 PC 正常）。
+结论落在 ColorOS 的两套独立机制上，记录于此，避免下次重走弯路。
+
+### 一、`o-kill(N)` 编号（实测）
+
+| 编号 | 后缀（仅 logcat 可见） | 语义 | 实测 |
+|---|---|---|---|
+| 2 | `with oneclick` | 一键清理 / 内存优化 | 15:00:23 发生，1 秒后自动重启 |
+| 35 | `with boot_clear` | **开机批量清扫** | 15:02:19、15:40:39 各一次 |
+| 72 | — | **语义未验证** | 11:55:29 出现 |
+
+- `with oneclick` / `with boot_clear` 后缀**只出现在 logcat 的 `am_kill` 行**；
+  logd 关掉后只剩 `exit-info` 里的 `o-kill(N)` → **编号对照表是必需品**
+- `boot_clear` 是**批量**：15:40:39.128 杀 KDE Connect，.130 杀 uid 10314 等，
+  同一时刻多包齐杀，非针对单个 app
+- 击杀后约 1 秒 `am_schedule_service_restart` 拉起（FGS `START_STICKY`），
+  用户侧表现为**约 30 秒断连窗口**（15:40:39 被杀 → 15:41:11 恢复）
+
+### 二、后台锁定不跨重启（实测）
+
+| 状态 | `oom_score_adj` | AMS 标记 |
+|---|---|---|
+| 最近任务加锁 | **50** | `fg +50 F/S/FGS`，cpuset/cpu 均 `/foreground` |
+| 未加锁 | **200** | `F/S/FGS` |
+| **加锁后重启** | **200** | 锁已丢 |
+
+→ 锁定只对**当次开机**有效，**挡不住开机清理**。重启后想让它不被 `boot_clear` 扫掉，
+只能靠 FGS 自动重启兜底。
+
+### 三、竞速现象：启动早晚决定死活
+
+| 重启 | KDE Connect 启动时刻 | 结果 |
+|---|---|---|
+| 15:08 | 开机后 **296 秒** | 晚于 `boot_clear` 窗口 → **躲过**（`exit-info` 无新条目） |
+| 15:38 | 开机后 **32 秒** | 撞上 15:40:39 `o-kill(35)` → **被杀** |
+
+**教训：别把"这次没被杀"当"配置生效"** —— 可能只是启动得晚。
+判定必须看 `/proc/<pid>/stat` 反算的启动时刻，不能只看"现在活着"。
+
+### 四、网络入站按 UID 过滤（BPF，最隐蔽的一个）
+
+现象：进程活着、`[::]:1716` 状态 `0A`(LISTEN)、uid 正确，但**连手机自己的 loopback 都超时**。
+
+物件：
+
+```
+/sys/fs/bpf/prog_oplus-netd_skfilter_accept_wlan_uid                  # 入站 accept 的 UID 过滤程序
+/sys/fs/bpf/map_oplus-netd_app_accept_wlan_socket_uid_limit_map       # accept 白名单
+/sys/fs/bpf/map_oplus-netd_app_drop_wlan_socket_uid_limit_map         # drop 名单
+iptables -S INPUT | grep bpf                                          # 规则挂在 INPUT（IPv4/IPv6 都有）
+```
+
+**判定顺序（缺一不可，跳步会误判成"app 没启动"）**：
+
+1. `/proc/net/tcp6` 有 `0A` 且 uid 正确 → 进程与 bind 都正常，别再从"没启动"方向查
+2. 手机本机 `nc 127.0.0.1 <port>` **也超时** → 丢包在 socket 层，不是网卡/路由/防火墙
+3. root(uid 0) 临时监听任意端口能被外部连 + 系统端口（24021/24022）能连 → **按 UID 过滤**，不是全局封锁
+4. `iptables -I INPUT 1 -p tcp --dport <port> -j ACCEPT` **无效** → 确认不在 iptables 层
+5. 解药：设置 → 电池 → 应用耗电管理 → 该应用 → **「允许完全后台行为」**
+   （实测改完 **5~10 秒内生效，无需重启**；TCP 从 `SYN_RECV` 卡死立刻变 `ESTABLISHED`）
+
+排除项（都试过无效，别重复）：Doze 白名单、`cmd netpolicy add restrict-background-whitelist`、
+`fw_dozable`/`fw_standby` 链（不存在）、`dumpsys netd` 里的 `NETWORK` 权限列表
+（那是**出站**权限，与入站 accept 白名单是两回事）。
+
+**诚实边界**：设备无 `bpftool`，`cat` 该 pin 文件报 `I/O error`，**读不出 map 内容**；
+"该 uid 不在白名单"由命名 + 第 3 步行为推定，**非直接读取**。
+**不要把这套机制写进模块**：绕过厂商网络管控、且 ColorOS 会在 app 状态变化时重写 map，不持久。
+
+### 五、logd 关闭时的取证手段（本模块 `disable_logd` 生效时必读）
+
+`logcat -d` 返回 0 行，但**排查不需要为此打开 logd**（关/开都要重启，反而重置现场）。
+
+| 需求 | 命令 | 关键点 |
+|---|---|---|
+| 进程死亡原因 + 时刻（**首选**） | `dumpsys activity exit-info <pkg>` | `#0` 最新；含 `reason=13 (OTHER KILLS BY SYSTEM)`、`description=o-kill(35)`、`FORCE STOP` |
+| 存活与优先级 | `cat /proc/<pid>/oom_score_adj`；`dumpsys activity processes \| grep -A3 <pkg>` | `200`=普通 FGS `50`=已加锁 |
+| 启动时刻（判是否被杀后重启） | `/proc/<pid>/stat` 第 22 列 ÷ `CLK_TCK`(100)，与 `/proc/uptime` 相减 | PID 变了 + 启动时刻后移 = 中途死过 |
+| 端口 | `grep -i :<hex端口> /proc/net/tcp6` | `0A`=LISTEN `01`=ESTABLISHED `06`=TIME_WAIT |
+| 接口使用时间戳 | `cmd appops get <pkg> <OP>` | 例 `WRITE_CLIPBOARD: allow; time=+4s ago` 证明写入发生过（读不到内容） |
+| 服务/屏幕/Doze | `getprop init.svc.<name>`、`dumpsys power`、`dumpsys deviceidle` | |
+| 崩溃/重启标记 | `/data/system/dropbox/`（`SYSTEM_BOOT@<epoch_ms>`） | 文件名是 **epoch 毫秒**，别按日期 glob |
+
+**exit-info 边界**：`Last Timestamp of Persistence Into Persistent Storage` 是落盘时刻，
+之后的条目只在内存里，**重启即丢**。取证要趁早；判断"零击杀"前先看 `#0` 时间戳。
+
+**logcat 唯一不可替代的场景**：需要毫秒级先后顺序。
+
+### 六、环形缓冲的坑（本次实踩）
+
+logd 默认 events 缓冲 **64 KiB**，重启后 5 分钟就可能被冲掉：
+15:08 开机，15:13:30 缓冲起点已滚到 15:13:30 —— **15:09~15:13 的 `boot_clear` 窗口整段丢失**。
+当时差点据此得出"本次零击杀"的错误结论，实际是**证据不存在 ≠ 事件未发生**。
+
+→ 要抓开机清理，必须在**开机后 60 秒内**连上 adb 持续抓，或直接用 `exit-info`（持久化）。
