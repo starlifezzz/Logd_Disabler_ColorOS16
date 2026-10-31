@@ -697,6 +697,13 @@ grep -q 'cloud_hosts_remove' $SRC/uninstall.sh && ok "uninstall.sh 卸载挂载�
 BADW=$(grep -nE '(>>?[[:space:]]*"?/system/etc/hosts|cp[^|;&]*[[:space:]]+/system/etc/hosts|mv[^|;&]*[[:space:]]+/system/etc/hosts|sed -i[^|;&]*/system/etc/hosts)' $SRC/*.sh 2>/dev/null | grep -vE '^[^:]*:[0-9]+:[[:space:]]*#')
 [ -z "$BADW" ] && ok "只 bind 不改写系统 hosts 文件" || { no "存在直接改写 /system/etc/hosts 的写法（必须只 bind）"; echo "$BADW" | sed 's/^/       /'; }
 grep -q 'localhost' $SRC/cloud_hosts.sh && ok "合并结果带 localhost 安全闸（防空 hosts 断解析）" || no "缺 localhost 安全闸"
+# 【防回归 2026-10-31】hosts.cloud 被 bind 后 mv 返回 EBUSY，旧写法 `mv ... 2>/dev/null` 吞错
+# → 剥离从未生效 → 每次 apply 追加 7 行（实测累积 13 段）。必须保留原地覆盖兜底。
+grep -q 'cat "$_ch_tmp" > "$CLOUD_HOSTS_FILE"' $SRC/cloud_hosts.sh && ok "落盘有原地覆盖兜底（mv 遇 EBUSY 时不丢剥离结果）" || no "缺原地覆盖兜底（EBUSY 时剥离会静默失效）"
+grep -q 'if ! mv -f "$_ch_tmp"' $SRC/cloud_hosts.sh && ok "mv 失败被显式判错（不再静默吞掉 EBUSY）" || no "mv 仍被静默吞错（旧 bug 会复发）"
+grep -q 'cmp -s "$_ch_tmp" /system/etc/hosts' $SRC/cloud_hosts.sh && ok "幂等短路（内容已最新不重复挂载）" || no "缺幂等短路（挂载层会每开机叠加）"
+BADMV=$(grep -nE '^[^#]*mv -f "\$CLOUD_HOSTS_FILE\.chk"' $SRC/cloud_hosts.sh 2>/dev/null)
+[ -z "$BADMV" ] && ok "无旧的 .chk 直接 mv 写法（临时文件统一走 _ch_tmp）" || { no "仍有旧 .chk mv 写法"; echo "$BADMV" | sed 's/^/       /'; }
 
 echo "═══ J. 开发者选项语义（v2.3.19-fix：旧版参数写反，重启即失效）═══"
 # 1) 禁止再出现"把开发者选项关掉"的写法（旧 bug 本体）
