@@ -2,6 +2,11 @@
 SRC="$(cd "$(dirname "$0")/.." && pwd)"   # 项目根（本脚本位于 .ci/ 下，自动定位）
 T="${TMPDIR:-$SRC/.ci/.tmp}"   # 临时目录：Termux 的 TMPDIR 可写，否则退回 .ci/.tmp（已 gitignore）
 CI="$(cd "$(dirname "$0")" && pwd)"   # 门禁脚本自身目录（.ci/），预置对拍脚本放这里
+# 【门禁自身 bug 修复 2026-10-31】.ci/.tmp 被 .gitignore:5 忽略 → 新克隆/清理过的工作区
+#   必然没有这个目录，而下面多处用 `> $T/xxx` 写文件 → 3 条断言假红：
+#     FileNotFoundError: .ci/.tmp/i.js / feat.txt；行 548: .ci/.tmp/aw.out 不存在
+#   门禁必须自建临时目录，不能依赖工作区里"恰好"存在。
+mkdir -p "$T" 2>/dev/null
 P=0; F=0
 ok(){ P=$((P+1)); printf "  ✅ %s\n" "$1"; }
 no(){ F=$((F+1)); printf "  ❌ %s\n" "$1"; }
@@ -175,8 +180,8 @@ echo "═══ H. 版本一致性 ═══"
 V=$(grep '^version=' $SRC/module.prop|cut -d= -f2); VC=$(grep '^versionCode=' $SRC/module.prop|cut -d= -f2)
 JV=$(python3 -c "import json;print(json.load(open('$SRC/update.json'))['version'])")
 JVC=$(python3 -c "import json;print(json.load(open('$SRC/update.json'))['versionCode'])")
-[ "$V" = "v2.3.19" ] && ok "module.prop version=$V" || no "version=$V"
-[ "$VC" = "53" ] && ok "module.prop versionCode=$VC" || no "versionCode=$VC"
+[ "$V" = "v2.3.21" ] && ok "module.prop version=$V" || no "version=$V"
+[ "$VC" = "54" ] && ok "module.prop versionCode=$VC" || no "versionCode=$VC"
 [ "$JV" = "$V" ] && ok "update.json version=$JV 一致" || no "update.json $JV != $V"
 [ "$JVC" = "$VC" ] && ok "update.json versionCode=$JVC 一致" || no "update.json $JVC != $VC"
 
@@ -717,7 +722,7 @@ grep -q "= \"0\" && echo locked" $SRC/webroot/index.html && no "WebUI checkCmd �
 grep -nE 'development_settings_enabled' $SRC/uninstall.sh 2>/dev/null | grep -vE '^[0-9]+:[[:space:]]*#' \
   && no "uninstall.sh 仍在写 development_settings_enabled（应只清 lock）" || ok "uninstall.sh 不写 development_settings_enabled"
 
-echo "═══ K. 开关语义：关 = 出厂值，开 = 改默认（v2.3.20 全量审计）═══"
+echo "═══ K. 开关语义：关 = 出厂值，开 = 改默认（v2.3.20 / v2.3.21 全量审计）═══"
 # 背景：开发者选项那类 bug 的通用形态有三种——
 #   ① 真反向（关分支把出厂开着的东西关掉）
 #   ② 关分支写"看起来像默认"的猜测值（比出厂更激进/更保守）
@@ -726,19 +731,27 @@ echo "═══ K. 开关语义：关 = 出厂值，开 = 改默认（v2.3.20 �
 # 1) 已实测"无此 sysctl / 整数文件写字符串必失败"的参数，脚本里不得再出现
 BADP=$(grep -nE 'debug_mask|dirty_background_ratio|printk_console_loglevel|khugepaged/defrag' $SRC/service.sh $SRC/uninstall.sh 2>/dev/null | grep -vE '^[^:]*:[0-9]+:[[:space:]]*#')
 [ -z "$BADP" ] && ok "无 debug_mask / dirty_background_ratio / printk_console_loglevel / khugepaged 写入" || { no "仍有已证伪的内核参数写入"; echo "$BADP" | sed 's/^/       /'; }
-# 2) extra_kernel 关闭分支必须写回实测出厂值
+# 1b) 【v2.3.21】service.sh 不得再写这 5 项：
+#     swappiness（方向反：zram 应 ≥100）/ printk（console=ttynull，零收益）/
+#     compact_unevictable_allowed（禁止压缩 mlocked 页，反作用）/
+#     dirty_ratio（bg=5% 抢先，实测空转）/ THP-defrag（enabled=never 时无意义）。
+#     uninstall.sh 仍保留它们作"旧版升级残留"回滚，故本断言只查 service.sh。
+GONE=$(grep -nE 'swappiness|compact_unevictable_allowed|dirty_ratio|kernel/printk|transparent_hugepage/defrag' $SRC/service.sh 2>/dev/null | grep -vE '^[0-9]+:[[:space:]]*#')
+[ -z "$GONE" ] && ok "service.sh 已停写 swappiness / compact_unevictable_allowed / dirty_ratio / printk / THP-defrag（v2.3.21）" || { no "service.sh 仍在写已删除的内核参数"; echo "$GONE" | sed 's/^/       /'; }
+# 2) extra_kernel：关闭分支只回写 THP=madvise；代码行里不得再出现 printk / defrag
+#    （注释里会提到这些参数名，故必须先剥掉注释行，否则假红）
 KSEG=$(sed -n '/8\. 额外内核优化/,/^fi$/p' $SRC/service.sh)
-echo "$KSEG" | sed -n '/^else$/,$p' | grep -qE 'echo "4 6 1 7" > /proc/sys/kernel/printk' \
-  && ok "extra_kernel 关闭写回 printk \"4 6 1 7\"（init.qti.kernel.rc:44 出厂）" || no "extra_kernel 关闭分支 printk 不是出厂值"
-echo "$KSEG" | sed -n '/^else$/,$p' | grep -qE 'echo madvise > /sys/kernel/mm/transparent_hugepage/enabled' \
-  && ok "extra_kernel 关闭写回 THP=madvise（CONFIG_TRANSPARENT_HUGEPAGE_MADVISE=y）" || no "extra_kernel 关闭分支 THP 不是出厂值"
-echo "$KSEG" | grep -qE 'echo always' && no "extra_kernel 仍写 THP=always（比出厂更激进）" || ok "extra_kernel 无 always 写入"
-# 3) memory_io 关闭分支 5 项必须与实测出厂一致
+KCODE=$(printf '%s\n' "$KSEG" | grep -vE '^[[:space:]]*#')
+echo "$KCODE" | sed -n '/^else$/,$p' | grep -qE 'echo madvise > /sys/kernel/mm/transparent_hugepage/enabled' \
+  && ok "extra_kernel 关闭分支写 THP=madvise（内核 CONFIG_TRANSPARENT_HUGEPAGE_MADVISE 默认；⚠️厂商 post_boot.sh:261 随后写 never，最终仍是 never）" || no "extra_kernel 关闭分支 THP 写入缺失"
+echo "$KCODE" | grep -qE 'echo always' && no "extra_kernel 仍写 THP=always（比出厂更激进）" || ok "extra_kernel 无 always 写入"
+echo "$KCODE" | grep -qE 'transparent_hugepage/defrag' && no "extra_kernel 仍写 THP defrag（enabled=never 时无意义）" || ok "extra_kernel 不再写 THP defrag（被 enabled=never 完全覆盖）"
+echo "$KCODE" | grep -qE 'kernel/printk' && no "extra_kernel 仍写 printk（console=ttynull，零收益）" || ok "extra_kernel 不再写 printk（本机 console=ttynull）"
+# 3) memory_io 关闭分支必须与实测出厂一致（v2.3.21 后只剩 2 项）
 MSEG=$(sed -n '/7\. 内存\/IO 优化/,/^fi$/p' $SRC/service.sh)
-echo "$MSEG" | sed -n '/^else$/,$p' | grep -qE 'echo 1 > /proc/sys/kernel/sched_schedstats' && ok "memory_io 关闭 sched_schedstats=1" || no "memory_io 关闭 sched_schedstats 不符"
-echo "$MSEG" | sed -n '/^else$/,$p' | grep -qE 'echo 100 > /proc/sys/vm/swappiness' && ok "memory_io 关闭 swappiness=100" || no "memory_io 关闭 swappiness 不符"
-echo "$MSEG" | sed -n '/^else$/,$p' | grep -qE 'echo 20 > /proc/sys/vm/dirty_ratio' && ok "memory_io 关闭 dirty_ratio=20" || no "memory_io 关闭 dirty_ratio 不符"
-echo "$MSEG" | sed -n '/^else$/,$p' | grep -qE 'echo 100 > /proc/sys/vm/vfs_cache_pressure' && ok "memory_io 关闭 vfs_cache_pressure=100" || no "memory_io 关闭 vfs_cache_pressure 不符"
+MCODE=$(printf '%s\n' "$MSEG" | grep -vE '^[[:space:]]*#')
+echo "$MCODE" | sed -n '/^else$/,$p' | grep -qE 'echo 1 > /proc/sys/kernel/sched_schedstats' && ok "memory_io 关闭 sched_schedstats=1（atrace.rc:10 出厂）" || no "memory_io 关闭 sched_schedstats 不符"
+echo "$MCODE" | sed -n '/^else$/,$p' | grep -qE 'echo 100 > /proc/sys/vm/vfs_cache_pressure' && ok "memory_io 关闭 vfs_cache_pressure=100（vmscan.c:74 默认）" || no "memory_io 关闭 vfs_cache_pressure 不符"
 # 4) 零读取方属性：service.sh 与 uninstall.sh 都不得再 setprop
 DEADPROPS='persist\.sys\.monitor|persist\.sys\.hotstart|persist\.debug\.kept|persist\.sys\.profiler_ms|persist\.sys\.strictmode|persist\.traced\.enable|persist\.traced_perf\.enable|persist\.sys\.assert\.panic'
 BADD=$(grep -nE "setprop[[:space:]]+($DEADPROPS)" $SRC/service.sh $SRC/uninstall.sh $SRC/post-fs-data.sh $SRC/boot-completed.sh 2>/dev/null | grep -vE '^[^:]*:[0-9]+:[[:space:]]*#')
@@ -748,8 +761,29 @@ sed -n '/5\. 进程查杀/,/^fi$/p' $SRC/service.sh | grep -n 'persist.sys.prelo
 # 6) 唯一有效属性必须仍被写
 sed -n '/6\. 预加载/,/^fi$/p' $SRC/service.sh | grep -q 'setprop persist.sys.preload 0' && ok "预加载开关仍写 preload=0（唯一有读取方 /system_ext/bin/iopgp）" || no "预加载开关实现缺失"
 # 7) uninstall 内核回滚与 service 同源
-grep -qE 'echo "4 6 1 7" > /proc/sys/kernel/printk' $SRC/uninstall.sh && ok "uninstall 内核回滚 printk 与出厂一致" || no "uninstall printk 回滚值不是出厂值"
-grep -qE 'echo madvise > /sys/kernel/mm/transparent_hugepage' $SRC/uninstall.sh && ok "uninstall 内核回滚 THP=madvise" || no "uninstall THP 回滚值不是出厂值"
+#    【v2.3.21 纠正】printk 出厂值不是 "4 6 1 7"（那是 init.qti.kernel.rc:44 的早期值，
+#    随后被 /vendor/bin/init.qcom.sh:455-465 按 build.type 覆盖：user→"4 3 1 4"、
+#    userdebug/eng→"6 6 1 7"）。uninstall 必须镜像同一判定，不能写死。
+grep -qE 'echo "6 6 1 7" > /proc/sys/kernel/printk' $SRC/uninstall.sh \
+  && grep -qE 'echo "4 3 1 4" > /proc/sys/kernel/printk' $SRC/uninstall.sh \
+  && ok "uninstall printk 回滚镜像 init.qcom.sh（user→4 3 1 4 / userdebug,eng→6 6 1 7）" || no "uninstall printk 回滚未镜像 build.type"
+WRONGP=$(grep -nE 'echo "4 6 1 7"' $SRC/service.sh $SRC/uninstall.sh 2>/dev/null | grep -vE '^[^:]*:[0-9]+:[[:space:]]*#')
+[ -z "$WRONGP" ] && ok "无脚本把早期值 \"4 6 1 7\" 当终值写回" || { no "仍有脚本写死 \"4 6 1 7\"（非系统终值）"; echo "$WRONGP" | sed 's/^/       /'; }
+grep -qE 'echo never > /sys/kernel/mm/transparent_hugepage/enabled' $SRC/uninstall.sh \
+  && grep -qE 'echo never > /sys/kernel/mm/transparent_hugepage/defrag' $SRC/uninstall.sh \
+  && ok "uninstall THP 回滚写厂商终值 never（enabled + defrag；不是内核默认 madvise）" || no "uninstall THP 回滚不是出厂终值 never"
+#    ⚠️ 回归项：uninstall 写 madvise 会让 ON 用户卸载后不重启的窗口里 THP 被打开
+WRONGT=$(grep -nE 'echo madvise > /sys/kernel/mm/transparent_hugepage' $SRC/uninstall.sh 2>/dev/null | grep -vE '^[^:]*:[0-9]+:[[:space:]]*#')
+[ -z "$WRONGT" ] && ok "uninstall 不再写 THP=madvise（避免卸载后把 THP 打开）" || { no "uninstall 仍写 THP=madvise（会把 ON 用户的 THP 翻成开启）"; echo "$WRONGT" | sed 's/^/       /'; }
+# 7b) 【v2.3.21】service.sh 已停写 3 项，uninstall 必须保留它们的"旧版残留"回滚
+#     （升级用户不重启就卸载时，本机还留着旧版写入的值）
+LEGACY_OK=1
+for _p in 'echo 100 > /proc/sys/vm/swappiness' \
+          'echo 1 > /proc/sys/vm/compact_unevictable_allowed' \
+          'echo 20 > /proc/sys/vm/dirty_ratio'; do
+  grep -qF "$_p" $SRC/uninstall.sh || { LEGACY_OK=0; echo "       缺: $_p"; }
+done
+[ "$LEGACY_OK" = "1" ] && ok "uninstall 保留 3 项旧版残留回滚（swappiness/compact/dirty_ratio；THP 两项见上条）" || no "uninstall 旧版残留回滚缺失（升级用户卸载后会留旧值）"
 # 8) WebUI 云控开关自检必须查自身域名（整段标记会让"只开 scene"误报）
 grep -q 'icosa-service-cn-01.allawntech.com\$' $SRC/webroot/index.html && ok "block_cloud_hosts checkCmd 用自身域名判定" || no "block_cloud_hosts checkCmd 未用自身域名"
 # 9) 第二批空转属性（block_ota / block_ads / disable_logd / 主题）必须停写

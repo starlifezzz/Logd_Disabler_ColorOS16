@@ -5,6 +5,9 @@
 # ══════════════════════════════════════════════════════════
 SRC="$(cd "$(dirname "$0")/.." && pwd)"   # 项目根（本脚本位于 .ci/ 下）
 T="${TMPDIR:-$SRC/.ci/.tmp}"   # 临时目录：TMPDIR 不可用时退回 .ci/.tmp（已 gitignore）
+# 【门禁自身 bug 修复 2026-10-31】.ci/.tmp 被 .gitignore 忽略 → 新克隆缺该目录，
+#   而 C 段用 `> $T/pkgs_*.txt` 写文件 → 重定向失败 → wc 报错 → 检查静默走偏。
+mkdir -p "$T" 2>/dev/null
 P=0; F=0
 ok(){ echo "  ✅ $1"; P=$((P+1)); }
 no(){ echo "  ❌ $1"; F=$((F+1)); }
@@ -103,22 +106,48 @@ if [ -f "$SRC/uninstall.sh" ]; then
   ok "uninstall.sh 存在（$(wc -l < "$SRC/uninstall.sh" | tr -d ' ') 行）"
   # [误报修正⑥] 原正则 `pm disable-user` 抓到 0 个包（实际是动态拼接调用），
   #   导致"0 vs 0"假通过。改用 service.log 金标准提取实际被禁的包。
-  su -c "grep -E 'disable-user 成功|已禁用' /data/adb/logd_disabler/service.log" 2>/dev/null \
-    | grep -oE "[a-z][a-z0-9_]+(\.[a-z0-9_]+)+" | sort -u > "$T/pkgs_off.txt"
-  [ -s "$T/pkgs_off.txt" ] || grep -ohE "[a-z][a-z0-9_]+(\.[a-z0-9_]+)" "$SRC"/service.sh 2>/dev/null | sort -u > "$T/pkgs_off.txt"
+  #
+  # [误报修正⑧ 2026-10-31] 原回落分支是典型 fail-open：
+  #   su 取不到设备日志时静默回落到 `[a-z]+(\.[a-z]+)` 无约束正则，从 service.sh
+  #   抓出 binder.c / build.prop / cnss_diag.conf / com.oplus / anager.send 等
+  #   79 个"包名" → 在 PC 上必然假红 79 条。
+  #   现在：① 正则加前缀约束（真实包名必以 com|org|net|io 开头）；
+  #        ② 排除整行注释（注释里的 com.coloros.lockassistant 并未被禁用，
+  #           实测旧写法会把它算成"被禁但不会恢复"）；
+  #        ③ 回落不再是"通过"，而是切换成【静态包含性】检查并在结果里标明模式；
+  #        ④ 静态模式仍提取到 0 个 → 判 ❌（检查器自身失效），不静默放行。
+  PKG_RE='(com|org|net|io)\.[a-z0-9_]+(\.[a-z0-9_]+)+'
   # 恢复清单 = uninstall.sh 的 ALL_PKGS
-  sed -n '/^ALL_PKGS="/,/^"/p' "$SRC/uninstall.sh" | grep -oE "[a-z][a-z0-9_]+(\.[a-z0-9_]+)+" | sort -u > "$T/pkgs_on.txt"
+  sed -n '/^ALL_PKGS="/,/^"/p' "$SRC/uninstall.sh" | grep -oE "$PKG_RE" | sort -u > "$T/pkgs_on.txt"
+
+  # 【金标准】设备侧 service.log 里实际被禁的包（</dev/null 防 su 等密码输入卡住）
+  su -c "grep -E 'disable-user 成功|已禁用' /data/adb/logd_disabler/service.log" </dev/null 2>/dev/null \
+    | grep -oE "$PKG_RE" | sort -u > "$T/pkgs_off.txt"
+  if [ -s "$T/pkgs_off.txt" ]; then
+    OFF_MODE="金标准"
+  else
+    # 【静态回落】无设备/无 su/日志被轮转时：service.sh 会禁用的包（排除注释行）
+    #   必须全部落在 uninstall.sh 的 ALL_PKGS 内。
+    OFF_MODE="静态包含性"
+    grep -vE '^[[:space:]]*#' "$SRC/service.sh" 2>/dev/null \
+      | grep -ohE "$PKG_RE" | sort -u > "$T/pkgs_off.txt"
+  fi
   N_OFF=$(wc -l < "$T/pkgs_off.txt" | tr -d ' ')
   N_ON=$(wc -l < "$T/pkgs_on.txt" | tr -d ' ')
   if [ "$N_OFF" = "0" ]; then
-    wt "service.log 里提不到被禁包（日志可能被轮转），可逆性无法用金标准验证"
+    # 静态模式提取到 0 = 正则/文件失效（检查器坏了），必须判红，不能 wt 混过去
+    if [ "$OFF_MODE" = "静态包含性" ]; then
+      no "可逆性检查自身失效：$OFF_MODE 模式提取到 0 个包（正则或 service.sh 异常）"
+    else
+      wt "service.log 里提不到被禁包（日志可能被轮转），可逆性无法用金标准验证"
+    fi
   else
     comm -23 "$T/pkgs_off.txt" "$T/pkgs_on.txt" > "$T/off_not_on.txt"
     N_GAP=$(wc -l < "$T/off_not_on.txt" | tr -d ' ')
     if [ "$N_GAP" = "0" ]; then
-      ok "可逆性金标准零缺口：实际被禁 $N_OFF 个包，全部落在 uninstall.sh 的 $N_ON 个恢复清单内"
+      ok "可逆性零缺口[$OFF_MODE]：被禁 $N_OFF 个包，全部落在 uninstall.sh 的 $N_ON 个恢复清单内"
     else
-      no "有 $N_GAP 个包被禁但卸载时不会恢复："
+      no "有 $N_GAP 个包被禁但卸载时不会恢复[$OFF_MODE]："
       head -10 "$T/off_not_on.txt" | sed 's/^/       · /'
     fi
   fi

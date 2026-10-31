@@ -227,22 +227,40 @@ start mediametrics 2>/dev/null
 
 # ===================== 4. 恢复内核参数 =====================
 ui_print "- 恢复内核参数..."
-# 【v2.3.20 审计】只回写模块真正改过、且"关闭值"已验证为出厂的 5+3 项。
+# 【v2.3.20 审计】只回写模块真正改过、且"关闭值"已验证为出厂的项。
 # 删掉的三类（原样写回反而会破坏出厂状态）：
 #   ① binder debug_mask 255：内核默认 0，写 255 = 打开全部 Binder 调试
 #   ② dirty_background_ratio 10：本机 init.rc:1896 出厂 5
 #   ③ printk_console_loglevel：本机无此 sysctl（写入静默失败）
 #      khugepaged/defrag：0/1 整数文件，写 always 报 EINVAL
+# 【v2.3.21】service.sh 已停写 swappiness / printk / compact_unevictable_allowed /
+#   dirty_ratio / THP-defrag（详见 service.sh 第 7/8 节审计注释）。但卸载发生在
+#   "不重启"的时刻，从旧版本升级上来的机器可能仍留着旧版写入的值 → 本段保留回滚。
+#   写的都是实测出厂值（THP 两项写厂商终值 never，不是内核默认的 madvise），
+#   幂等；对新装用户等于把出厂值再写一遍，无副作用。
+# 【金标准】卸载后重启，内核与厂商 post_boot 脚本会自行恢复，本段只是免去"必须重启"。
 echo 1 > /proc/sys/kernel/sched_schedstats 2>/dev/null
-echo 1 > /proc/sys/vm/compact_unevictable_allowed 2>/dev/null
-echo 100 > /proc/sys/vm/swappiness 2>/dev/null
-echo 20 > /proc/sys/vm/dirty_ratio 2>/dev/null
 echo 100 > /proc/sys/vm/vfs_cache_pressure 2>/dev/null
-# printk 出厂 "4 6 1 7"（/vendor/etc/init/hw/init.qti.kernel.rc:44 实测）
-echo "4 6 1 7" > /proc/sys/kernel/printk 2>/dev/null
-# THP 出厂 madvise（内核 CONFIG_TRANSPARENT_HUGEPAGE_MADVISE=y，/proc/config.gz 实测）
-echo madvise > /sys/kernel/mm/transparent_hugepage/enabled 2>/dev/null
-echo madvise > /sys/kernel/mm/transparent_hugepage/defrag 2>/dev/null
+# THP（enabled + defrag）：【出厂终值是 never】，不是内核默认的 madvise ——
+#   厂商 /vendor/bin/init.kernel.post_boot.sh:261/263 自己写 never，且该脚本在模块
+#   之后执行（实测：模块写 madvise，重启后终值仍是 never）。
+#   ⚠️ 卸载要还原的是"出厂终值"：写 madvise 会让 ON 用户（THP 已是 never）卸载后
+#   不重启的窗口里 THP 被错误打开 —— 这正是 v2.3.21 修掉的回滚 bug。
+echo never > /sys/kernel/mm/transparent_hugepage/enabled 2>/dev/null
+echo never > /sys/kernel/mm/transparent_hugepage/defrag 2>/dev/null
+# --- 以下 3 项为 v2.3.21 删除的写入，仅作旧版升级残留的回滚 ---
+echo 100 > /proc/sys/vm/swappiness 2>/dev/null
+echo 1 > /proc/sys/vm/compact_unevictable_allowed 2>/dev/null
+echo 20 > /proc/sys/vm/dirty_ratio 2>/dev/null
+# printk：真实终值由 /vendor/bin/init.qcom.sh:455-465 按 build.type 决定
+#   （userdebug/eng → "6 6 1 7"；user → "4 3 1 4"）。这里镜像同一判定。
+#   【纠正 v2.3.21】旧版写死 "4 6 1 7" 是 init.qti.kernel.rc:44 的【早期值】，
+#   随后会被 init.qcom.sh 覆盖，并不是系统终值（实测本机 ro.build.type=user，
+#   终值 = "4 3 1 4"）→ 写死它等于把 default_message_loglevel 从 3 抬到 6。
+case "$(getprop ro.build.type)" in
+    userdebug|eng) echo "6 6 1 7" > /proc/sys/kernel/printk 2>/dev/null ;;
+    *)             echo "4 3 1 4" > /proc/sys/kernel/printk 2>/dev/null ;;
+esac
 # --- 【v2.3.9】MGLRU：写回出厂值 0x0003（本模块已移除 MGLRU 开关，此行为升级兜底）---
 # 【背景】实测 /proc/config.gz: CONFIG_LRU_GEN=y + CONFIG_LRU_GEN_ENABLED=y
 #   → 该内核出厂 MGLRU 即为【开启】(0x0003)，post-fs-data.sh 基线日志也实测 =0x0003。

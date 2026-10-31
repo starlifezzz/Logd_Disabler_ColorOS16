@@ -69,7 +69,7 @@ console.log('═══ F6. 特殊块动作 ↔ WebUI 声明 ═══');
 [['disable_logd','start logd|stop logd|pkill'],['lock_developer_options','development_settings_enabled'],
  ['kill_redundant_processes','pkill'],['system_prop_toggles','setprop'],
  ['disable_data_collection','/system_ext/bin'],['memory_io_optimization','sched_schedstats'],
- ['extra_kernel_optimization','kernel/printk']].forEach(([k,re])=>{
+ ['extra_kernel_optimization','transparent_hugepage/enabled']].forEach(([k,re])=>{
   new RegExp(re).test(sh)?ok(`${k} 服务端确有对应实现 (${re})`):no(`${k} 服务端找不到实现 (${re})`);
 });
 sh.includes('is_on "block_ota"')&&sh.includes('disable_pkg "com.oplus.ota" "block_ota"')&&sh.includes('stop update_engine')

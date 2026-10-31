@@ -704,47 +704,75 @@ fi
 #    → 两边都不再写，保持内核默认。
 # ② dirty_background_ratio：本机 init.rc:1896 固定写 5（实测出厂值）。
 #    原"开"写 5 = 空操作；原"关"写 10 反而把出厂 5 改成 10。→ 两边都不再写。
+# 【v2.3.21 审计：再删 3 项 —— 空转 / 反向 / 被厂商覆盖】
+# ③ swappiness 30 → 删。本机是 zram（内存内 swap 7.5GB，lz4；/proc/swaps 实测），
+#    内核文档 admin-guide/sysctl/vm.rst 明确："For in-memory swap, like zram or
+#    zswap... values beyond 100 can be considered"。写 30 = 把换出当成贵 3 倍多 →
+#    压力下更倾向杀后台，与"保后台"目标【相反】。
+#    且厂商 /vendor/bin/init.qcom.post_boot.sh:715/820/4267/4823 每次开机写回 100
+#    （实测最终值 100 ≠ 模块目标 30）→ 本来就抢不过。
+# ④ compact_unevictable_allowed 0 → 删。出厂 1（mm/Kconfig COMPACT_UNEVICTABLE_DEFAULT
+#    default 1，仅 PREEMPT_RT 为 0）。文档：1 = 允许压缩 mlocked 页以换取大块连续内存；
+#    0 = 禁止移动 unevictable 页 → 高阶分配成功率下降（GPU/相机需要连续物理页）。
+#    本机 mlocked 仅 114MB / 14.85GB → 能省下的极少，而反作用方向明确。
+# ⑤ dirty_ratio 10 → 删。出厂 20（mm/page-writeback.c:90 vm_dirty_ratio=20）。
+#    实测 Dirty 12~652kB，而 dirty_background_ratio=5（init.rc 出厂）在 0.74GB 就启动
+#    后台回写，抢在两个前台阈值（10%=1.48GB / 20%=2.97GB）之前 → 日常永不触及，空转。
+# 【保留 2 项】
+#   · sched_schedstats=0：关掉 static-key 分支；代价 = sched_stat_* tracepoint 失效
+#     （/system/etc/init/atrace.rc:10 打开它就是为这些 tracepoint），perfetto 少数据。
+#   · vfs_cache_pressure=50：文档"Decreasing ... causes the kernel to prefer to retain
+#     dentry and inode caches"，方向明确、不极端（0 才危险）。
 # 【原则】开关关闭必须回到出厂值，不能写一个"看起来像默认"的猜测值。
 if is_on "memory_io_optimization"; then
     log "[MemIO] 启用：写入优化参数..."
     echo 0 > /proc/sys/kernel/sched_schedstats 2>/dev/null
-    echo 0 > /proc/sys/vm/compact_unevictable_allowed 2>/dev/null
-    echo 30 > /proc/sys/vm/swappiness 2>/dev/null
-    echo 10 > /proc/sys/vm/dirty_ratio 2>/dev/null
     echo 50 > /proc/sys/vm/vfs_cache_pressure 2>/dev/null
-    log "[MemIO] 完成"
+    # 【v2.3.21】改为回读校验：原 `echo ... && log "完成"` 是假绿灯
+    #   （日志写"完成"，实际值可能被后续厂商脚本覆盖，审计时无法分辨）。
+    log "[MemIO] 完成：sched_schedstats=$(cat /proc/sys/kernel/sched_schedstats 2>/dev/null) vfs_cache_pressure=$(cat /proc/sys/vm/vfs_cache_pressure 2>/dev/null)（期望 0 / 50）"
 else
     log "[MemIO] 关闭：恢复出厂参数..."
     echo 1 > /proc/sys/kernel/sched_schedstats 2>/dev/null
-    echo 1 > /proc/sys/vm/compact_unevictable_allowed 2>/dev/null
-    echo 100 > /proc/sys/vm/swappiness 2>/dev/null
-    echo 20 > /proc/sys/vm/dirty_ratio 2>/dev/null
     echo 100 > /proc/sys/vm/vfs_cache_pressure 2>/dev/null
-    log "[MemIO] 恢复完成"
+    log "[MemIO] 恢复完成：sched_schedstats=$(cat /proc/sys/kernel/sched_schedstats 2>/dev/null) vfs_cache_pressure=$(cat /proc/sys/vm/vfs_cache_pressure 2>/dev/null)（期望 1 / 100）"
 fi
 
 # ===================== 8. 额外内核优化 =====================
 # 【v2.3.20 审计：删掉 3 个空转/写错的参数】
-# ① printk 出厂值不是 "4 4 1 7"：本机 /vendor/etc/init/hw/init.qti.kernel.rc:44
-#    实测写 "4 6 1 7"。原"关"写 4 4 1 7 = 把 console_loglevel 从 6 压到 4（改变了出厂行为）。
-#    → 关闭分支改为写回 "4 6 1 7"。
+# ① printk：旧版"关"写 "4 4 1 7"，与任何真实值都不符 → 删除。
+#    【v2.3.21 纠正】真终值也不是 init.qti.kernel.rc:44 的 "4 6 1 7"：该行之后
+#    /vendor/bin/init.qcom.sh:455-465 会按 build.type 再写一次
+#    （userdebug/eng → "6 6 1 7"；user → "4 3 1 4"；本机实测 ro.build.type=user，
+#    终值 "4 3 1 4"）。旧版把它当出厂值写回是错的。
 # ② printk_console_loglevel：本机不存在该 sysctl（ls 报 No such file），写入静默失败 → 整段删除。
 # ③ transparent_hugepage/khugepaged/defrag 是【整数】文件（0/1），写 "never"/"always"
 #    实测退出码 1（EINVAL），原开关两向都是空转 → 整段删除。
-# ④ THP 出厂值不是 "always"：本机内核 CONFIG_TRANSPARENT_HUGEPAGE_MADVISE=y
-#    （/proc/config.gz 实测）→ 出厂 [madvise]。原"关"写 always = 比出厂更激进。
+# ④ THP 出厂值不是 "always"：原"关"写 always = 比出厂更激进 → 已删。
+# 【v2.3.21 审计：再删 2 项】
+# ⑤ printk "3 3 3 3" → 删。本机 /proc/cmdline 实测 console=ttynull —— 内核控制台
+#    输出直接丢弃，而 console_loglevel 只决定"哪些消息送往 console"，不影响 ring
+#    buffer 与 dmesg → 收益 = 0。且写 "3 3 3 3" 会把 minimum_console_loglevel 从
+#    出厂 1 抬到 3（自锁：后续调试没法把 console 调到 3 以下）。
+#    另外厂商脚本在模块之后还会改首字段（实测旧版最终值 "4 3 3 3" ≠ 模块目标
+#    "3 3 3 3"）→ 原"完成"日志是假绿灯。
+# ⑥ THP defrag never → 删。厂商 /vendor/bin/init.kernel.post_boot.sh:263 本来就写
+#    never，模块再写一遍属纯冗余；且 enabled=never 时 defrag 本就无作用对象。
+# 【保留 1 项 · ⚠️ 已实测为空转，是否保留待定】
+#    THP enabled=never：厂商 /vendor/bin/init.kernel.post_boot.sh:261 自己就写 never
+#    （该段注释原文 "# We do not use THP"），且该脚本在 service.sh 之后执行
+#    → 本项与厂商同值且被覆盖 = 不改变任何实际行为。
+#    保留理由：零风险、不会把 THP 打开（真正危险的是 always）；不是"有效优化"。
+#    注意"关闭"分支写 madvise 与厂商相反（厂商是 never）——同样被厂商脚本覆盖，
+#    最终仍是 never，但语义上属"关分支比出厂更激进"，是否移除整个开关待决定。
 if is_on "extra_kernel_optimization"; then
-    log "[Kernel] 启用：写入内核参数..."
-    echo "3 3 3 3" > /proc/sys/kernel/printk 2>/dev/null
+    log "[Kernel] 启用：关闭透明大页..."
     echo never > /sys/kernel/mm/transparent_hugepage/enabled 2>/dev/null
-    echo never > /sys/kernel/mm/transparent_hugepage/defrag 2>/dev/null
-    log "[Kernel] 完成"
+    log "[Kernel] 完成：THP enabled=$(cat /sys/kernel/mm/transparent_hugepage/enabled 2>/dev/null)（期望含 [never]）"
 else
     log "[Kernel] 关闭：恢复出厂参数..."
-    echo "4 6 1 7" > /proc/sys/kernel/printk 2>/dev/null
     echo madvise > /sys/kernel/mm/transparent_hugepage/enabled 2>/dev/null
-    echo madvise > /sys/kernel/mm/transparent_hugepage/defrag 2>/dev/null
-    log "[Kernel] 恢复完成"
+    log "[Kernel] 恢复完成：THP enabled=$(cat /sys/kernel/mm/transparent_hugepage/enabled 2>/dev/null)（期望含 [madvise]）"
 fi
 
 # ===================== 8b.（已移除）=====================
