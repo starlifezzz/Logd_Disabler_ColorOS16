@@ -364,3 +364,109 @@ DNS         localhost / 被拦域名→127.0.0.1 / 正常域名解析 全部正�
    一旦出现 +7 / +N 的等差递增，几乎必然是「剥离失败 + 追加成功」
 5. 同一个坑的变体：`sed -i`（内部就是 rename）同样会在 bind 源上失败，本项目统一改用
    `sed ... > tmp` + `cat tmp > file`
+
+---
+
+## 云控 hosts 三重失效：cron 覆盖 / 挂载传播 / SELinux 标签（2026-11-01）
+
+上一节的修复（幂等 + 原地覆盖）让「每次 apply 净增 7 行」的问题消失，但真机 19 小时长跑后
+发现**域名拦截仍然静默失效**：`hosts.cloud` 标记段 0 段 0 域名、`sms.ads.heytapmobi.com`
+解析回真实 IP `111.206.136.11`。逐层挖出三个独立根因，全部实证。
+
+### 根因一：bindhosts 每天 10:00 的 cron 会重写它自己的 hosts
+
+```
+hosts.cloud  mtime=2026-11-01 10:00:03  size=7005625  inode=568928
+尾部内容     # bindhosts v215
+crontab      0 10 * * * sh /data/adb/modules/bindhosts/bindhosts.sh --force-update
+```
+
+`bindhosts.sh --force-update` 重新生成 `$MODDIR/system/etc/hosts`（7 MB 广告拦截列表），
+**把本模块写在同一个 inode 里的标记段整段覆盖掉**。所以不是「我们没写进去」，而是「写进去了，
+被别人按天擦掉」。
+
+### 根因二：`/data` 是 shared peer group，挂载会互相复制
+
+```
+372  55  254:77 /adb/logd_disabler/hosts.cloud            /system/etc/hosts              shared:60
+606  372 254:77 /adb/modules/bindhosts/system/etc/hosts   /system/etc/hosts              shared:60
+636  206 254:77 /adb/modules/bindhosts/system/etc/hosts   /data/adb/logd_disabler/hosts.cloud  shared:60
+```
+
+- `mount 636` 的语义是：**bindhosts 把它的 hosts bind 到了本模块的 `hosts.cloud` 路径上**
+- 起因是 `/data`（id=206）本身 `shared:60`，任何「源在 `/data` 下」的 bind 都继承该组；
+  在其上再挂载会按「同一相对路径」复制到其它成员 → 三个路径互为 peer
+- 实测：挂载 `.own` 后 inode 同时变成 `1358455`（三处一致），随后 cron 一跑三处标记段全没
+- **toybox `mount` 不支持 `--make-private`**：`mount --make-private /system/etc/hosts` 会把参数
+  当未知选项去读 `/etc/fstab`，报 `bad /etc/fstab` 且 **rc=0（假成功）**
+- 可行的断开方式：`umount` 掉挂在本模块路径上的影子层。实测卸掉后，在 `/system/etc/hosts`
+  挂探针文件不再传播到 bindhosts 路径（`peer2.sh`：探针 inode 1358733 未扩散）
+
+⚠️ `umount` 本身也**会传播**：卸 `hosts.cloud` 的影子层会连带移除 `/system/etc/hosts`
+上对应的 bindhosts 层（实测 3 层 → 1 层）。这不是 bug，是必须利用/防范的特性。
+
+### 根因三（最致命）：`/data/adb` 下文件的 SELinux 标签让整个 hosts 被忽略
+
+```
+-rw-r--r-- 1 root root u:object_r:adb_data_file:s0  341  /system/etc/hosts   ← 源文件在 /data/adb 下
+$ chcon u:object_r:system_file:s0 /data/adb/logd_disabler/hosts.cloud
+$ ping -c1 sms.ads.heytapmobi.com
+PING sms.ads.heytapmobi.com (127.0.0.1)     ← 立即生效
+```
+
+- 内容完全正确（5 条 `0.0.0.0` 都在），但普通 app 读不到 `adb_data_file` → **解析器直接忽略整份 hosts**
+- 判定陷阱：`ping` 已知域名可能命中缓存；要用**从未解析过的域名**做探针，
+  实测探针返回 `unknown host` = 解析器没读 hosts（不是缓存问题）
+- **含义**：此前能用，只是因为顶层恰好是 bindhosts 的 `system_file` 文件。
+  **没装 bindhosts 的用户，云控拦截一直是无效的** —— 这是长期存在的严重缺陷
+
+### 修复过程中新踩的两个坑（都已修）
+
+1. **`mv` 换掉 inode → 挂载根变 `//deleted` → 之后所有 bind 报 ENOENT**
+   ```
+   mountinfo: 372 55 254:77 /adb/logd_disabler/hosts.cloud//deleted  /system/etc/hosts
+   mount -o bind /data/adb/logd_disabler/hosts.cloud /system/etc/hosts
+   mount: ...: No such file or directory     ← 源和目标都存在，仍失败
+   ```
+   原因：`mv` = 建新 inode + 改名，旧 bind 仍引用已删除 inode；挂载传播到 `//deleted` 路径失败。
+   → 落盘**一律 `cat tmp > file` 原地覆盖**，永不用 `mv`
+2. **先 unshadow 再读 = 丢掉用户基线**
+   先卸影子层会（经传播）连带移除 `/system/etc/hosts` 上的 bindhosts 层，
+   于是读到的只是本模块自己的 341 字节旧文件 → **241727 行广告拦截基线被整份丢弃**。
+   → 顺序必须是**先读生效 hosts、再断传播**
+
+### 最终修复清单（`cloud_hosts.sh`）
+
+| 步骤 | 做法 | 防的是 |
+|---|---|---|
+| ① 读 | `sed` 剥旧标记段，读的是**当前生效** `/system/etc/hosts` | 丢基线 |
+| ② 断传播 | `cloud_hosts_unshadow`：卸掉挂在本模块路径上的影子层 | 写进对方文件 |
+| ③ 清残 | `cloud_hosts_drop_stale`：卸掉 root 以 `//deleted` 结尾的层 | 后续 mount ENOENT |
+| ④ 选目标 | 仍被覆盖 → 私有副本 `hosts.cloud.own` | 卸不掉时的兜底 |
+| ⑤ 落盘 | `cat tmp > file`（原地覆盖，保 inode） | `//deleted` 挂载根 |
+| ⑥ 打标 | `chcon u:object_r:system_file:s0` + 标签校验 | app 读不到 hosts |
+| ⑦ 挂载 | `mount -o bind` | — |
+| ⑧ 判活 | **生效层 inode == 源文件 inode** 且标记段在位 | 只看标记段的假绿 |
+| ⑨ 幂等 | 同上条件成立则跳过，不再叠层 | 挂载层膨胀 |
+
+### 验证（2026-11-01 12:44 真机开机后实测）
+
+```
+代码        cloud_hosts.sh 240 行 md5=6a06e2165e5ab250b74a998ff1a57479
+hosts       241734 行  标记段=1  域名=5  标签=u:object_r:system_file:s0  层=2
+//deleted   0 个
+DNS         sms.ads / htms → 127.0.0.1    www.baidu.com 正常
+cron 验收   手动跑 bindhosts --force-update 后：标记段仍 1、241734 行、域名 5、DNS 仍 127.0.0.1
+            bindhosts/hosts 里标记段=0（证明没写进对方文件）
+核心运行态  logd=stopped  mediametrics=running(18568)  config 41 键  WiFi/蓝牙/音频正常
+```
+
+### 教训
+
+1. **别假设「文件内容对 = 功能生效」**：SELinux 标签能让整份文件被忽略，权限位看着全对
+2. **`/data` 是 shared peer group**：源在 `/data` 下的 bind 会与其它挂载互相复制，
+   `umount` 也会传播；断开链路只能卸影子层（toybox 无 `--make-private`）
+3. **`mv` 永远不要用在可能被 bind 引用的文件上**：换 inode 会留下 `//deleted` 挂载根
+4. **依赖顺序就是正确性**：「先读后断」与「先断后读」结果差 7 MB 数据
+5. **第三方模块的定时任务要当环境事实对待**：每天 10:00 的一次 cron 足以让功能静默失效，
+   验证不能只看「刚装完那一刻」

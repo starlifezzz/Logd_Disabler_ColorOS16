@@ -699,11 +699,48 @@ BADW=$(grep -nE '(>>?[[:space:]]*"?/system/etc/hosts|cp[^|;&]*[[:space:]]+/syste
 grep -q 'localhost' $SRC/cloud_hosts.sh && ok "合并结果带 localhost 安全闸（防空 hosts 断解析）" || no "缺 localhost 安全闸"
 # 【防回归 2026-10-31】hosts.cloud 被 bind 后 mv 返回 EBUSY，旧写法 `mv ... 2>/dev/null` 吞错
 # → 剥离从未生效 → 每次 apply 追加 7 行（实测累积 13 段）。必须保留原地覆盖兜底。
-grep -q 'cat "$_ch_tmp" > "$CLOUD_HOSTS_FILE"' $SRC/cloud_hosts.sh && ok "落盘有原地覆盖兜底（mv 遇 EBUSY 时不丢剥离结果）" || no "缺原地覆盖兜底（EBUSY 时剥离会静默失效）"
-grep -q 'if ! mv -f "$_ch_tmp"' $SRC/cloud_hosts.sh && ok "mv 失败被显式判错（不再静默吞掉 EBUSY）" || no "mv 仍被静默吞错（旧 bug 会复发）"
+grep -q 'if ! cat "$_ch_tmp" > "$_ch_file"' $SRC/cloud_hosts.sh && ok "落盘用原地覆盖并显式判错（保持 inode，不产生 //deleted 挂载根）" || no "缺原地覆盖落盘（mv 换 inode 会让挂载根变成 //deleted）"
+# 【防回归 2026-11-01 四次】mv 是「建新 inode + 改名」：被 bind 引用的旧 inode 变成 deleted，
+# mountinfo 里 root 变 "...//deleted"，之后每次 bind 都因传播目标不存在报 ENOENT
+# （实测：mount 源和目标都在，却报 No such file or directory，且末尾只查标记段 → 假绿）。
+BADMV2=$(grep -nE '^[^#]*mv[^;|]*"\$_ch_tmp"' $SRC/cloud_hosts.sh 2>/dev/null)
+[ -z "$BADMV2" ] && ok "落盘不含 mv（避免 //deleted 挂载根导致后续挂载 ENOENT）" || { no "仍有 mv 落盘写法"; echo "$BADMV2" | sed 's/^/       /'; }
+# 【防回归 2026-11-01 五次】必须「先读生效 hosts，再 unshadow」：
+#   umount 在 shared peer group 里会传播，先卸影子层会连带移除 /system/etc/hosts 上的
+#   bindhosts 层（实测：先卸后读只读到本模块 341 字节旧文件，241727 行广告基线全丢）。
+LN_SED=$(grep -n "sed '/^# >>> ColorOS16 云控域名" $SRC/cloud_hosts.sh | head -1 | cut -d: -f1)
+LN_UNS=$(grep -n '^    cloud_hosts_unshadow$' $SRC/cloud_hosts.sh | head -1 | cut -d: -f1)
+if [ -n "$LN_SED" ] && [ -n "$LN_UNS" ] && [ "$LN_SED" -lt "$LN_UNS" ]; then
+  ok "先读生效 hosts 再卸影子层（保住用户既有广告拦截基线）"
+else
+  no "读取与 unshadow 顺序颠倒（先卸会丢掉对方模块的基线）"
+fi
 grep -q 'cmp -s "$_ch_tmp" /system/etc/hosts' $SRC/cloud_hosts.sh && ok "幂等短路（内容已最新不重复挂载）" || no "缺幂等短路（挂载层会每开机叠加）"
 BADMV=$(grep -nE '^[^#]*mv -f "\$CLOUD_HOSTS_FILE\.chk"' $SRC/cloud_hosts.sh 2>/dev/null)
 [ -z "$BADMV" ] && ok "无旧的 .chk 直接 mv 写法（临时文件统一走 _ch_tmp）" || { no "仍有旧 .chk mv 写法"; echo "$BADMV" | sed 's/^/       /'; }
+# 【防回归 2026-11-01】bindhosts 会把它的 hosts bind 到本模块 hosts.cloud 路径上
+# （mountinfo 实锤），写 hosts.cloud 等于写对方文件；对方每天 10:00 的 cron 重新生成
+# → 本模块标记段被抹掉 → 域名拦截静默失效（实测 10:00:03 被重写，标记段 1→0）。
+# 必须保留：挂载表检测 + 私有副本兜底 + 写后回读校验。
+grep -q '^cloud_hosts_shadowed()' $SRC/cloud_hosts.sh && ok "有挂载表覆盖检测（cloud_hosts_shadowed）" || no "缺覆盖检测（会把内容写进别的模块的文件）"
+grep -q 'CLOUD_HOSTS_OWN_FILE=' $SRC/cloud_hosts.sh && ok "有私有副本路径常量（被覆盖时的兜底目标）" || no "缺私有副本常量"
+grep -q '_ch_file="$CLOUD_HOSTS_OWN_FILE"' $SRC/cloud_hosts.sh && ok "被覆盖时自动切私有副本" || no "被覆盖时未切换（会继续污染对方文件）"
+grep -q '写入后回读不到标记段' $SRC/cloud_hosts.sh && ok "写后回读校验（落盘失败必报错）" || no "缺写后回读校验"
+grep -q 'mount -o bind "$_ch_file" /system/etc/hosts' $SRC/cloud_hosts.sh && ok "bind 源用选定的落盘文件" || no "bind 源未用 _ch_file（兜底副本形同虚设）"
+BADMNT=$(grep -nE '^[^#]*mount .*bind "\$CLOUD_HOSTS_FILE"' $SRC/cloud_hosts.sh 2>/dev/null)
+[ -z "$BADMNT" ] && ok "无「直接 bind hosts.cloud」旧写法（绕过覆盖检测）" || { no "仍有直接 bind hosts.cloud 的写法"; echo "$BADMNT" | sed 's/^/       /'; }
+grep -q 'cloud_hosts_shadowed "$CLOUD_HOSTS_FILE" || rm -f' $SRC/cloud_hosts.sh && ok "清理时不删被覆盖的路径（不碰对方文件）" || no "清理逻辑未避开被覆盖路径"
+# 【防回归 2026-11-01 二次】幂等短路必须同时校验「生效层就是我们的文件」（比 inode），
+# 否则「内容恰好相同但生效层是别人的文件」会被误判为已生效，私有副本永不创建。
+grep -q '_ch_top=$(stat -c%i /system/etc/hosts' $SRC/cloud_hosts.sh && ok "幂等短路校验生效层 inode（防「内容相同但层是别人的」误判）" || no "幂等短路未校验生效层归属（会被别人的文件蒙混过去）"
+grep -qF '[ "$_ch_top" = "$_ch_own" ]' $SRC/cloud_hosts.sh && ok "短路条件含 inode 相等判定" || no "短路条件缺 inode 相等判定"
+# 【防回归 2026-11-01 三次】/data/adb 下文件默认标签 adb_data_file，普通 app 读不到
+# → 内容正确但整个 hosts 被忽略（域名照常解析到真实 IP）。必须 chcon 成 system_file。
+grep -q 'chcon u:object_r:system_file:s0' $SRC/cloud_hosts.sh && ok "落盘后 chcon system_file（否则 app 读不到 hosts，拦截静默失效）" || no "缺 chcon（/data/adb 文件标签会让 hosts 被忽略）"
+grep -q 'SELinux 标签是' $SRC/cloud_hosts.sh && ok "有标签校验（不是 system_file 就拒绝挂载）" || no "缺标签校验"
+grep -q '^cloud_hosts_unshadow()' $SRC/cloud_hosts.sh && ok "有影子层清理（断开挂载传播，避免写进对方文件）" || no "缺影子层清理"
+grep -q '^cloud_hosts_drop_stale()' $SRC/cloud_hosts.sh && ok "有失效挂载层清理（root=//deleted，否则后续 bind 报 ENOENT）" || no "缺失效挂载层清理"
+grep -q 'bind 未生效（生效层 inode=' $SRC/cloud_hosts.sh && ok "最终生效判定比 inode（防「旧内容带标记段」假绿）" || no "最终判定仍只看标记段（挂载失败会假绿）"
 
 echo "═══ J. 开发者选项语义（v2.3.19-fix：旧版参数写反，重启即失效）═══"
 # 1) 禁止再出现"把开发者选项关掉"的写法（旧 bug 本体）
