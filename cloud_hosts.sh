@@ -95,6 +95,37 @@ cloud_hosts_domains() {
         echo "scene.dc.oppomobile.com"
         echo "sms.ads.heytapmobi.com"
     fi
+    # ③ 第三方 SDK 遥测：纯日志/统计/广告上报，与 ColorOS 云控不是一类，故独立开关
+    #    【证据等级】域名来自 NOIR 静态扫描（unzip+strings 提取 dex 内 URL）+ 域名语义判断，
+    #      未逐个实测；与 ① 那 3 个（有实证依据）不同，单列一项便于用户自行取舍。
+    #    【例外】aspect-upush / offmsg 是友盟推送的统计端点，拦掉不影响推送通道本身
+    #      （通道是 *.umeng.com 的 msg 域名），但可能影响推送到达率统计。
+    if is_on "block_sdk_telemetry"; then
+        # 友盟 Umeng：错误日志 4 个 + 离线消息统计 + 推送统计
+        echo "errlog.umeng.com"
+        echo "errlogos.umeng.com"
+        echo "errnewlog.umeng.com"
+        echo "errnewlogos.umeng.com"
+        echo "offmsg.umeng.com"
+        echo "aspect-upush.umeng.com"
+        # 字节跳动：APM 与日志上报（不含 aweme/ecom，那是抖音功能域名）
+        echo "apmlog.snssdk.com"
+        echo "rtapplog.snssdk.com"
+        echo "rtlog.snssdk.com"
+        echo "cgp.snssdk.com"
+        # OPPO 广告投放
+        echo "adx.ads.oppomobile.com"
+        # 巨量引擎广告
+        echo "ad.oceanengine.com"
+        echo "athena-api.oceanengine.com"
+        # OPPO 审计 / 日志上报
+        echo "api-audit.heytapmobi.com"
+        echo "ilogkit-service-cn.allawntech.com"
+        echo "u.bot.heytapmobi.com"
+        # 腾讯 Bugly 崩溃上报 / 虎扑统计
+        echo "bugtrace.3g.qq.com"
+        echo "stat.huluxia.com"
+    fi
 }
 
 # 当前生效的 hosts 里是否有本模块标记段

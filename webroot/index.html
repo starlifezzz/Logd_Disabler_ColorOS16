@@ -706,6 +706,12 @@ var FEATURES = [
     detail: '原理：在 hosts 里把两个域名解析到 0.0.0.0：\n• scene.dc.oppomobile.com —— 智能场景数据下发（出行/快递/日程卡片的内容来源）\n• sms.ads.heytapmobi.com —— 短信里的推广内容\n\n效果：场景服务拿不到服务端规则与卡片数据，这类桌面卡片与通知可能不再刷新；短信推广不再加载。\n\n代价：这是本组唯一有感的取舍——你如果在意出行/快递/日程卡片，就别开这一项。注意：负一屏（assistantscreen）是另一个应用，与本项无关，开了也不会把它恢复。\n\n回滚：关闭本项后重启，hosts 立即恢复原状（系统文件没被改写，只是挂载层被卸掉）。',
     checkCmd: 'grep -q " scene.dc.oppomobile.com$" /system/etc/hosts 2>/dev/null && echo blocked || echo clean',
     verifyCmd: 'echo "== 域名（期望全部 blocked）=="; for d in scene.dc.oppomobile.com sms.ads.heytapmobi.com; do if grep -q " $d$" /system/etc/hosts 2>/dev/null; then echo "$d:blocked"; else echo "$d:pass"; fi; done; echo "== 场景服务进程（被拦后仍会运行，只是拉不到数据）=="; pidof com.coloros.sceneservice 2>/dev/null || echo stopped'
+  },
+  { key: 'block_sdk_telemetry', icon: 'block--outlined', title: '第三方 SDK 遥测拦截',
+    desc: '拦掉友盟/字节/巨量/腾讯等第三方 SDK 的日志与广告上报域名（18 个）',
+    detail: '原理：把 18 个第三方 SDK 遥测域名解析到 0.0.0.0，走与「云控域名拦截」相同的 hosts 合并覆盖机制（不依赖 bindhosts）。\n\n分组：\n• 友盟 Umeng 6 个 —— 错误日志 errlog/errlogos/errnewlog/errnewlogos、离线消息统计 offmsg、推送统计 aspect-upush\n• 字节跳动 4 个 —— APM 与日志 apmlog/rtapplog/rtlog/cgp.snssdk（不含 aweme/ecom，那是抖音功能域名）\n• OPPO 广告 1 个 —— adx.ads.oppomobile\n• 巨量引擎 2 个 —— ad.oceanengine / athena-api.oceanengine\n• OPPO 审计上报 3 个 —— api-audit.heytapmobi / ilogkit-service-cn.allawntech / u.bot.heytapmobi\n• 腾讯/虎扑 2 个 —— bugtrace.3g.qq（Bugly 崩溃上报）/ stat.huluxia\n\n效果：这些 SDK 的日志、崩溃上报、广告请求失败，不再产生外连。\n\n代价：基本无感——上报失败只影响厂商侧的数据收集。⚠️ 例外：aspect-upush 与 offmsg 属友盟推送的统计端点，拦掉不影响推送通道本身，但可能影响推送到达率统计（如果你用带友盟 SDK 的 app，建议先观察再开）。\n\n诚实标注：这 18 个域名来自 NOIR 静态扫描 + 域名语义判断，未逐个实测；与「云控域名拦截」那 3 个（有实证依据）证据等级不同，故单列一项。\n\n回滚：关闭本项后重启（开机时自动卸载挂载层），或卸载模块。',
+    checkCmd: 'grep -q " errlog.umeng.com$" /system/etc/hosts 2>/dev/null && echo blocked || echo clean',
+    verifyCmd: 'echo "== 域名（期望全部 blocked）=="; for d in errlog.umeng.com errlogos.umeng.com errnewlog.umeng.com errnewlogos.umeng.com offmsg.umeng.com aspect-upush.umeng.com apmlog.snssdk.com rtapplog.snssdk.com rtlog.snssdk.com cgp.snssdk.com adx.ads.oppomobile.com ad.oceanengine.com athena-api.oceanengine.com api-audit.heytapmobi.com ilogkit-service-cn.allawntech.com u.bot.heytapmobi.com bugtrace.3g.qq.com stat.huluxia.com; do if grep -q " $d$" /system/etc/hosts 2>/dev/null; then echo "$d:blocked"; else echo "$d:pass"; fi; done; echo "== 标记段（期望 2 行）=="; grep -cF "ColorOS16 云控域名" /system/etc/hosts 2>/dev/null'
   }
  ]},
 { group: '性能优化', groupIcon: 'rocket_launch--outlined', items: [

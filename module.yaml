@@ -1,0 +1,22 @@
+# KernelSU Modules 展示元数据（仅上架列表用，不进模块 zip）
+# 规范：https://developers.kernelsu.org/docs/module-yaml
+# 注意：版本与下载地址【不】写在这里 —— 由 release zip 内的 module.prop 决定
+# yaml-language-server: $schema=https://raw.githubusercontent.com/KernelSU-Modules/tools/main/schemas/module.schema.json
+schemaVersion: 1
+
+# 必须与 module.prop 的 id 完全一致（大小写敏感）
+id: Logd_Disabler_ColorOS16
+
+name: ColorOS16 优化版
+summary: ColorOS 16（一加 / OPPO）系统精简与隐私优化。图形界面逐项关闭日志、遥测、云控域名与冗余服务，所有改动可一键还原。
+description: README.md
+license: CC-BY-NC-ND-4.0
+homepage: https://github.com/starlifezzz/Logd_Disabler_ColorOS16
+support: https://github.com/starlifezzz/Logd_Disabler_ColorOS16/issues
+
+tags: [coloros, oplus, oneplus, debloat, privacy, telemetry, logs]
+
+# 按实测机型填写（一加 Ace5 / ColorOS 16 = Android 16 = API 36）。
+# 仅作列表筛选提示，不是保证；脚本按 ColorOS16 的包名与路径编写，低版本不适用。
+compatibility:
+  androidMinApi: 36

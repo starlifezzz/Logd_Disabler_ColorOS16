@@ -5,9 +5,10 @@ OUT=os.path.join(SRC,'Logd_Disabler_ColorOS16.zip')
 # 排除规则照抄 zip.sh
 # 完全照抄 CI 的 -x 规则：*.git* *.github* *.lingma* .gitignore README.md
 #   Logd_Disabler_ColorOS16.zip zip.sh update.json reference/*
-EXCL_DIRS = {'.git','.github','.lingma','reference','META-INF','node_modules','__pycache__'}
+#   .ci/* coloros.md module.yaml（v2.3.23 上架 KSU Modules：仓库元数据不进用户设备）
+EXCL_DIRS = {'.git','.github','.lingma','reference','META-INF','node_modules','__pycache__','.ci'}
 EXCL_FILES = {'Logd_Disabler_ColorOS16.zip','verify_status.sh','README.md',
-              '.gitignore','zip.sh','update.json'}
+              '.gitignore','zip.sh','update.json','coloros.md','module.yaml'}
 EXCL_PAT = re.compile(r'^(verify_.*|.*\.orig|.*\.bak|.*\.swp)$')
 
 def git_mode(rel):

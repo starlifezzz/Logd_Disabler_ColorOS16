@@ -47,7 +47,7 @@ grep -n 'echo 0x' $SRC/service.sh $SRC/post-fs-data.sh $SRC/customize.sh $SRC/bo
 echo "═══ C. 开关数量与同步 ═══"
 AK=$(grep -m1 'ALL_KEYS="' $SRC/service.sh | sed 's/.*ALL_KEYS="//;s/".*//')
 N=$(echo $AK | wc -w)
-[ "$N" = "36" ] && ok "ALL_KEYS 数量 = 36" || no "ALL_KEYS = $N (期望 36)"
+[ "$N" = "37" ] && ok "ALL_KEYS 数量 = 37" || no "ALL_KEYS = $N (期望 37)"
 AK2=$(grep -m1 -A0 'ALL_KEYS="' $SRC/service.sh | head -1)
 C1=$(grep -c 'ALL_KEYS="' $SRC/service.sh); [ "$C1" = "2" ] && ok "ALL_KEYS 出现 2 处" || no "ALL_KEYS 出现 $C1 处"
 grep -m1 'ALL_KEYS="' $SRC/service.sh | grep -q enable_mglru && no "ALL_KEYS 仍含 enable_mglru" || ok "ALL_KEYS 已无 enable_mglru"
@@ -68,13 +68,13 @@ extra=[k for k in feats if k not in ak]
 missing=[k for k in ak if k not in feats]
 open(f'{tmp}/feat.txt','w').write("%d\n%s\n%s\n" % (len(feats), ','.join(extra), ','.join(missing)))
 print(f"  FEATURES keys = {len(feats)}")
-if not extra and not missing and len(feats)==36:
-    print(f"  ✅ FEATURES == ALL_KEYS == 36，无缺无多")
+if not extra and not missing and len(feats)==37:
+    print(f"  ✅ FEATURES == ALL_KEYS == 37，无缺无多")
 else:
     print(f"  ❌ extra={extra} missing={missing}")
 PY
-[ "$(sed -n 1p $T/feat.txt)" = "36" ] && [ -z "$(sed -n 2p $T/feat.txt)" ] && [ -z "$(sed -n 3p $T/feat.txt)" ] \
-  && ok "FEATURES ↔ ALL_KEYS 一致(36)" || no "FEATURES ↔ ALL_KEYS 不一致"
+[ "$(sed -n 1p $T/feat.txt)" = "37" ] && [ -z "$(sed -n 2p $T/feat.txt)" ] && [ -z "$(sed -n 3p $T/feat.txt)" ] \
+  && ok "FEATURES ↔ ALL_KEYS 一致(37)" || no "FEATURES ↔ ALL_KEYS 不一致"
 
 echo "═══ E. 核心功能仍完整 ═══"
 BINS="midasd ostatsd ostats_pullerd ostats_tpd criticallog subsystem_ramdump"
@@ -180,10 +180,25 @@ echo "═══ H. 版本一致性 ═══"
 V=$(grep '^version=' $SRC/module.prop|cut -d= -f2); VC=$(grep '^versionCode=' $SRC/module.prop|cut -d= -f2)
 JV=$(python3 -c "import json;print(json.load(open('$SRC/update.json'))['version'])")
 JVC=$(python3 -c "import json;print(json.load(open('$SRC/update.json'))['versionCode'])")
-[ "$V" = "v2.3.22" ] && ok "module.prop version=$V" || no "version=$V"
-[ "$VC" = "55" ] && ok "module.prop versionCode=$VC" || no "versionCode=$VC"
+[ "$V" = "v2.3.23" ] && ok "module.prop version=$V" || no "version=$V"
+[ "$VC" = "56" ] && ok "module.prop versionCode=$VC" || no "versionCode=$VC"
 [ "$JV" = "$V" ] && ok "update.json version=$JV 一致" || no "update.json $JV != $V"
 [ "$JVC" = "$VC" ] && ok "update.json versionCode=$JVC 一致" || no "update.json $JVC != $VC"
+# H2) 【v2.3.23】KernelSU Modules 上架元数据一致性
+#     module.yaml 的 id 必须与 module.prop 完全一致（大小写敏感），否则上架校验报错
+if [ -f "$SRC/module.yaml" ]; then
+  MYID=$(sed -n 's/^id:[[:space:]]*//p' $SRC/module.yaml | head -1 | tr -d '\r')
+  PID=$(grep '^id=' $SRC/module.prop | cut -d= -f2)
+  [ "$MYID" = "$PID" ] && ok "module.yaml id 与 module.prop 一致（$MYID）" || no "module.yaml id=$MYID ≠ module.prop id=$PID"
+  grep -qE '^schemaVersion:[[:space:]]*1[[:space:]]*$' $SRC/module.yaml && ok "module.yaml schemaVersion=1" || no "module.yaml schemaVersion 不是 1"
+  MD=$(sed -n 's/^description:[[:space:]]*//p' $SRC/module.yaml | head -1 | tr -d '\r')
+  [ -f "$SRC/$MD" ] && ok "module.yaml 描述文件存在（$MD）" || no "module.yaml 描述文件缺失: $MD"
+  # 上架要求 zipUrl 指向真实资产名；KSU 官方 action 产出 id-versionCode-version.zip
+  JZ=$(python3 -c "import json;print(json.load(open('$SRC/update.json'))['zipUrl'])")
+  echo "$JZ" | grep -qE "/$PID-$VC-$V\.zip$" && ok "update.json zipUrl 用 KSU action 资产名（$PID-$VC-$V.zip）" || no "update.json zipUrl 与 KSU action 资产名不符: $JZ"
+else
+  no "缺 module.yaml（KernelSU Modules 上架必需）"
+fi
 
 echo
 echo "═══ F6. 二级开关 → 一级实时联动（v2.3.15 实测 bug 回归）═══"
@@ -829,6 +844,17 @@ done
 [ "$LEGACY_OK" = "1" ] && ok "uninstall 保留 3 项旧版残留回滚（swappiness/compact/dirty_ratio；THP 两项见上条）" || no "uninstall 旧版残留回滚缺失（升级用户卸载后会留旧值）"
 # 8) WebUI 云控开关自检必须查自身域名（整段标记会让"只开 scene"误报）
 grep -q 'icosa-service-cn-01.allawntech.com\$' $SRC/webroot/index.html && ok "block_cloud_hosts checkCmd 用自身域名判定" || no "block_cloud_hosts checkCmd 未用自身域名"
+grep -q 'errlog.umeng.com\$' $SRC/webroot/index.html && ok "block_sdk_telemetry checkCmd 用自身域名判定" || no "block_sdk_telemetry checkCmd 未用自身域名"
+# 8b) 第三方 SDK 遥测开关三处齐全（域名定义 / 开机复核 / WebUI 卡片）
+grep -q 'is_on "block_sdk_telemetry"' $SRC/cloud_hosts.sh && ok "cloud_hosts.sh 有 block_sdk_telemetry 域名块" || no "cloud_hosts.sh 缺 block_sdk_telemetry"
+grep -q 'is_on "block_sdk_telemetry"' $SRC/boot-completed.sh && ok "boot-completed.sh 复核判断含 block_sdk_telemetry" || no "boot-completed.sh 复核判断缺 block_sdk_telemetry"
+grep -q "key: 'block_sdk_telemetry'" $SRC/webroot/index.html && ok "WebUI 有 block_sdk_telemetry 卡片" || no "WebUI 缺 block_sdk_telemetry 卡片"
+# 8c) 18 个 SDK 域名必须全在 cloud_hosts.sh 里（防漏写/写错）
+SDK_MISS=""
+for d in errlog.umeng.com errlogos.umeng.com errnewlog.umeng.com errnewlogos.umeng.com offmsg.umeng.com aspect-upush.umeng.com apmlog.snssdk.com rtapplog.snssdk.com rtlog.snssdk.com cgp.snssdk.com adx.ads.oppomobile.com ad.oceanengine.com athena-api.oceanengine.com api-audit.heytapmobi.com ilogkit-service-cn.allawntech.com u.bot.heytapmobi.com bugtrace.3g.qq.com stat.huluxia.com; do
+  grep -qF "\"$d\"" $SRC/cloud_hosts.sh || SDK_MISS="$SDK_MISS $d"
+done
+[ -z "$SDK_MISS" ] && ok "18 个 SDK 域名全在 cloud_hosts.sh" || no "cloud_hosts.sh 缺域名:$SDK_MISS"
 # 9) 第二批空转属性（block_ota / block_ads / disable_logd / 主题）必须停写
 #    取证：logd 系列是临时 umount 后 grep 真实二进制（bind 覆盖会导致假阴性）；
 #          其余为全机 APK dex（含 /my_*）+ lib64 + bin + init rc 全扫 0 命中。

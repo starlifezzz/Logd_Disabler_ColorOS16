@@ -1,6 +1,7 @@
 name: Build Module and Release
 
-# 触发条件：推送 v* 格式的 tag（如 v1.1），或手动触发
+# 触发条件：推送 v* 格式的 tag（如 v2.3.23）→ 打包 + 自检 + 发布不可变 Release
+# workflow_dispatch：只跑「打包 + 自检」，不发布（发布步骤有 startsWith(ref, 'refs/tags/v') 门）
 on:
   push:
     tags:
@@ -26,24 +27,26 @@ jobs:
         run: |
           echo "version=$(grep '^version=' module.prop | cut -d= -f2)" >> "$GITHUB_OUTPUT"
           echo "version_code=$(grep '^versionCode=' module.prop | cut -d= -f2)" >> "$GITHUB_OUTPUT"
-          echo "tag=${{ github.ref_name }}"
 
-      # 打包可刷 zip：改用【排除法】，与本地 zip.sh 完全一致
-      # 【本次修复】旧版用白名单，导致 sepolicy.rule 与 uninstall.sh 被漏打包：
+      # 打包可刷 zip：改用【排除法】，与本地 zip.sh / .ci/build_zip.py 完全一致
+      # 【历史修复】旧版用白名单，导致 sepolicy.rule 与 uninstall.sh 被漏打包：
       #   - 缺 sepolicy.rule → pm 全部报 "Can't find service: package"
       #   - 缺 uninstall.sh  → 卸载后不回滚，包/属性/挂载永久残留
       #   实测 Release v2.3.0 zip(15 条目) 确认两文件缺失。
-      #   排除法可自动包含后续新增文件（如 cnss_diag_*.conf），不会再漏。
+      # 【v2.3.23】上架 KernelSU Modules：排除仓库元数据与 CI 工具，不进用户设备
+      #   （.ci/* 是门禁脚本、coloros.md 是事故档案、module.yaml 是列表元数据，
+      #     三者都不参与模块运行，KSU 只读 module.prop + 各脚本 + webroot/）
       - name: Package module zip
         run: |
           sudo apt-get update && sudo apt-get install -y zip
           zip -9 -r Logd_Disabler_ColorOS16.zip . \
             -x "*.git*" "*.github*" "*.lingma*" ".gitignore" "README.md" \
-            "Logd_Disabler_ColorOS16.zip" "zip.sh" "update.json" "reference/*"
+            "Logd_Disabler_ColorOS16.zip" "zip.sh" "update.json" "reference/*" \
+            ".ci/*" "coloros.md" "module.yaml"
           echo "--- zip contents ---"
           unzip -l Logd_Disabler_ColorOS16.zip
 
-      # 【本次新增】打包自检：必需文件缺失直接失败，防止再次漏打包
+      # 打包自检：必需文件缺失直接失败，防止再次漏打包
       - name: Verify zip contains required files
         run: |
           FAIL=0
@@ -65,21 +68,50 @@ jobs:
           [ "$FAIL" -eq 0 ] || exit 1
           echo "✅ 打包自检通过"
 
-      # 生成 update.json 到临时位置（不污染当前工作区）
+      # 【v2.3.23】发布改用 KernelSU Modules 官方 action：
+      #   - 它先跑与 modules.kernelsu.org 同源的校验器（zip 结构 / module.prop /
+      #     module.yaml / id 一致性 / versionCode 递增），不合格就什么都不发
+      #     → 不会白烧一个不可变版本号
+      #   - 发布顺序为 draft → 上传 → publish（不可变 Release 必须在发布前传完资产）
+      #   - 资产名固定为 {id}-{versionCode}-{version}.zip，下面的 update.json 要用它
+      # 前置条件：仓库 Settings → General → Releases → Enable release immutability
+      - name: Publish immutable release (KernelSU Modules)
+        id: release
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: KernelSU-Modules/tools/actions/module-release@b6d340ddcd562ad482568b6e66b8d7a9c34d645e
+        with:
+          zip: Logd_Disabler_ColorOS16.zip
+          generate-release-notes: true
+
+      # 生成 update.json：zipUrl 必须指向 action 实际产出的资产名，
+      # 否则 module.prop 的 updateJson 下载 404（KSU 管理器更新检测会失败）
       - name: Generate update.json
+        if: startsWith(github.ref, 'refs/tags/v')
+        env:
+          ASSET: ${{ steps.release.outputs.asset-name }}
+          TAG: ${{ github.ref_name }}
+          VER: ${{ steps.module_info.outputs.version }}
+          VCODE: ${{ steps.module_info.outputs.version_code }}
         run: |
+          if [ -z "$ASSET" ]; then
+            echo "::error::拿不到 release 资产名，拒绝写 update.json（会指向 404）"
+            exit 1
+          fi
           cat > /tmp/update.json <<EOF
           {
-            "version": "${{ steps.module_info.outputs.version }}",
-            "versionCode": ${{ steps.module_info.outputs.version_code }},
-            "zipUrl": "https://github.com/starlifezzz/Logd_Disabler_ColorOS16/releases/download/${{ github.ref_name }}/Logd_Disabler_ColorOS16.zip",
-            "changelog": "https://github.com/starlifezzz/Logd_Disabler_ColorOS16/releases/tag/${{ github.ref_name }}"
+            "version": "$VER",
+            "versionCode": $VCODE,
+            "zipUrl": "https://github.com/starlifezzz/Logd_Disabler_ColorOS16/releases/download/$TAG/$ASSET",
+            "changelog": "https://github.com/starlifezzz/Logd_Disabler_ColorOS16/releases/tag/$TAG"
           }
           EOF
           cat /tmp/update.json
 
       # 把 update.json 推回 main 分支（module.prop 的 updateJson 指向 main 分支文件）
       - name: Commit update.json back to main
+        if: startsWith(github.ref, 'refs/tags/v')
+        env:
+          TAG: ${{ github.ref_name }}
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
@@ -87,13 +119,5 @@ jobs:
           git checkout main
           cp /tmp/update.json update.json
           git add update.json
-          git diff --cached --quiet || git commit -m "chore: update update.json for ${{ github.ref_name }}"
+          git diff --cached --quiet || git commit -m "chore: update update.json for $TAG"
           git push origin main
-
-      # 上传 zip 到 GitHub Release（tag 对应版本）
-      - name: Create Release
-        uses: softprops/action-gh-release@v2
-        with:
-          files: Logd_Disabler_ColorOS16.zip
-          generate_release_notes: true
- 

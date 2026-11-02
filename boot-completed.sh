@@ -54,7 +54,7 @@ is_on() {
 CLOUD_LOG="/data/adb/logd_disabler/service.log"
 if [ -f "$MODDIR/cloud_hosts.sh" ]; then
     . "$MODDIR/cloud_hosts.sh"
-    if is_on "block_cloud_hosts" || is_on "block_scene_hosts"; then
+    if is_on "block_cloud_hosts" || is_on "block_scene_hosts" || is_on "block_sdk_telemetry"; then
         if cloud_hosts_active; then
             echo "[$(date '+%Y-%m-%d %H:%M:%S')] [CloudHosts] 开机复核：标记段在位（$(grep -c '^0\.0\.0\.0 ' /system/etc/hosts 2>/dev/null) 条 0.0.0.0）" >> "$CLOUD_LOG"
         else
