@@ -89,6 +89,8 @@ cloud_hosts_domains() {
         echo "icosa-service-cn-01.allawntech.com"
         echo "andesbrain-ai-cn.heytapmobi.com"
         echo "htms.heytapmobi.com"
+        # 同一上报通道的备用/旧域名：主域被拦后 SDK 回退到这里（实测 4 个 App 同时引用两个域）
+        echo "htms.heytapmobile.com"
     fi
     # ② 场景卡片与短信推广：有取舍（卡片不刷新），单独一个开关
     if is_on "block_scene_hosts"; then
@@ -101,13 +103,16 @@ cloud_hosts_domains() {
     #    【例外】aspect-upush / offmsg 是友盟推送的统计端点，拦掉不影响推送通道本身
     #      （通道是 *.umeng.com 的 msg 域名），但可能影响推送到达率统计。
     if is_on "block_sdk_telemetry"; then
-        # 友盟 Umeng：错误日志 4 个 + 离线消息统计 + 推送统计
+        # 友盟 Umeng：错误日志 4 个 + 离线消息统计 + 推送统计 + 广告消息统计
+        #   msg.umengcloud.com 必须显式列：hosts 是精确匹配，bindhosts 的
+        #   `umengcloud.com` 整域条目【不覆盖】子域（实测 apex→127.0.0.1 但本域→真实 IP）
         echo "errlog.umeng.com"
         echo "errlogos.umeng.com"
         echo "errnewlog.umeng.com"
         echo "errnewlogos.umeng.com"
         echo "offmsg.umeng.com"
         echo "aspect-upush.umeng.com"
+        echo "msg.umengcloud.com"
         # 字节跳动：APM 与日志上报（不含 aweme/ecom，那是抖音功能域名）
         echo "apmlog.snssdk.com"
         echo "rtapplog.snssdk.com"
@@ -125,6 +130,63 @@ cloud_hosts_domains() {
         # 腾讯 Bugly 崩溃上报 / 虎扑统计
         echo "bugtrace.3g.qq.com"
         echo "stat.huluxia.com"
+        # 腾讯：广告归因（kv?attaid=）/ 灯塔分析（/analytics/v2_upload）/ Bugly 崩溃上报（/rqd/async）
+        echo "h.trace.qq.com"
+        echo "otheve.beacon.qq.com"
+        echo "astat.bugly.qcloud.com"
+        echo "astat.bugly.cros.wr.pvp.net"
+        # 腾讯 QPlus 统计（/report/report）
+        echo "cgi.qplus.com"
+        # 腾讯地图 SDK 的 GPS 上报（/report?type=sdk）；定位查询走 loc.map.qq，不在此列
+        echo "rttgpsreport.map.qq.com"
+        # 阿里系：mPaaS 移动分析 / MAS 日志上传（/loggw/logUpload.do）
+        echo "mdap.alipaylog.com"
+        echo "cn-hangzhou-mas-log.cloud.alipay.com"
+        # 友盟统计族（与 errlog 同源）
+        echo "alogus.umeng.com"
+        echo "alogsus.umeng.com"
+        # HeyTap 浏览器内核日志 / 万联 xlog 日志服务
+        echo "kernellog.browser.heytapmobi.com"
+        echo "dev-xlog-service.wanyol.com"
+        # 乐播投屏日志上报（8855/8856/8865/8868）；投屏功能通道是
+        # gslb/imdns/devicemgr/pin.hpplay.cn，不在本清单内，故不影响投屏
+        echo "logu.hpplay.cn"
+        # 21CN 统计（云闪付 com.unionpay.tsmservice 上报；NOIR 0.2.5 归类 trackers）
+        echo "collect.ux.21cn.com"
+        # ================= v2.3.27：第三轮 NOIR 全量补齐（22 条）=================
+        # 【选入标准】① 与已拦域同后端/同服务（同 IP 或同族路径）——拦主不拦备等于没拦；
+        #   ② 路径是纯日志/统计/归因；③ 公共 DNS 有 A 记录（NXDOMAIN 的加了也是装饰）。
+        # 【证据】NOIR 0.2.6 全量扫描（240 App / 3869 端点）+ AliDNS DoH 逐条查 A 记录。
+        # 阿里 MDAP 日志网关族（mdap.alipay 与已拦 mdap.alipaylog 同为 110.76.24.162）
+        echo "mdap.alipay.com"
+        echo "mdap.mpaas.cn-hangzhou.aliyuncs.com"
+        echo "loggw-extiny.alipay.com"
+        # 字节 AppLog / 归因族（与已拦 rtlog.snssdk 同族；ctobsnssdk 走的是归因数据）
+        echo "rtlog.zijieapi.com"
+        echo "toblog-alink.ctobsnssdk.com"
+        echo "tobapplog.volceapplog.com"
+        echo "toblog.volceapplog.com"
+        # 友盟日志族补充（cnlogs 与已拦 alogus.umeng 同为 58.221.74.137）
+        echo "cnlogs.umeng.com"
+        echo "ulogs.umeng.com"
+        echo "ulogs.umengcloud.com"
+        echo "plbslog.umeng.com"
+        echo "pslog.umeng.com"
+        echo "preulogs.umeng.com"
+        # 高德 SDK 日志初始化（/v3/log/init）；log.qchannel03.cn 路径 /n/dpz/，用途未验证
+        echo "apiinit.amap.com"
+        echo "log.qchannel03.cn"
+        # OPPO/HeyTap 自家埋点：epoch = H5 事件采集（/soporcollect），usertrace = 场景服务用户轨迹
+        echo "epoch-cn.cdo.heytapmobi.com"
+        echo "epoch.cdo.oppomobile.com"
+        echo "nearby.dc.oppomobile.com"
+        echo "cort-report-cn.heytapmobi.com"
+        echo "ocloud-webdata-cn.heytapmobi.com"
+        echo "mdp-usertrace-cn.wanyol.com"
+        echo "usertrace-inter-cn.wanyol.com"
+        # 【诚实标注】cgi.qplus.com 与 dev-xlog-service.wanyol.com 经 AliDNS 双节点复核为
+        #   NXDOMAIN（公共 DNS 无 A 记录）→ hosts 拦截大概率无效，保留仅为覆盖运营商/HTTPDNS
+        #   另有解析的可能，不计入有效拦截数。
     fi
 }
 

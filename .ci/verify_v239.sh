@@ -180,8 +180,8 @@ echo "═══ H. 版本一致性 ═══"
 V=$(grep '^version=' $SRC/module.prop|cut -d= -f2); VC=$(grep '^versionCode=' $SRC/module.prop|cut -d= -f2)
 JV=$(python3 -c "import json;print(json.load(open('$SRC/update.json'))['version'])")
 JVC=$(python3 -c "import json;print(json.load(open('$SRC/update.json'))['versionCode'])")
-[ "$V" = "v2.3.23" ] && ok "module.prop version=$V" || no "version=$V"
-[ "$VC" = "56" ] && ok "module.prop versionCode=$VC" || no "versionCode=$VC"
+[ "$V" = "v2.3.27" ] && ok "module.prop version=$V" || no "version=$V"
+[ "$VC" = "60" ] && ok "module.prop versionCode=$VC" || no "versionCode=$VC"
 [ "$JV" = "$V" ] && ok "update.json version=$JV 一致" || no "update.json $JV != $V"
 [ "$JVC" = "$VC" ] && ok "update.json versionCode=$JVC 一致" || no "update.json $JVC != $VC"
 # H2) 【v2.3.23】KernelSU Modules 上架元数据一致性
@@ -844,17 +844,18 @@ done
 [ "$LEGACY_OK" = "1" ] && ok "uninstall 保留 3 项旧版残留回滚（swappiness/compact/dirty_ratio；THP 两项见上条）" || no "uninstall 旧版残留回滚缺失（升级用户卸载后会留旧值）"
 # 8) WebUI 云控开关自检必须查自身域名（整段标记会让"只开 scene"误报）
 grep -q 'icosa-service-cn-01.allawntech.com\$' $SRC/webroot/index.html && ok "block_cloud_hosts checkCmd 用自身域名判定" || no "block_cloud_hosts checkCmd 未用自身域名"
+grep -qF '"htms.heytapmobile.com"' $SRC/cloud_hosts.sh && ok "云控备用域名 htms.heytapmobile.com 已覆盖" || no "云控备用域名 htms.heytapmobile.com 缺失（主域被拦后 SDK 会回退）"
 grep -q 'errlog.umeng.com\$' $SRC/webroot/index.html && ok "block_sdk_telemetry checkCmd 用自身域名判定" || no "block_sdk_telemetry checkCmd 未用自身域名"
 # 8b) 第三方 SDK 遥测开关三处齐全（域名定义 / 开机复核 / WebUI 卡片）
 grep -q 'is_on "block_sdk_telemetry"' $SRC/cloud_hosts.sh && ok "cloud_hosts.sh 有 block_sdk_telemetry 域名块" || no "cloud_hosts.sh 缺 block_sdk_telemetry"
 grep -q 'is_on "block_sdk_telemetry"' $SRC/boot-completed.sh && ok "boot-completed.sh 复核判断含 block_sdk_telemetry" || no "boot-completed.sh 复核判断缺 block_sdk_telemetry"
 grep -q "key: 'block_sdk_telemetry'" $SRC/webroot/index.html && ok "WebUI 有 block_sdk_telemetry 卡片" || no "WebUI 缺 block_sdk_telemetry 卡片"
-# 8c) 18 个 SDK 域名必须全在 cloud_hosts.sh 里（防漏写/写错）
+# 8c) 55 个遥测域名必须全在 cloud_hosts.sh 里（防漏写/写错）
 SDK_MISS=""
-for d in errlog.umeng.com errlogos.umeng.com errnewlog.umeng.com errnewlogos.umeng.com offmsg.umeng.com aspect-upush.umeng.com apmlog.snssdk.com rtapplog.snssdk.com rtlog.snssdk.com cgp.snssdk.com adx.ads.oppomobile.com ad.oceanengine.com athena-api.oceanengine.com api-audit.heytapmobi.com ilogkit-service-cn.allawntech.com u.bot.heytapmobi.com bugtrace.3g.qq.com stat.huluxia.com; do
+for d in errlog.umeng.com errlogos.umeng.com errnewlog.umeng.com errnewlogos.umeng.com offmsg.umeng.com aspect-upush.umeng.com msg.umengcloud.com alogus.umeng.com alogsus.umeng.com apmlog.snssdk.com rtapplog.snssdk.com rtlog.snssdk.com cgp.snssdk.com h.trace.qq.com otheve.beacon.qq.com astat.bugly.qcloud.com astat.bugly.cros.wr.pvp.net cgi.qplus.com rttgpsreport.map.qq.com mdap.alipaylog.com cn-hangzhou-mas-log.cloud.alipay.com adx.ads.oppomobile.com ad.oceanengine.com athena-api.oceanengine.com api-audit.heytapmobi.com ilogkit-service-cn.allawntech.com u.bot.heytapmobi.com bugtrace.3g.qq.com stat.huluxia.com kernellog.browser.heytapmobi.com dev-xlog-service.wanyol.com logu.hpplay.cn collect.ux.21cn.com mdap.alipay.com mdap.mpaas.cn-hangzhou.aliyuncs.com loggw-extiny.alipay.com rtlog.zijieapi.com toblog-alink.ctobsnssdk.com tobapplog.volceapplog.com toblog.volceapplog.com cnlogs.umeng.com ulogs.umeng.com ulogs.umengcloud.com plbslog.umeng.com pslog.umeng.com preulogs.umeng.com apiinit.amap.com log.qchannel03.cn epoch-cn.cdo.heytapmobi.com epoch.cdo.oppomobile.com nearby.dc.oppomobile.com cort-report-cn.heytapmobi.com ocloud-webdata-cn.heytapmobi.com mdp-usertrace-cn.wanyol.com usertrace-inter-cn.wanyol.com; do
   grep -qF "\"$d\"" $SRC/cloud_hosts.sh || SDK_MISS="$SDK_MISS $d"
 done
-[ -z "$SDK_MISS" ] && ok "18 个 SDK 域名全在 cloud_hosts.sh" || no "cloud_hosts.sh 缺域名:$SDK_MISS"
+[ -z "$SDK_MISS" ] && ok "55 个遥测域名全在 cloud_hosts.sh" || no "cloud_hosts.sh 缺域名:$SDK_MISS"
 # 9) 第二批空转属性（block_ota / block_ads / disable_logd / 主题）必须停写
 #    取证：logd 系列是临时 umount 后 grep 真实二进制（bind 覆盖会导致假阴性）；
 #          其余为全机 APK dex（含 /my_*）+ lib64 + bin + init rc 全扫 0 命中。

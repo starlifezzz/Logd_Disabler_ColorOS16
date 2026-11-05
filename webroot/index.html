@@ -697,9 +697,9 @@ var FEATURES = [
   },
   { key: 'block_cloud_hosts', icon: 'cloud_off--outlined', title: '云控域名拦截',
     desc: '模块自带 hosts 覆盖，拦掉云控配置下发域名（不依赖 bindhosts）',
-    detail: '原理：把 3 个云控域名写进 hosts 并解析到 0.0.0.0，再用 bind 挂载覆盖 /system/etc/hosts：\n• icosa-service-cn-01.allawntech.com —— 云控配置下发（游戏调度/温控/功能开关）\n• andesbrain-ai-cn.heytapmobi.com —— 云控 AI 配置\n• htms.heytapmobi.com —— HeyTap 数据上报通道\n\n合并而非替换：先读当前生效的 hosts，保留你已有的广告拦截规则（bindhosts / AdAway 等），只追加本模块的标记段。系统分区文件本身不会被改写。\n\n效果：云控配置拉取失败，服务端下发的调度参数与功能开关拿不到，只能用本地默认配置。\n\n代价：基本无感——对应的 cosa 应用已被「游戏空间」开关禁用，htms 也已被「消息推送与云通道」禁用；只有你重新启用它们时，才会看到请求失败后重试。\n\n回滚：关闭本项后重启（开机时自动卸载挂载层），或卸载模块。',
+    detail: '原理：把 4 个云控域名写进 hosts 并解析到 0.0.0.0，再用 bind 挂载覆盖 /system/etc/hosts：\n• icosa-service-cn-01.allawntech.com —— 云控配置下发（游戏调度/温控/功能开关）\n• andesbrain-ai-cn.heytapmobi.com —— 云控 AI 配置\n• htms.heytapmobi.com —— HeyTap 数据上报通道\n• htms.heytapmobile.com —— 同一上报通道的备用/旧域名（主域被拦后 SDK 会回退到这里，不拦则拦截形同虚设）\n\n合并而非替换：先读当前生效的 hosts，保留你已有的广告拦截规则（bindhosts / AdAway 等），只追加本模块的标记段。系统分区文件本身不会被改写。\n\n效果：云控配置拉取失败，服务端下发的调度参数与功能开关拿不到，只能用本地默认配置。\n\n代价：基本无感——对应的 cosa 应用已被「游戏空间」开关禁用，htms 也已被「消息推送与云通道」禁用；只有你重新启用它们时，才会看到请求失败后重试。\n\n回滚：关闭本项后重启（开机时自动卸载挂载层），或卸载模块。',
     checkCmd: 'grep -q " icosa-service-cn-01.allawntech.com$" /system/etc/hosts 2>/dev/null && echo blocked || echo clean',
-    verifyCmd: 'echo "== 标记段（期望 2 行 = 开始+结束）=="; grep -cF "ColorOS16 云控域名" /system/etc/hosts 2>/dev/null; echo "== 域名（期望全部 blocked）=="; for d in icosa-service-cn-01.allawntech.com andesbrain-ai-cn.heytapmobi.com htms.heytapmobi.com; do if grep -q " $d$" /system/etc/hosts 2>/dev/null; then echo "$d:blocked"; else echo "$d:pass"; fi; done; echo "== 挂载层 =="; grep " /system/etc/hosts " /proc/mounts 2>/dev/null | head -2; echo "== 合并源文件 =="; ls -l /data/adb/logd_disabler/hosts.cloud 2>/dev/null || echo "(未生成)"'
+    verifyCmd: 'echo "== 标记段（期望 2 行 = 开始+结束）=="; grep -cF "ColorOS16 云控域名" /system/etc/hosts 2>/dev/null; echo "== 域名（期望全部 blocked）=="; for d in icosa-service-cn-01.allawntech.com andesbrain-ai-cn.heytapmobi.com htms.heytapmobi.com htms.heytapmobile.com; do if grep -q " $d$" /system/etc/hosts 2>/dev/null; then echo "$d:blocked"; else echo "$d:pass"; fi; done; echo "== 挂载层 =="; grep " /system/etc/hosts " /proc/mounts 2>/dev/null | head -2; echo "== 合并源文件 =="; ls -l /data/adb/logd_disabler/hosts.cloud 2>/dev/null || echo "(未生成)"'
   },
   { key: 'block_scene_hosts', icon: 'visibility_off--outlined', title: '场景与短信推广拦截',
     desc: '拦掉场景卡片数据与短信推广域名（有取舍：卡片不再刷新）',
@@ -707,11 +707,11 @@ var FEATURES = [
     checkCmd: 'grep -q " scene.dc.oppomobile.com$" /system/etc/hosts 2>/dev/null && echo blocked || echo clean',
     verifyCmd: 'echo "== 域名（期望全部 blocked）=="; for d in scene.dc.oppomobile.com sms.ads.heytapmobi.com; do if grep -q " $d$" /system/etc/hosts 2>/dev/null; then echo "$d:blocked"; else echo "$d:pass"; fi; done; echo "== 场景服务进程（被拦后仍会运行，只是拉不到数据）=="; pidof com.coloros.sceneservice 2>/dev/null || echo stopped'
   },
-  { key: 'block_sdk_telemetry', icon: 'block--outlined', title: '第三方 SDK 遥测拦截',
-    desc: '拦掉友盟/字节/巨量/腾讯等第三方 SDK 的日志与广告上报域名（18 个）',
-    detail: '原理：把 18 个第三方 SDK 遥测域名解析到 0.0.0.0，走与「云控域名拦截」相同的 hosts 合并覆盖机制（不依赖 bindhosts）。\n\n分组：\n• 友盟 Umeng 6 个 —— 错误日志 errlog/errlogos/errnewlog/errnewlogos、离线消息统计 offmsg、推送统计 aspect-upush\n• 字节跳动 4 个 —— APM 与日志 apmlog/rtapplog/rtlog/cgp.snssdk（不含 aweme/ecom，那是抖音功能域名）\n• OPPO 广告 1 个 —— adx.ads.oppomobile\n• 巨量引擎 2 个 —— ad.oceanengine / athena-api.oceanengine\n• OPPO 审计上报 3 个 —— api-audit.heytapmobi / ilogkit-service-cn.allawntech / u.bot.heytapmobi\n• 腾讯/虎扑 2 个 —— bugtrace.3g.qq（Bugly 崩溃上报）/ stat.huluxia\n\n效果：这些 SDK 的日志、崩溃上报、广告请求失败，不再产生外连。\n\n代价：基本无感——上报失败只影响厂商侧的数据收集。⚠️ 例外：aspect-upush 与 offmsg 属友盟推送的统计端点，拦掉不影响推送通道本身，但可能影响推送到达率统计（如果你用带友盟 SDK 的 app，建议先观察再开）。\n\n诚实标注：这 18 个域名来自 NOIR 静态扫描 + 域名语义判断，未逐个实测；与「云控域名拦截」那 3 个（有实证依据）证据等级不同，故单列一项。\n\n回滚：关闭本项后重启（开机时自动卸载挂载层），或卸载模块。',
+  { key: 'block_sdk_telemetry', icon: 'block--outlined', title: '遥测域名拦截',
+    desc: '拦掉第三方 SDK 与厂商埋点的日志、统计、广告上报域名（55 个）',
+    detail: '原理：把 55 个遥测域名解析到 0.0.0.0，走与「云控域名拦截」相同的 hosts 合并覆盖机制（不依赖 bindhosts）。\n\n分组：\n• 友盟 Umeng 15 个 —— 错误日志 errlog/errlogos/errnewlog/errnewlogos、离线消息统计 offmsg、推送统计 aspect-upush、广告消息统计 msg.umengcloud、统计族 alogus/alogsus、日志族 cnlogs/ulogs/ulogs.umengcloud/plbslog/pslog/preulogs\n• 字节跳动 8 个 —— APM 与日志 apmlog/rtapplog/rtlog/cgp.snssdk、AppLog 与归因 rtlog.zijieapi/toblog-alink.ctobsnssdk/tobapplog.volceapplog/toblog.volceapplog（不含 aweme/ecom，那是抖音功能域名）\n• 腾讯 6 个 —— 广告归因 h.trace.qq（kv?attaid= 上报）、灯塔分析 otheve.beacon.qq（/analytics/v2_upload）、Bugly 崩溃上报 astat.bugly.qcloud / astat.bugly.cros.wr.pvp.net（/rqd/async）、QPlus 统计 cgi.qplus（/report/report）、地图 SDK 的 GPS 上报 rttgpsreport.map.qq（/report?type=sdk，只报不查，定位查询走 loc.map.qq）\n• 阿里系 5 个 —— mPaaS 分析 mdap.alipaylog / mdap.alipay（/loggw/log.do，与 mdap.alipaylog 同 IP 110.76.24.162）、日志上传 cn-hangzhou-mas-log.cloud.alipay（/loggw/logUpload.do）/ mdap.mpaas.cn-hangzhou.aliyuncs（/loggw/webLog.do）/ loggw-extiny.alipay\n• OPPO 广告 1 个 —— adx.ads.oppomobile\n• 巨量引擎 2 个 —— ad.oceanengine / athena-api.oceanengine\n• OPPO 审计上报 3 个 —— api-audit.heytapmobi / ilogkit-service-cn.allawntech / u.bot.heytapmobi\n• Bugly 旧域名/虎扑 2 个 —— bugtrace.3g.qq / stat.huluxia\n• 浏览器/万联日志 2 个 —— kernellog.browser.heytapmobi（浏览器内核日志）/ dev-xlog-service.wanyol（xlog 日志服务）\n• 乐播投屏 1 个 —— logu.hpplay.cn（8855/8856/8865/8868 日志端口；投屏功能通道是 gslb/imdns/devicemgr/pin，不在此列）\n• 21CN 统计 1 个 —— collect.ux.21cn（云闪付上报）\n• 高德/腾讯渠道 2 个 —— apiinit.amap（高德 SDK /v3/log/init）/ log.qchannel03.cn（路径 /n/dpz/，用途未验证）\n• OPPO/HeyTap 自家埋点 7 个 —— epoch-cn.cdo.heytapmobi + epoch.cdo.oppomobile（/soporcollect H5 事件采集）/ nearby.dc.oppomobile（/api/v2/report_position）/ cort-report-cn.heytapmobi / ocloud-webdata-cn.heytapmobi / mdp-usertrace-cn.wanyol + usertrace-inter-cn.wanyol（场景服务用户轨迹）\n\n效果：这些 SDK 的日志、崩溃上报、广告请求失败，不再产生外连。\n\n代价：基本无感——上报失败只影响厂商侧的数据收集。⚠️ 例外：aspect-upush 与 offmsg 属友盟推送的统计端点，拦掉不影响推送通道本身，但可能影响推送到达率统计（如果你用带友盟 SDK 的 app，建议先观察再开）。\n\n⚠️ 为什么 msg.umengcloud 必须单列：hosts 是精确匹配，bindhosts 底表里的 umengcloud.com 整域条目【不覆盖】子域（实测 apex 解析 127.0.0.1、本域解析真实 IP），所以别指望别人替你拦。\n\n诚实标注：这 55 个域名来自 NOIR 静态扫描 + APK dex 字面量回验 + 域名语义判断，未做运行时抓包（logd 已关）；与「云控域名拦截」那 3 个（有实证依据）证据等级不同，故单列一项。\n\n回滚：关闭本项后重启（开机时自动卸载挂载层），或卸载模块。',
     checkCmd: 'grep -q " errlog.umeng.com$" /system/etc/hosts 2>/dev/null && echo blocked || echo clean',
-    verifyCmd: 'echo "== 域名（期望全部 blocked）=="; for d in errlog.umeng.com errlogos.umeng.com errnewlog.umeng.com errnewlogos.umeng.com offmsg.umeng.com aspect-upush.umeng.com apmlog.snssdk.com rtapplog.snssdk.com rtlog.snssdk.com cgp.snssdk.com adx.ads.oppomobile.com ad.oceanengine.com athena-api.oceanengine.com api-audit.heytapmobi.com ilogkit-service-cn.allawntech.com u.bot.heytapmobi.com bugtrace.3g.qq.com stat.huluxia.com; do if grep -q " $d$" /system/etc/hosts 2>/dev/null; then echo "$d:blocked"; else echo "$d:pass"; fi; done; echo "== 标记段（期望 2 行）=="; grep -cF "ColorOS16 云控域名" /system/etc/hosts 2>/dev/null'
+    verifyCmd: 'echo "== 域名（期望全部 blocked）=="; for d in errlog.umeng.com errlogos.umeng.com errnewlog.umeng.com errnewlogos.umeng.com offmsg.umeng.com aspect-upush.umeng.com msg.umengcloud.com alogus.umeng.com alogsus.umeng.com apmlog.snssdk.com rtapplog.snssdk.com rtlog.snssdk.com cgp.snssdk.com h.trace.qq.com otheve.beacon.qq.com astat.bugly.qcloud.com astat.bugly.cros.wr.pvp.net cgi.qplus.com rttgpsreport.map.qq.com mdap.alipaylog.com cn-hangzhou-mas-log.cloud.alipay.com adx.ads.oppomobile.com ad.oceanengine.com athena-api.oceanengine.com api-audit.heytapmobi.com ilogkit-service-cn.allawntech.com u.bot.heytapmobi.com bugtrace.3g.qq.com stat.huluxia.com kernellog.browser.heytapmobi.com dev-xlog-service.wanyol.com logu.hpplay.cn collect.ux.21cn.com mdap.alipay.com mdap.mpaas.cn-hangzhou.aliyuncs.com loggw-extiny.alipay.com rtlog.zijieapi.com toblog-alink.ctobsnssdk.com tobapplog.volceapplog.com toblog.volceapplog.com cnlogs.umeng.com ulogs.umeng.com ulogs.umengcloud.com plbslog.umeng.com pslog.umeng.com preulogs.umeng.com apiinit.amap.com log.qchannel03.cn epoch-cn.cdo.heytapmobi.com epoch.cdo.oppomobile.com nearby.dc.oppomobile.com cort-report-cn.heytapmobi.com ocloud-webdata-cn.heytapmobi.com mdp-usertrace-cn.wanyol.com usertrace-inter-cn.wanyol.com; do if grep -q " $d$" /system/etc/hosts 2>/dev/null; then echo "$d:blocked"; else echo "$d:pass"; fi; done; echo "== 标记段（期望 2 行）=="; grep -cF "ColorOS16 云控域名" /system/etc/hosts 2>/dev/null'
   }
  ]},
 { group: '性能优化', groupIcon: 'rocket_launch--outlined', items: [
@@ -883,7 +883,7 @@ var FEATURES = [
   },
   { key: 'disable_network_optimization', icon: 'wifi_tethering--outlined', title: '网络优化服务',
     desc: '关闭网络质量优化服务',
-    deps: '⚠️ 连带影响：网络感知/蜂窝网络质量被禁用后，网络信号优化与智能切换功能失效（基础上网不受影响）；WiFi 质量组件被禁用后，WiFi 弱信号自动优化不可用。',
+    deps: '⚠️ 连带影响：网络感知/蜂窝网络质量被禁用后，网络信号优化与智能切换功能失效（基础上网不受影响）。\n\n⚠️ 实测补充（Ace5 / 2026-11）：这 5 个包里有 4 个本身就是常驻宿主 com.oplus.subsys 按 APK 路径加载的插件（networksense=NetworkSense_plugin_NetworkSense、tai.wifiqoe=SubsysPlugins_plugin_WifiQoe、cellularqoe=SubsysPlugins_plugin_CellularQoe、tai.borderpresearch=SubsysPlugins_plugin_BorderPreSearch）。宿主不查 PMS 启用状态，实测包处于禁用态时进程照跑、插件全部映射进内存，开关开/关两种状态重启后运行态无差异。因此本项的实际收益未经证实。',
     pkgs: ['com.oplus.networksense', 'com.oplus.cellularqoe', 'com.oplus.tai.wifiqoe', 'com.oplus.tai.borderpresearch', 'com.oplus.nearcomm'],
     subNames: ['网络感知', '蜂窝网络质量', 'WiFi 质量', '边界预搜索', '近场通信'],
     subDescs: [
@@ -896,11 +896,11 @@ var FEATURES = [
     subDetails: [
       '原理：禁用后网络状态感知采样停止，智能切换失去输入。\n\n代价：网络智能优化/切换失效；基础上网不受影响。',
       '原理：禁用后蜂窝 QoE 评估停止，不再上报网络质量指标。\n\n代价：蜂窝侧质量优化失效；通话与上网不受影响。',
-      '原理：禁用后 WiFi 质量评估停止，弱信号自动优化失去依据。\n\n代价：WiFi 弱信号优化不可用；正常连接不受影响。',
+      '原理：禁用该包只阻止它被显式拉起；评估逻辑由常驻宿主 com.oplus.subsys 按 APK 路径加载运行，实测禁用后仍在跑（见卡片实测补充）。\n\n代价：实际效果未经证实；正常连接不受影响。',
       '原理：禁用后边界探测与预搜索停止，不再提前测试链路。\n\n代价：网络切换预加速失效，切换可能略慢；上网不受影响。',
       '原理：禁用后近场链路优化服务停止，不再为近场互联做链路调优。\n\n代价：近场互联优化通道失效；NFC 支付/刷卡走独立栈，不受影响。'
     ],
-    detail: '原理：禁用网络感知、蜂窝与 WiFi 质量评估等 5 个网络优化包。\n\n效果：信号优化与智能切换策略停止。\n\n代价：网络质量优化失效，基础上网不受影响（连带影响详见卡片警告）。\n\n回滚：关闭本项后重启，或卸载模块即可恢复。',
+    detail: '原理：禁用网络感知、蜂窝与 WiFi 质量评估等 5 个网络优化包。\n\n效果：这 5 个包不再被显式拉起。\n\n⚠️ 实测（Ace5 / 2026-11）：其中 4 个包就是常驻宿主 com.oplus.subsys 按 APK 路径加载的插件，宿主不查 PMS 状态。实测包被禁用时 subsys 进程仍常驻运行（77 线程），9 个插件 APK 全部映射进 /proc/<pid>/maps；开关开/关两种状态重启后运行态无差异。故「禁用包 = 优化停止」不成立，本项实际收益未经证实，可能接近于零。\n\n代价：网络质量优化未必真的停止；基础上网不受影响。\n\n回滚：关闭本项后重启，或卸载模块即可恢复。',
     checkCmd: 'pm list packages -d --user 0 2>/dev/null | grep -qF "package:com.oplus.networksense" && echo disabled || echo enabled',
     verifyCmd: 'for p in com.oplus.networksense com.oplus.cellularqoe com.oplus.tai.wifiqoe com.oplus.tai.borderpresearch com.oplus.nearcomm; do if pm list packages -d --user 0 2>/dev/null | grep -qF "package:$p"; then echo "$p:disabled"; elif ! pm list packages --user 0 2>/dev/null | grep -qF "package:$p"; then echo "$p:missing"; else echo "$p:enabled"; fi; done'
   },
@@ -946,7 +946,7 @@ var FEATURES = [
     desc: '关闭耗电/音频监控、日志与崩溃收集等 9 个后台组件',
     deps: '⚠️ 连带影响：日志工具(日志服务)被禁用后 logcat 输出受限，后续排查问题将缺乏日志依据；崩溃收集被禁用后，app 崩溃记录不会上报（对普通使用无感）。',
     pkgs: ['com.oplus.powermonitor', 'com.oplus.audiomonitor', 'com.oplus.logkit', 'com.oplus.engineermode', 'com.oplus.crashbox', 'com.oplus.contentportal', 'com.oplus.postmanservice', 'com.oplus.subsys', 'com.oplus.engineernetwork'],
-    subNames: ['电源监控', '音频监控', '日志工具', '工程模式', '崩溃收集', '资讯分发', '常规巡检', '子系统状态', '工程网络'],
+    subNames: ['电源监控', '音频监控', '日志工具', '工程模式', '崩溃收集', '资讯分发', '常规巡检', '子系统插件宿主', '工程网络'],
     subDescs: [
       '电源监控服务（powermonitor），按应用统计耗电并供设置页展示。',
       '音频监控服务（audiomonitor），监测音频通路状态与异常。',
@@ -955,7 +955,7 @@ var FEATURES = [
       '崩溃收集组件（crashbox），收集应用崩溃记录并上报。',
       '资讯分发服务（contentportal），为负一屏、浏览器等聚合并分发资讯内容。',
       '常规巡检服务（postmanservice），周期性执行系统自检与状态上报。',
-      '子系统状态服务（subsys），汇总基带/WiFi 等子系统的运行状态，供系统诊断使用。',
+      '子系统插件宿主（subsys），常驻进程，按 APK 路径直接加载 QoE/网络感知插件（实测映射 9 个：WifiQoe、NetworkSense、CellularQoe、BorderPreSearch、NetScore、NetPrediction、AppSense、MotionSense、CellMap），为网络评分与漫游推荐提供模型。',
       '工程网络组件（engineernetwork），网络调试用的工程入口。'
     ],
     subDetails: [
@@ -966,10 +966,10 @@ var FEATURES = [
       '原理：禁用后崩溃记录收集与上报停止。\n\n代价：App 崩溃不再上报，厂商侧感知不到；对使用无感（详见卡片警示）。',
       '原理：禁用后资讯分发停止，不再后台拉取资讯内容。\n\n代价：部分内容入口（浏览器资讯等）失去内容源；常用 App 不受影响。',
       '原理：禁用后常规检测支持停止，不再周期性巡检上报。\n\n代价：常规自检报告缺失；对使用无感。',
-      '原理：禁用后子系统状态聚合服务停止，不再轮询各子系统。\n\n代价：子系统状态监控缺失；通话/上网等子系统功能本身不受影响。',
+      '原理：禁用该包只让它不再被显式拉起；实测（Ace5 / 2026-11）包处于禁用态时进程仍常驻运行（77 线程）、插件全部按路径映射进 /proc/<pid>/maps。宿主不查 PMS 状态。\n\n代价：基本无收益；通话/上网等子系统功能不受影响。',
       '原理：禁用后工程网络调试入口下线。\n\n代价：网络工程调试不可用；普通联网不受影响。'
     ],
-    detail: '原理：禁用功耗/音频监控、日志工具、崩溃收集等 9 个监控与工具包（含 logkit）。\n\n效果：后台监控与日志采集停止，省内存省 CPU。\n\n代价：logcat 输出受限、崩溃记录缺失，排障缺少日志依据（连带影响详见卡片警告）。\n\n回滚：关闭本项后重启，或卸载模块即可恢复。',
+    detail: '原理：禁用功耗/音频监控、日志工具、崩溃收集等 9 个监控与工具包（含 logkit）。\n\n效果：后台监控与日志采集停止，省内存省 CPU。\n\n代价：logcat 输出受限、崩溃记录缺失，排障缺少日志依据（连带影响详见卡片警告）。\n\n⚠️ 例外：其中的 com.oplus.subsys 实测禁用无效——它是常驻插件宿主，按 APK 路径加载插件，不查 PMS 状态（详见该子项）。\n\n回滚：关闭本项后重启，或卸载模块即可恢复。',
     checkCmd: 'pm list packages -d --user 0 2>/dev/null | grep -qF "package:com.oplus.powermonitor" && echo disabled || echo enabled',
     verifyCmd: 'for p in com.oplus.powermonitor com.oplus.audiomonitor com.oplus.logkit com.oplus.engineermode com.oplus.crashbox com.oplus.contentportal com.oplus.postmanservice com.oplus.subsys com.oplus.engineernetwork; do if pm list packages -d --user 0 2>/dev/null | grep -qF "package:$p"; then echo "$p:disabled"; elif ! pm list packages --user 0 2>/dev/null | grep -qF "package:$p"; then echo "$p:missing"; else echo "$p:enabled"; fi; done'
   },
