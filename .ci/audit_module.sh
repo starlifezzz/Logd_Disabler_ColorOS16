@@ -192,8 +192,14 @@ MV=$(grep '^version=' "$SRC/module.prop" | cut -d= -f2)
 MC=$(grep '^versionCode=' "$SRC/module.prop" | cut -d= -f2)
 UV=$(grep -oE '"version"[[:space:]]*:[[:space:]]*"[^"]*"' "$SRC/update.json" | grep -oE 'v[0-9.]+')
 UC=$(grep -oE '"versionCode"[[:space:]]*:[[:space:]]*[0-9]+' "$SRC/update.json" | grep -oE '[0-9]+$')
-[ "$MV" = "$UV" ] && ok "module.prop version=$MV = update.json version=$UV" || no "版本不一致: module.prop=$MV vs update.json=$UV"
-[ "$MC" = "$UC" ] && ok "module.prop versionCode=$MC = update.json versionCode=$UC" || no "versionCode 不一致: $MC vs $UC"
+# 【v2.3.27-fix 2026-11-08】update.json 允许滞后于 module.prop（main 可提前 bump 开发版本），
+#   但绝不允许【高于】——那会让用户被提示升级到不存在的 release（zipUrl 404，提示永不消失）。
+UV_N=$(printf '%s' "$UC" | tr -dc '0-9'); MV_N=$(printf '%s' "$MC" | tr -dc '0-9')
+if [ -n "$UV_N" ] && [ -n "$MV_N" ] && [ "$UV_N" -le "$MV_N" ]; then
+  ok "update.json versionCode=$UC ≤ module.prop versionCode=$MC（无幽灵更新）"
+else
+  no "update.json versionCode=$UC > module.prop versionCode=$MC（提示升级到不存在的版本）"
+fi
 if [ -f "$SRC/webroot/index.html" ]; then
   IV=$(grep -oE 'moduleVersion[^,;]*' "$SRC/webroot/index.html" | head -1)
   echo "  · WebUI 取版本来源: $IV"

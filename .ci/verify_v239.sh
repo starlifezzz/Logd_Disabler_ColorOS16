@@ -182,8 +182,21 @@ JV=$(python3 -c "import json;print(json.load(open('$SRC/update.json'))['version'
 JVC=$(python3 -c "import json;print(json.load(open('$SRC/update.json'))['versionCode'])")
 [ "$V" = "v2.3.27" ] && ok "module.prop version=$V" || no "version=$V"
 [ "$VC" = "60" ] && ok "module.prop versionCode=$VC" || no "versionCode=$VC"
-[ "$JV" = "$V" ] && ok "update.json version=$JV 一致" || no "update.json $JV != $V"
-[ "$JVC" = "$VC" ] && ok "update.json versionCode=$JVC 一致" || no "update.json $JVC != $VC"
+# 【v2.3.27-fix 2026-11-08】update.json 只允许 ≤ module.prop，不再要求相等。
+#   原因：update.json 由 release 工作流在【发版时】生成并推回 main；
+#   main 上的 module.prop 可以提前 bump（开发中的下一版），此时 update.json
+#   必须继续指向【已发布】的版本，否则就是"幽灵更新"：
+#   用户被提示升级到一个不存在的 release → zipUrl 404 → 装不上 → 提示永远消不掉。
+#   （2026-11-08 社区实报：2.3.23/56 用户一直被告知要更新到未发布的 2.3.27/60）
+#   反向保护仍然保留：update.json > module.prop 判红。
+JVC_N=$(printf '%s' "$JVC" | tr -dc '0-9'); VC_N=$(printf '%s' "$VC" | tr -dc '0-9')
+[ -n "$JVC_N" ] && [ -n "$VC_N" ] && [ "$JVC_N" -le "$VC_N" ] \
+  && ok "update.json versionCode=$JVC ≤ module.prop=$VC（不高于开发版本，无幽灵更新）" \
+  || no "update.json versionCode=$JVC > module.prop=$VC（会提示升级到不存在的版本）"
+JZ=$(python3 -c "import json;print(json.load(open('$SRC/update.json'))['zipUrl'])")
+echo "$JZ" | grep -qE -- "-$JVC-$JV\.zip$" \
+  && ok "update.json zipUrl 资产名与自身版本自洽（…-$JVC-$JV.zip）" \
+  || no "update.json zipUrl 与自身 version/versionCode 不符: $JZ"
 # H2) 【v2.3.23】KernelSU Modules 上架元数据一致性
 #     module.yaml 的 id 必须与 module.prop 完全一致（大小写敏感），否则上架校验报错
 if [ -f "$SRC/module.yaml" ]; then
@@ -194,8 +207,7 @@ if [ -f "$SRC/module.yaml" ]; then
   MD=$(sed -n 's/^description:[[:space:]]*//p' $SRC/module.yaml | head -1 | tr -d '\r')
   [ -f "$SRC/$MD" ] && ok "module.yaml 描述文件存在（$MD）" || no "module.yaml 描述文件缺失: $MD"
   # 上架要求 zipUrl 指向真实资产名；KSU 官方 action 产出 id-versionCode-version.zip
-  JZ=$(python3 -c "import json;print(json.load(open('$SRC/update.json'))['zipUrl'])")
-  echo "$JZ" | grep -qE "/$PID-$VC-$V\.zip$" && ok "update.json zipUrl 用 KSU action 资产名（$PID-$VC-$V.zip）" || no "update.json zipUrl 与 KSU action 资产名不符: $JZ"
+  echo "$JZ" | grep -qE -- "/$PID-$JVC-$JV\.zip$" && ok "update.json zipUrl 用 KSU action 资产名（$PID-$JVC-$JV.zip）" || no "update.json zipUrl 与 KSU action 资产名不符: $JZ"
 else
   no "缺 module.yaml（KernelSU Modules 上架必需）"
 fi
