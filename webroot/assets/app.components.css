@@ -7,7 +7,6 @@
 /* ===== 进度条区域 ===== */
 .progress-row{display:flex;align-items:center;gap:12px;margin-bottom:16px}
 .progress-row mdui-linear-progress{flex:1}
-.progress-text{font-size:12px;color:rgb(var(--mdui-color-on-surface-variant));white-space:nowrap}
 .switch-wrap{position:relative;display:inline-flex;align-items:center}
 .switch-wrap .opt-hint{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:10px;line-height:1;color:rgb(var(--mdui-color-on-surface-variant));white-space:nowrap;pointer-events:none;z-index:1}
 /* 【v2.3.11】异步 verifyCmd 尚未回填 pkgStates 时的占位文案，淡化显示，

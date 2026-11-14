@@ -69,9 +69,6 @@
   background:repeating-linear-gradient(0deg,rgba(0,0,0,.04) 0 1px,transparent 1px 3px);
   border-radius:inherit;
 }
-[data-theme="crt"] .log-box-retro .log-warn{color:rgb(var(--mdui-color-tertiary))}
-[data-theme="crt"] .log-box-retro .log-error{color:rgb(var(--mdui-color-error))}
-[data-theme="crt"] .log-box-retro .log-info{color:rgb(var(--mdui-color-on-surface-variant))}
 
 /* ===== E. 头部条：虚线分隔 + 屏幕底色 + 等宽标签（布局/字号在 pages 层中性提供） ===== */
 [data-theme="crt"] .log-crt-header,

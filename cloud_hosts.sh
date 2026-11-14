@@ -84,9 +84,11 @@ cloud_hosts_drop_stale() {
 # 输出当前配置要拦截的域名（每行一个）；无输出 = 两个开关都关
 # 依赖调用方已定义 is_on()
 cloud_hosts_domains() {
-    # ① 云控配置下发：cosa 已由 disable_gamespace 禁用，这里属"零成本"兜底
+    # ① 云控配置下发
+    #    v2.3.28：删掉 icosa-service-cn-01.allawntech.com —— 481 个已安装包全量 dex 扫描
+    #    0 命中（连 "icosa-service" 拆分形态都 0 命中），COSA.apk 1478 条目也 0 命中，
+    #    原注释「cosa 提供该域名」已被证伪 → 判为无效域名，不再拦截。
     if is_on "block_cloud_hosts"; then
-        echo "icosa-service-cn-01.allawntech.com"
         echo "andesbrain-ai-cn.heytapmobi.com"
         echo "htms.heytapmobi.com"
         # 同一上报通道的备用/旧域名：主域被拦后 SDK 回退到这里（实测 4 个 App 同时引用两个域）
@@ -96,6 +98,13 @@ cloud_hosts_domains() {
     if is_on "block_scene_hosts"; then
         echo "scene.dc.oppomobile.com"
         echo "sms.ads.heytapmobi.com"
+        # v2.3.28：运营位 / Tips 下发（NOIR 0.4.3 全量重扫：traffic-operation 19 包、oms-forward 9 包、tips 系 3 包）
+        #   与场景卡片同类取舍：拦掉后运营入口/角标/Tips 不再刷新，功能本身可用
+        echo "traffic-operation-cn.allawntech.com"
+        echo "tips-h5.coloros.com"
+        echo "oms-forward-cn.heytapmobi.com"
+        echo "tips.apps.oppomobile.com"
+        echo "tipsfs.oppomobile.com"
     fi
     # ③ 第三方 SDK 遥测：纯日志/统计/广告上报，与 ColorOS 云控不是一类，故独立开关
     #    【证据等级】域名来自 NOIR 静态扫描（unzip+strings 提取 dex 内 URL）+ 域名语义判断，
@@ -184,6 +193,29 @@ cloud_hosts_domains() {
         echo "ocloud-webdata-cn.heytapmobi.com"
         echo "mdp-usertrace-cn.wanyol.com"
         echo "usertrace-inter-cn.wanyol.com"
+        # ============ v2.3.28：NOIR 0.4.3 全量重扫补全（ColorOS 一手上报 + 广告 16 条）============
+        # 【证据】359 个启用包（系统 321 + 用户 38）：NOIR 扫描 157 + 设备端 dex 补抽 202；
+        #   字符串常量 ≠ 运行时连接，未抓包、未看 DNS 日志 —— 与既有诚实标注同等级。
+        # 【取舍·必读】rest-cn-feedback / static-cn-feedback 是用户反馈 SDK：拦掉后系统 App 里
+        #   「意见反馈」「问题上报」提交会失败（52 个 App 共用该 SDK），功能入口仍在、只是发不出去。
+        # 【与既有条目】adx.ads.oppomobile 已拦，这里补 heytapmobi 变体；
+        #   stg-data.ads 的 /monitor/stat/err 与 /proxy/strategy/ 路径在 com.android.mms dex 实测存在。
+        echo "rest-cn-feedback.heytapmobi.com"
+        echo "static-cn-feedback.heytapmobi.com"
+        echo "mdp-usertrace-cn.heytapmobi.com"
+        echo "screen-report-cn.allawntech.com"
+        echo "ua.prof.oppo.com"
+        echo "stg-data.ads.heytapmobi.com"
+        echo "adx.ads.heytapmobi.com"
+        echo "adsfs.oppomobile.com"
+        echo "uapi.ads.heytapmobi.com"
+        echo "ssp-adx.ads.heytapmobi.com"
+        echo "cl-data.ads.heytapmobi.com"
+        echo "push-ads-cn.heytapmobi.com"
+        echo "bact.cpc.heytapmobi.com"
+        echo "u.cpc.heytapmobi.com"
+        echo "cpc-assets-cn.heytapmobi.com"
+        echo "cpc-message-cn.heytapmobi.com"
         # 【诚实标注】cgi.qplus.com 与 dev-xlog-service.wanyol.com 经 AliDNS 双节点复核为
         #   NXDOMAIN（公共 DNS 无 A 记录）→ hosts 拦截大概率无效，保留仅为覆盖运营商/HTTPDNS
         #   另有解析的可能，不计入有效拦截数。

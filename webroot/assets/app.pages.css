@@ -105,4 +105,3 @@
 .gh-cmd-dol{color:rgb(var(--mdui-color-tertiary));font-weight:700;margin-right:6px}
 /* 按钮行：M3 组件，辉光在 theme 层 */
 .gh-links{position:relative;z-index:2;display:flex;gap:8px;margin-top:14px}
-.hidden{display:none!important}

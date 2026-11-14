@@ -58,7 +58,6 @@ mdui-dialog::part(panel){
 }
 /* 对话框 slot=header 底部分割线 */
 mdui-dialog [slot=header]{border-bottom:1px dashed rgba(var(--mdui-color-outline-variant),.3);padding-bottom:12px}
-.footer{text-align:center;padding:20px 16px;font-size:12px;color:rgb(var(--mdui-color-on-surface-variant))}
 /* ===== 全局操作栏（一键优化/恢复） ===== */
 .global-actions{display:flex;gap:10px;padding:0 0 12px;flex-wrap:wrap}
 .global-actions mdui-button{flex:1;min-width:120px}

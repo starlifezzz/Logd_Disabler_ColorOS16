@@ -43,7 +43,6 @@ body{background:var(--mdui-color-surface);color:var(--mdui-color-on-surface);mar
 /* ===== 进度条区域 ===== */
 .progress-row{display:flex;align-items:center;gap:12px;margin-bottom:16px}
 .progress-row mdui-linear-progress{flex:1}
-.progress-text{font-size:12px;color:var(--mdui-color-on-surface-variant);white-space:nowrap}
 /* 主页 CRT 风格：进度条扫描线 + 终端百分比 */
 .progress-crt{position:relative;overflow:hidden;border-radius:8px}
 .progress-crt::after{
@@ -185,7 +184,6 @@ mdui-dialog [slot=header]{border-bottom:1px dashed rgba(var(--mdui-color-outline
 .toast-fade-enter-active,.toast-fade-leave-active{transition:opacity .22s ease,transform .24s cubic-bezier(.2,.8,.3,1)}
 .toast-fade-enter-from,.toast-fade-leave-to{opacity:0;transform:translateX(-50%) translateY(-12px)}
 .toast-fade-enter-to,.toast-fade-leave-from{opacity:1;transform:translateX(-50%) translateY(0)}
-.footer{text-align:center;padding:20px 16px;font-size:12px;color:var(--mdui-color-on-surface-variant)}
 /* ===== 日志页 ===== */
 .log-page-body{padding:8px 16px 16px}
 .log-actions{display:flex;justify-content:flex-end;gap:8px;padding-top:12px}
@@ -215,10 +213,6 @@ mdui-dialog [slot=header]{border-bottom:1px dashed rgba(var(--mdui-color-outline
   background:repeating-linear-gradient(0deg,rgba(0,0,0,.04) 0 1px,transparent 1px 3px);
   border-radius:inherit;
 }
-/* 日志行颜色增强 */
-.log-box-retro .log-warn{color:rgb(var(--mdui-color-tertiary))}
-.log-box-retro .log-error{color:rgb(var(--mdui-color-error))}
-.log-box-retro .log-info{color:var(--mdui-color-on-surface-variant)}
 /* ===== 关于页 ===== */
 .about-tips{padding:8px 20px 16px;display:flex;flex-direction:column;gap:10px}
 .tip-row{font-size:13px;line-height:1.6;color:var(--mdui-color-on-surface-variant);padding:10px 12px;border-radius:8px;background:rgba(var(--mdui-color-surface-container-high),.5)}
@@ -371,7 +365,6 @@ mdui-dialog [slot=header]{border-bottom:1px dashed rgba(var(--mdui-color-outline
 /* 按钮保持 M3 组件，仅加轻微辉光提升"炫"感（不跳脱） */
 .gh-links{position:relative;z-index:2;display:flex;gap:8px;margin-top:14px}
 .gh-links mdui-button{box-shadow:0 0 14px rgba(var(--mdui-color-primary),.28)}
-.hidden{display:none!important}
 /* ===== 全复古主题（CRT 终端风） =====
    设计原则：颜色全部取 M3 变量，不新增色值；
    扫描线/发光仅用 ::before/::after 叠层，不影响交互 */

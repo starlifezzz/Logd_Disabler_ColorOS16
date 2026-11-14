@@ -180,8 +180,17 @@ echo "═══ H. 版本一致性 ═══"
 V=$(grep '^version=' $SRC/module.prop|cut -d= -f2); VC=$(grep '^versionCode=' $SRC/module.prop|cut -d= -f2)
 JV=$(python3 -c "import json;print(json.load(open('$SRC/update.json'))['version'])")
 JVC=$(python3 -c "import json;print(json.load(open('$SRC/update.json'))['versionCode'])")
-[ "$V" = "v2.3.27" ] && ok "module.prop version=$V" || no "version=$V"
-[ "$VC" = "60" ] && ok "module.prop versionCode=$VC" || no "versionCode=$VC"
+# 【2026-11-14】不再钉死具体版本号。钉死 = 每次 bump 必红 2 条，久红就形成
+#   「2 红是正常的」惯性 —— 这正是门禁失效的标准路径。
+#   （2026-11-05 幽灵更新事故中，门禁旧断言反过来逼着去改 update.json。）
+#   改为校验【格式】而非【数值】：具体版本号由人决定，门禁不参与。
+printf '%s' "$V" | grep -qE '^v[0-9]+\.[0-9]+\.[0-9]+$' \
+  && ok "module.prop version 格式合法（$V，vX.Y.Z）" \
+  || no "module.prop version 格式非法（应为 vX.Y.Z）: $V"
+case "$VC" in
+  ''|*[!0-9]*) no "module.prop versionCode 非纯数字: $VC" ;;
+  *) [ "$VC" -gt 0 ] && ok "module.prop versionCode 为正整数（$VC）" || no "module.prop versionCode 必须 >0: $VC" ;;
+esac
 # 【v2.3.27-fix 2026-11-08】update.json 只允许 ≤ module.prop，不再要求相等。
 #   原因：update.json 由 release 工作流在【发版时】生成并推回 main；
 #   main 上的 module.prop 可以提前 bump（开发中的下一版），此时 update.json
@@ -568,11 +577,11 @@ for(const f of process.argv.slice(1)) rules(fs.readFileSync(f,"utf8")).forEach(x
 const need=[".perf-tips",".perf-actions",".perf-table-wrap",".perf-table",".perf-sub",".perf-note",".perf-empty",
             ".delta-good",".delta-bad",".delta-none",
             ".gh-card",".gh-profile",".gh-avatar-wrap",".gh-avatar",".gh-name",".gh-bio",".gh-cmd",".gh-crt",
-            ".tip-row b",".hidden"];
+            ".tip-row b"];
 const miss=need.filter(r=>!set.has(r));
 if(miss.length){ console.error("  缺失("+miss.length+"):",miss.join(" ")); process.exit(1); }
 process.exit(0);' $CSS_ALL \
-  && ok "性能页/个人页被吞的 20 条规则已全部恢复可解析" || no "仍有规则被吞未恢复"
+  && ok "性能页/个人页被吞的 19 条规则已全部恢复可解析" || no "仍有规则被吞未恢复"
 
 echo "═══ F16. WebUI 页面严格自查（沙箱执行 + 逐项对撞）═══"
 # 这是 F1-F15 的补盲：前面大多是 grep 文本匹配，查不出
@@ -855,7 +864,7 @@ for _p in 'echo 100 > /proc/sys/vm/swappiness' \
 done
 [ "$LEGACY_OK" = "1" ] && ok "uninstall 保留 3 项旧版残留回滚（swappiness/compact/dirty_ratio；THP 两项见上条）" || no "uninstall 旧版残留回滚缺失（升级用户卸载后会留旧值）"
 # 8) WebUI 云控开关自检必须查自身域名（整段标记会让"只开 scene"误报）
-grep -q 'icosa-service-cn-01.allawntech.com\$' $SRC/webroot/index.html && ok "block_cloud_hosts checkCmd 用自身域名判定" || no "block_cloud_hosts checkCmd 未用自身域名"
+grep -q 'htms.heytapmobi.com\$' $SRC/webroot/index.html && ok "block_cloud_hosts checkCmd 用自身域名判定" || no "block_cloud_hosts checkCmd 未用自身域名"
 grep -qF '"htms.heytapmobile.com"' $SRC/cloud_hosts.sh && ok "云控备用域名 htms.heytapmobile.com 已覆盖" || no "云控备用域名 htms.heytapmobile.com 缺失（主域被拦后 SDK 会回退）"
 grep -q 'errlog.umeng.com\$' $SRC/webroot/index.html && ok "block_sdk_telemetry checkCmd 用自身域名判定" || no "block_sdk_telemetry checkCmd 未用自身域名"
 # 8b) 第三方 SDK 遥测开关三处齐全（域名定义 / 开机复核 / WebUI 卡片）
