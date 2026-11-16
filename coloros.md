@@ -470,3 +470,116 @@ cron 验收   手动跑 bindhosts --force-update 后：标记段仍 1、241734 �
 4. **依赖顺序就是正确性**：「先读后断」与「先断后读」结果差 7 MB 数据
 5. **第三方模块的定时任务要当环境事实对待**：每天 10:00 的一次 cron 足以让功能静默失效，
    验证不能只看「刚装完那一刻」
+
+---
+
+## 事故：测试脚本切片越界 → 在真机上执行了大半截 `service.sh`（2026-11-16）
+
+### 现象
+
+为验证「`bootfix_masterkey` 关掉后 `service.sh` 是否真的不碰该包」，写了个 harness：
+从已装 `service.sh` 里切出 bootfix 那一段，配假 config 执行。切片用「小节标题含 `1.`」判定结束位置。
+实际切出 **248 行**，以 root（`u:r:ksu:s0`）在真机跑完，其中包含
+`service.sh` 第 152-154 行的 `( sleep 8; cloud_hosts_apply ) &`。
+
+结果：`/system/etc/hosts` 上叠出第二层 bind（`mntid=606 parent=372` 压在 `mntid=372 parent=55` 之上，
+两层 `root` 都是 `/adb/logd_disabler/hosts.cloud`）。
+
+### 影响（诚实分级）
+
+- **功能无差异**：两层指向同一个文件 `hosts.cloud`（mtime 20:45:33 未被改写，标记段内 101 个域名不变），
+  解析行为完全相同。
+- **真实风险在卸载**：`uninstall.sh` 只卸一层 → 卸完仍有一层残留，域名拦截会残留到下次重启。
+- **包状态未变**：116 个已禁用包与测试前快照 `comm -3` 为空。原因是 harness 缺桩函数
+  （`pkg_live_state` / `record_orig` / `bootstrap_orig_states` 报 not found），各分支全走了 `⏭️ 跳过`。
+- **诚实边界**：无法证明那一分钟内没有 disable→enable 的瞬时写；只能说最终集合一致，
+  且 `package-restrictions.xml` 的写是幂等的。
+
+### 复原与验证
+
+```
+umount /system/etc/hosts                 → rc=0
+挂载层数                                 1（mntid=372）
+顶层 inode                               1358820 == /data/adb/logd_disabler/hosts.cloud 的 inode
+标记段 / 域名                            起止各 1 / 101 个
+hosts.cloud mtime                        2026-11-16 20:45:33（未被改写）
+已禁用包                                 116，与快照 comm 空
+温控 disabled zone / mediametrics       31 / running(18568, mtime 2026-01-09)
+logd / update_engine                     stopped(二进制 size=1) / stopped
+config.json md5                          b25ec8f2…（与快照一致）
+pkg_orig_state.txt                       74 行，mtime 2026-10-18
+重复挂载目标                             仅 /linkerconfig（系统自带）
+```
+
+修正后的 harness 加了三道护栏，任一不满足即拒绝运行：
+① 从 `BOOTFIX_PKG=` 向上找 `if`、按 `if/fi` 配平切片（不靠行号、不靠子串）；
+② 块必须 ≤ 40 行且含 `BOOTFIX_PKG` 与 `is_off`；
+③ 块内不得出现 `mount` / `setprop` / `pkill` / `stop` / `cloud_hosts` / `ALL_KEYS` / `disable_pkg` / `kill_pkg_procs`。
+另外 `pm` / `am` 全部替换为只打印的桩——即使前三条失效也动不了真机。
+
+护栏的失败路径已演示：改前那一版切出 248 行、含 `pkill` 与 `disable_pkg` → 直接 `FATAL` + `rc=1`，
+一行命令都没执行。改后切出 21 行（第 334-354 行），三个样本结果正确：
+
+| 样本 | 输出 |
+|---|---|
+| `bootfix_masterkey: false` | `[BootFix] 开关 bootfix_masterkey=false（用户已在 WebUI 关闭）→ 不碰 com.wifi.masterkey.lite` |
+| 键缺失 | `[BootFix] ... 不在包列表（已禁用/卸载或不存在），无需处理` |
+| 真机 config（键=true） | 同「键缺失」 |
+
+### 教训
+
+1. **「抽一段代码出来测试」= 执行那段代码**。`service.sh` 是有副作用的脚本，抽片段等于在真机上跑片段，
+   哪怕你只想看一个 `if`。要么整脚本在桩环境里跑（所有外部命令换成打印），要么别跑。
+2. **结构性判断禁用子串匹配**：`'1.' in s` 会被 `11.`、`0.1` 命中。切片只能靠**配平**（`if/fi`、`{}`）
+   或**精确整行常量**，并断言切出长度合理。
+3. **护栏要能证明自己会拦**：本次第一版 harness 写完就跑了，没做失败路径演示；第二版先确认
+   「喂越界切片 → FATAL + 非零退出」才敢用。检查类工具的绿灯在演示失败路径前不算证据。
+4. **事故后先量变化，再谈影响**：先比包集合、挂载层数、inode、mtime（都是可枚举的硬指标），
+   再说「有没有危害」。凭「感觉没变」不算。
+5. **挂载复原的验收标准是 inode 一致**，不是「内容看起来对」——内容对但生效层是别人的文件照样算没复原。
+
+---
+
+## 检查器陷阱：`raw.githubusercontent.com` 缓存让「已收录」被读成「未同步」（2026-11-16）
+
+### 现象
+
+本模块 2026-11-16 20:49:48 审核通过（`status: listed`）。但同一时刻读
+`https://raw.githubusercontent.com/KernelSU-Modules/repo/main/status.json` 得到：
+
+```
+maxVersionCode: null      stable: null      lastSuccessAt: null
+```
+
+与 `sources.lock.json` 的 `maxVersionCode: 62` / `health.lastSuccessAt: 2026-11-16T12:50:15Z` 直接矛盾。
+若只看 raw 这一份，会得出错误结论「审核过了但同步没跑、客户端还看不到」。
+
+### 根因
+
+`raw.githubusercontent.com` 走 Fastly 缓存，**加 `?cb=<epoch>` 也不保证能破**（实测未破）。
+换 `https://cdn.jsdelivr.net/gh/KernelSU-Modules/repo@main/status.json` 取到的是真值：
+
+```
+health: ok    lastSuccessAt: 2026-11-16T12:50:15.693Z
+maxVersionCode: 62    stable: {tag: v2.3.29, versionCode: 62, publishedAt: 2026-11-16T12:37:00Z}
+```
+
+### 正确的取证顺序（本模块已实测）
+
+| 顺序 | 来源 | 能回答什么 |
+|---|---|---|
+| ① | 数据仓库 `modules/<id>.yaml` | `status: listed` / `review.decision: approved` / 审核人与时间 |
+| ② | `sources.lock.json` → `modules.<id>` | `maxVersionCode`、`health.lastSuccessAt`、**资产 sha256 digest**（最全，且是给客户端用的锁文件） |
+| ③ | `status.json`（**必须经 jsDelivr 或 API**） | 站点健康态、`stable` 版本 |
+| ④ | 站点详情页 + 首页索引 | 用户实际看到的版本与 Download 链接 |
+
+三方交叉验证的锚点是 **sha256**：`sources.lock.json` 的 digest、详情页显示的 sha256、
+本地对下载资产实测的 sha256 必须三者相同。本次三者均为
+`4ebad2ba0dec00bbbe3217ce4cb34c073734def5600732b8944b781982733ead`，才敢下「已收录且资产一致」的结论。
+
+### 教训
+
+1. **同一 URL 读到旧值 ≠ 数据不存在**：与「0 命中先证明模式有效」同源。任何「没有 / 未同步 / 未收录」
+   的结论，换通道（jsDelivr / API / 站点页面）复验一次再下。
+2. **CDN 缓存是有状态的**：讲不出「我用了哪条通道」的读数，不能当证据写进结论。
+3. **锁文件优先于状态文件**：`sources.lock.json` 才是客户端取版本与摘要的依据，`status.json` 只是展示层。
