@@ -574,6 +574,96 @@ done
 #   logd.logpersistd / logd.logpersistd.enable / persist.logd.disabled 均【0 命中】，
 #   且全机 lib64 与 init rc 也无读取方 → 属空转，删除。
 # 真正起作用的是：bind 覆盖二进制（post-fs-data）+ stop/pkill + ctl.stop（init 控制属性）。
+
+# ===================== metamodule 覆盖补偿（v2.3.30 · COS17 适配） =====================
+# 【为什么需要这一段】KernelSU 官方时序（kernelsu.org/guide/metamodule.html）：
+#   同一轮 post-fs-data 里，第 4 步跑模块脚本、第 6 步才跑 metamodule 的 metamount.sh。
+#   本模块在 post-fs-data.sh 里对 /system/bin/* 做的 bind，会被随后挂上的
+#   「KSU /system/bin tmpfs」整体遮蔽：路径重新指到原厂二进制，
+#   而 /proc/mounts 里那条 bind 记录【仍然存在】→ 只数挂载条数 = 假绿（本机已复现）。
+#   （/system_ext/bin、/vendor/bin 是否同样被遮蔽：未实测，故一并按尺寸复核。）
+# 【本段做什么】在本阶段（late_start，晚于 metamount.sh）按【覆盖源尺寸】复核：
+#   目标尺寸 ≠ 源尺寸 → 再 bind 一次。幂等：已生效的目标尺寸本来就等于源尺寸。
+# 【判据为什么用尺寸】dummy 是空文件（touch 创建 = 0 字节；老版本遗留内容时实测 1 字节），
+#   任何真实二进制都不可能这么小；而"挂载条数"会被遮蔽残留污染，不能当生效证据。
+#   注意：判据必须拿【实际 dummy 尺寸】比，不能写死 0 或 1（两种值都真实存在）。
+# 【范围】只补本模块自己的 4 类共 17 个目标：logd 5 / OTA 2 / 数据采集 6 / WiFi conf 4。
+#   mediametrics 绝不在清单内（v2.3.10 关键回归项：bind 它会让 Oboe/AAudio 静音 + ANR）。
+# 【WiFi conf 判据不同】模块自带 conf 与原厂同尺寸（431/403 字节、只差 1 个字节），
+#   尺寸判据失效 → 改用 LOG_PATH_FLAG 是否为 0 判定。
+# 【回滚】uninstall.sh 的 umount 段已覆盖全部目标；重启也会重跑 post-fs-data。
+_MF_FIXED=0
+_mf_bind_dummy() {
+    # $1=目标路径  $2=dummy 源  $3=所属开关（仅用于日志）
+    [ -e "$1" ] || return 0
+    _mf_ssz=$(stat -c %s "$2" 2>/dev/null); _mf_tsz=$(stat -c %s "$1" 2>/dev/null)
+    [ -n "$_mf_ssz" ] && [ -n "$_mf_tsz" ] || return 0
+    [ "$_mf_tsz" = "$_mf_ssz" ] && return 0     # 尺寸已等于 dummy = 已生效
+    if mount -o bind "$2" "$1" 2>/dev/null; then
+        _mf_asz=$(stat -c %s "$1" 2>/dev/null)
+        if [ "$_mf_asz" = "$_mf_ssz" ]; then
+            log "[MetaFix] 补绑成功 $1（$3）：$_mf_tsz → $_mf_asz 字节"
+            _MF_FIXED=$((_MF_FIXED + 1))
+        else
+            log "[MetaFix] ⚠️ 补绑后尺寸仍不符 $1（$3）：期望 $_mf_ssz 实测 ${_mf_asz:-读取失败}"
+        fi
+    else
+        log "[MetaFix] ❌ 补绑失败 $1（$3），当前尺寸 $_mf_tsz"
+    fi
+}
+_mf_bind_flag0() {
+    # $1=目标 conf  $2=覆盖源 conf  $3=所属开关（仅用于日志）
+    [ -e "$1" ] || return 0
+    grep -qE '^LOG_PATH_FLAG[[:space:]]*=[[:space:]]*0' "$1" 2>/dev/null && return 0
+    if mount -o bind "$2" "$1" 2>/dev/null; then
+        if grep -qE '^LOG_PATH_FLAG[[:space:]]*=[[:space:]]*0' "$1" 2>/dev/null; then
+            log "[MetaFix] 补绑成功 $1（$3）：LOG_PATH_FLAG=$(grep -E 'LOG_PATH_FLAG' "$1" 2>/dev/null | tr -d '\r')"
+            _MF_FIXED=$((_MF_FIXED + 1))
+        else
+            log "[MetaFix] ⚠️ 补绑后 LOG_PATH_FLAG 仍非 0: $1（$3）"
+        fi
+    else
+        log "[MetaFix] ❌ 补绑失败 $1（$3）：LOG_PATH_FLAG=$(grep -E 'LOG_PATH_FLAG' "$1" 2>/dev/null | tr -d '\r')"
+    fi
+}
+_mf_apply() {
+    if [ ! -f "$WORK_DIR/dummy" ]; then
+        log "[MetaFix] ⚠️ 未找到 $WORK_DIR/dummy，跳过覆盖补偿"
+        return 0
+    fi
+    # 环境取证（只留日志证据，不参与判断）
+    _mf_mm="无"; [ -d /data/adb/metamodule ] && _mf_mm="存在"
+    log "[MetaFix] 环境: metamodule=$_mf_mm /system/bin 挂载行=$(grep -c ' /system/bin ' /proc/mounts 2>/dev/null || true)"
+    if is_on "disable_logd"; then
+        for _mf_b in /system/bin/logd /system/bin/logcat /system/bin/logpersist.start /system/bin/logpersist.stop /system/bin/logtagd; do
+            _mf_bind_dummy "$_mf_b" "$WORK_DIR/dummy" "disable_logd"
+        done
+    fi
+    if is_on "block_ota"; then
+        for _mf_b in /system/bin/update_engine /system/bin/update_engine_client; do
+            _mf_bind_dummy "$_mf_b" "$WORK_DIR/dummy" "block_ota"
+        done
+    fi
+    if is_on "disable_data_collection"; then
+        for _mf_b in /system_ext/bin/midasd /system_ext/bin/ostatsd /system_ext/bin/ostats_pullerd \
+                     /system_ext/bin/ostats_tpd /system_ext/bin/criticallog /vendor/bin/subsystem_ramdump; do
+            _mf_bind_dummy "$_mf_b" "$WORK_DIR/dummy" "disable_data_collection"
+        done
+    fi
+    if is_on "disable_wifi_log"; then
+        _mf_src_a="$MODDIR/cnss_diag_off.conf"
+        _mf_src_b="$MODDIR/cnss_diag_always_on_off.conf"
+        _mf_pa="$WORK_DIR/cnss_diag.persist.conf"
+        _mf_pb="$WORK_DIR/cnss_diag_always_on.persist.conf"
+        [ -f "$_mf_src_a" ] && _mf_bind_flag0 /odm/etc/wifi/cnss_diag.conf "$_mf_src_a" "disable_wifi_log"
+        [ -f "$_mf_src_b" ] && _mf_bind_flag0 /odm/etc/wifi/cnss_diag_always_on.conf "$_mf_src_b" "disable_wifi_log"
+        [ -f "$_mf_pa" ] && _mf_bind_flag0 /mnt/vendor/persist/wlan/cnss_diag.conf "$_mf_pa" "disable_wifi_log"
+        [ -f "$_mf_pb" ] && _mf_bind_flag0 /mnt/vendor/persist/wlan/cnss_diag_always_on.conf "$_mf_pb" "disable_wifi_log"
+    fi
+    log "[MetaFix] 复核完成：补绑 $_MF_FIXED 个目标（已生效的自动跳过；0 = 无遮蔽或本来就已生效）"
+}
+_mf_apply
+
 if is_on "disable_logd"; then
     log "[Logd] 启用：杀进程..."
     stop logd 2>/dev/null
@@ -825,7 +915,9 @@ if is_on "disable_thermal_control"; then
     log "[Thermal] 首轮 zone=$_zn cooling=$_cn，5 秒后复核一轮（防温控服务回写）..."
     sleep 5
     _thermal_apply
-    log "[Thermal] 复核轮 zone=$_zn cooling=$_cn；快照行数=$(wc -l < "$SNAP" 2>/dev/null) (期望 72)"
+    # 【v2.3.30】72 只是 COS16 上的白名单 zone+cooling 命中数，不同机型/内核温控节点数不同，
+    #   写死会误报"没生效"。改为只记录本次实际命中数，判据看 _zn/_cn 是否 >0。
+    log "[Thermal] 复核轮 zone=$_zn cooling=$_cn；快照行数=$(wc -l < "$SNAP" 2>/dev/null) (无固定期望值；COS16 实测命中 72，仅供对照，判据 = _zn>0 且 _cn>0)"
 else
     log "[Thermal] 关闭：zone/阀门由开机默认值自然恢复；oiface 属性回写见 post-fs-data.sh"
 fi
@@ -939,9 +1031,16 @@ log "[复核][WiFi] 属性观测 fulldump=$(getprop persist.sys.oplus.wifi.fulld
 log "[复核][BtLog] /proc/mounts 挂载数=$(grep -c 'bluetooth/logs' /proc/mounts 2>/dev/null || true) (期望 1)"
 log "[复核][BtLog] 目录上下文=$(ls -Zd /data/misc/bluetooth/logs 2>/dev/null || echo 读取失败) (期望 bluetooth_logs_data_file)"
 log "[复核][BtLog] tmpfs 内文件数=$(ls -A /data/misc/bluetooth/logs 2>/dev/null | wc -l) (>0 正常：BT 在 tmpfs 内新建，磁盘旧日志已被遮蔽)"
-log "[复核][DataCollection] bind 挂载数=$(grep -cE ' /(system_ext/bin/(midasd|ostatsd|ostats_pullerd|ostats_tpd|criticallog)|vendor/bin/subsystem_ramdump) ' /proc/mounts 2>/dev/null || true) (期望 6)"
-log "[复核][DataCollection] 被覆盖二进制尺寸=$(stat -c %s /system_ext/bin/midasd 2>/dev/null)/$(stat -c %s /system_ext/bin/criticallog 2>/dev/null) (bind 后应为 dummy 尺寸，非原始 2029056/81728)"
-log "[复核][DataCollection] mediametrics 未被覆盖: size=$(stat -c %s /system/bin/mediametrics 2>/dev/null) (期望 18568 = 原始值) init.svc=[$(getprop init.svc.mediametrics 2>/dev/null)] (期望 running，否则 AAudio/Oboe 应用会无声+ANR)"
+# 【v2.3.30】挂载条数不再当生效判据：装了 metamodule 时，被 tmpfs 遮蔽的 bind 记录
+#   仍留在 /proc/mounts（本机复现）→ 条数=6 也可能完全没生效。生效判据改为「尺寸 == dummy」。
+log "[复核][DataCollection] bind 挂载数=$(grep -cE ' /(system_ext/bin/(midasd|ostatsd|ostats_pullerd|ostats_tpd|criticallog)|vendor/bin/subsystem_ramdump) ' /proc/mounts 2>/dev/null || true) (期望 6 = 无 metamodule 时的正常值；⚠️ 被遮蔽后条数仍为 6，故本行只作参考，不作判据)"
+_dc_dummy=$(stat -c %s "$WORK_DIR/dummy" 2>/dev/null)
+_dc_sz=""
+for _dc_b in /system_ext/bin/midasd /system_ext/bin/ostatsd /system_ext/bin/ostats_pullerd /system_ext/bin/ostats_tpd /system_ext/bin/criticallog /vendor/bin/subsystem_ramdump; do
+    _dc_sz="$_dc_sz $(basename "$_dc_b")=$(stat -c %s "$_dc_b" 2>/dev/null || echo 缺)"
+done
+log "[复核][DataCollection] 覆盖生效判据: 尺寸${_dc_sz} (全部 == dummy ${_dc_dummy:-?} 字节才算生效；COS16 实测原值 midasd=2029056 criticallog=81728，仅供对照)"
+log "[复核][DataCollection] mediametrics 未被覆盖: size=$(stat -c %s /system/bin/mediametrics 2>/dev/null) 挂载=$(grep -c ' /system/bin/mediametrics ' /proc/mounts 2>/dev/null || true) (判据 = 挂载 0 且尺寸 != dummy 尺寸 ${_dc_dummy:-?} 字节；实测原值 COS16=18568 / COS17=18648，随版本变，勿写死) init.svc=[$(getprop init.svc.mediametrics 2>/dev/null)] (期望 running，否则 AAudio/Oboe 应用会无声+ANR)"
 log "[复核][DataCollection] init.svc midasd=[$(getprop init.svc.midasd 2>/dev/null)] ostatsd=[$(getprop init.svc.ostatsd 2>/dev/null)] ostats_pullerd=[$(getprop init.svc.ostats_pullerd 2>/dev/null)] ostats_tpd=[$(getprop init.svc.ostats_tpd 2>/dev/null)] criticallog=[$(getprop init.svc.criticallog 2>/dev/null)] (期望 stopped 或空，绝不能 running)"
 log "[复核][DataCollection] 残留进程数=$(pidof midasd ostatsd ostats_pullerd ostats_tpd criticallog subsystem_ramdump 2>/dev/null | wc -w) (期望 0)"
 # 【v2.3.11】期望值随开关动态：以前这里写死"期望 8"，父开关关闭走"恢复"分支时

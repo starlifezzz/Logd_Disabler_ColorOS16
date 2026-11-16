@@ -35,8 +35,11 @@ pmx() {
 # 汇总 service.sh 中所有可能被禁用的包（PKG_TABLE + 特殊块 + 总开关）
 ui_print "- 恢复被禁用的包..."
 # 注意：下面是「超集清单」，允许包含 service.sh 已不再主动禁用的历史包。
-#   例：livepicker 曾被旧版本禁用，新版虽不再主动禁，但升级过的设备上仍是禁用态，
-#   卸载时必须确保它被启用，否则永久禁着。多恢复几个包无害。
+#   ★ 两个"死包名"【不可删】，删了会让老用户永久被禁：
+#     - com.android.wallpaper.livepicker —— fd4e530 从主题组移出，旧版曾禁用
+#     - com.coloros.sceneservice         —— cfed859 前后两次移出，旧版曾禁用
+#   这两个包在 service.sh / post-fs-data.sh / webroot 里 0 引用（已核），
+#   只在本清单保留；升级过的设备上它们可能仍是禁用态，卸载时必须确保被启用。
 # 注意：本清单是 shell 词分割列表，双引号内禁止出现 # 注释——否则会被当成包名。
 ALL_PKGS="
 com.oplus.healthservice

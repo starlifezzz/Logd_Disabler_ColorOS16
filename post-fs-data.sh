@@ -490,7 +490,7 @@ log "[自检][BtLog] /proc/mounts 中 bluetooth/logs 挂载数: $(grep -c 'bluet
 log "[自检][BtLog] 目录上下文: $(ls -Zd "$BTLOG" 2>/dev/null || echo 读取失败)"
 log "[自检][BtLog] 目录属主权限: $(stat -c '%a %u:%g' "$BTLOG" 2>/dev/null || echo 读取失败)"
 log "[自检][BtLog] tmpfs 内文件数: $(ls -A "$BTLOG" 2>/dev/null | wc -l) （>0 属正常：BT 在 tmpfs 内新建文件，磁盘旧日志已被遮蔽）"
-log "[自检][DataCollection] bind 挂载数=$(grep -cE ' /(system_ext/bin/(midasd|ostatsd|ostats_pullerd|ostats_tpd|criticallog)|vendor/bin/subsystem_ramdump) ' /proc/mounts 2>/dev/null || true) (期望 6；mediametrics 已于 v2.3.10 移出清单，绝不能被 bind)"
+log "[自检][DataCollection] bind 挂载数=$(grep -cE ' /(system_ext/bin/(midasd|ostatsd|ostats_pullerd|ostats_tpd|criticallog)|vendor/bin/subsystem_ramdump) ' /proc/mounts 2>/dev/null || true) (期望 6 = 无 metamodule 时的正常值；⚠️ 装了 metamodule 时 KSU 会在本阶段之后挂 /system/bin tmpfs，此处 bind 可能被遮蔽而条数仍是 6 → service.sh 的 MetaFix 段按尺寸补绑、并据此判定真实生效)"
 log "[自检][DataCollection] 启动状态 midasd=[$(getprop init.svc.midasd 2>/dev/null)] ostatsd=[$(getprop init.svc.ostatsd 2>/dev/null)] criticallog=[$(getprop init.svc.criticallog 2>/dev/null)] (本阶段 midasd/ostats* 应为空；criticallog 可能仍 running，由 service.sh 补杀)"
 log "[自检][DataCollection] mediametrics 必须正常: init.svc=[$(getprop init.svc.mediametrics 2>/dev/null)] 挂载=$(grep -c ' /system/bin/mediametrics ' /proc/mounts 2>/dev/null || true) (期望 未被 bind，否则 AAudio/Oboe 应用会无声+ANR)"
 log "[自检][MGLRU] lru_gen.enabled=$(cat /sys/kernel/mm/lru_gen/enabled 2>/dev/null || echo 读不到) (本模块不写入；内核 CONFIG_LRU_GEN_ENABLED=y → 出厂 0x0003)"
