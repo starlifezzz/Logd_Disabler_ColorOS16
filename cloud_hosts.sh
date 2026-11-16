@@ -219,6 +219,52 @@ cloud_hosts_domains() {
         # 【诚实标注】cgi.qplus.com 与 dev-xlog-service.wanyol.com 经 AliDNS 双节点复核为
         #   NXDOMAIN（公共 DNS 无 A 记录）→ hosts 拦截大概率无效，保留仅为覆盖运营商/HTTPDNS
         #   另有解析的可能，不计入有效拦截数。
+        # ============ NOIR 0.4.4 冷扫补全（第三方 SDK 日志 20 条）============
+        # 【证据】NOIR 0.4.4 冷扫（2026-11-16）：481 包中 239 个候选 APK 全部重新拆包
+        #   （cache hits=0），每条域名均经 AliDNS DoH 查 A 记录（无解析不收录），
+        #   并逐个反查 report.csv 的 endpoints 列确认引用它的包。
+        #   【同等诚实标注】字符串常量 ≠ 运行时必然连接；未抓包、未看 DNS 日志。
+        # 【刻意不加的 11 条·必读】NOIR 归为 tracker，但本模块判断不该拦：
+        #   aweme.snssdk.com / i.snssdk.com / mon.snssdk.com
+        #     —— 抖音/头条 API 域，与既有条目「不含 aweme/ecom」的取舍一致，拦了功能失效
+        #   log.tpns.tencent.com / stat.api.tpns.tencent.com
+        #     —— 腾讯 TPNS 推送通道与统计，拦掉影响使用 TPNS 的 App 推送送达
+        #   sg.stat.appmifile.com —— 公共 DNS 为 NXDOMAIN，加了是装饰
+        #   jrlt.beacon.qq.com / pingma.qq.com —— A 记录实测为 0.0.0.1，上游已黑洞，无需重复拦
+        #   reports.exodus-privacy.eu.org —— Exodus Privacy 的提交接口，不是跟踪器
+        #   tracker-staging.ai.srv —— 非法 TLD，NOIR 提取误伤
+        #   zxid-m.mobileservice.cn —— 用途未验证（被米家、智联招聘引用），暂不收录
+        # 字节跳动：广告归因 / APM / AppLog 日志族（与已拦 rtlog.snssdk / rtapplog.snssdk 同厂）
+        echo "ad.zijieapi.com"
+        echo "apmplus.volces.com"
+        echo "applog.snssdk.com"
+        echo "log.snssdk.com"
+        # 阿里：淘宝 adashx 广告归因（引用方：高德、闲鱼）
+        echo "h-adashx.ut.taobao.com"
+        # UC / 夸克：性能与日志上报（引用方：淘宝、闲鱼）
+        echo "applog.uc.cn"
+        echo "applog-perf.uc.cn"
+        echo "applog.lc.quark.cn"
+        echo "px.ucweb.com"
+        echo "up4.ucweb.com"
+        # 腾讯灯塔备域（主域 otheve.beacon.qq.com 已拦）
+        echo "othstr.beacon.qq.com"
+        # 讯飞日志上报（引用方：OPPO 浏览器）
+        echo "log.iflytek.com"
+        # 高德日志上报
+        #   【未验证】该域仅见于 com.autonavi.minimap 的日志上报路径；是否参与定位链路未实测，
+        #   若不放心，删掉这一行即可（其余 19 条与它无依赖）。
+        echo "logs.amap.com"
+        # 七牛上传日志（引用方：虎扑）
+        echo "uplog.qbox.me"
+        # 小米小爱追踪（引用方：米家）
+        echo "tracker.xiaomixiaoai.com"
+        echo "tracker-preview.xiaomixiaoai.com"
+        # OPPO 广告区域变体（主域 stg-data.ads.heytapmobi.com 已在上方拦截；精确匹配不覆盖子域）
+        echo "stg-data-f.ads.heytapmobi.com"
+        echo "stg-data-id.ads.heytapmobi.com"
+        echo "stg-data-in.ads.heytapmobi.com"
+        echo "stg-data-sg.ads.heytapmobi.com"
     fi
 }
 

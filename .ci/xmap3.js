@@ -11,7 +11,11 @@ const W=[];F.forEach(g=>(g.items||[]).forEach(i=>W.push(i)));
 const SUB=[...new Set(W.filter(i=>i.subGroupKey).map(i=>i.subGroupKey))];
 
 // 服务端动作集合
-const acted=new Set([...sh.matchAll(/is_on\s+"?([A-Za-z0-9_]+)"?/g)].map(m=>m[1]));
+// 【v2.3.29】除 is_on 外，is_off 也是合法的服务端分支：默认启用项（bootfix_masterkey）
+// 用「键缺失=开」语义，只能写成 `if is_off "k"; then 跳过 else 动作 fi`。
+// 若只认 is_on，这类项会被误判「服务端完全不处理」。方向由 F5 单独核。
+const ACT_RE=/(?:is_on|is_off)\s+"?([A-Za-z0-9_]+)"?/g;
+const acted=new Set([...sh.matchAll(ACT_RE)].map(m=>m[1]));
 sh.match(/PKG_TABLE='([\s\S]*?)'/)[1].trim().split('\n').filter(l=>l.trim())
   .forEach(l=>acted.add(l.split('|')[0]));
 
@@ -22,7 +26,7 @@ SUB.every(k=>acted.has(k))?ok('两个一级编组 key 也在 ALL_KEYS/默认配�
 
 console.log('═══ F1b. is_on 分支分布在 service.sh / post-fs-data.sh ═══');
 const ss=fs.readFileSync(SRC+'/service.sh','utf8'), pf=fs.readFileSync(SRC+'/post-fs-data.sh','utf8');
-const inS=[...new Set([...ss.matchAll(/is_on\s+"?([A-Za-z0-9_]+)"?/g)].map(m=>m[1]))];
+const inS=[...new Set([...ss.matchAll(ACT_RE)].map(m=>m[1]))];
 const inP=[...new Set([...pf.matchAll(/is_on\s+"?([A-Za-z0-9_]+)"?/g)].map(m=>m[1]))];
 ok('service.sh 分支: '+inS.length+' 个  →  '+inS.join(', '));
 ok('post-fs-data.sh 分支: '+inP.length+' 个  →  '+inP.join(', '));
@@ -77,6 +81,19 @@ sh.includes('is_on "block_ads_and_tracking"')
   &&sh.includes('disable_pkg "com.oplus.qualityprotect" "block_ads_and_tracking"')
   &&sh.includes('enable_pkg "com.oplus.qualityprotect"')
   ?ok('block_ads: 禁 4 包（含 qualityprotect/midas 宿主，disable/enable 对称；v2.3.20 删掉 10 个空转写入）'):no('block_ads 实现不全');
+
+console.log('═══ F7. 默认启用项（is_off 语义）专检 ═══');
+const dOn=W.filter(i=>i.defaultOn).map(i=>i.key);
+dOn.length?ok('WebUI defaultOn 项: '+dOn.join(', ')):no('WebUI 无任何 defaultOn 项（与 service.sh DEFAULT_ON_KEYS 应对齐）');
+const dok=((sh.match(/^DEFAULT_ON_KEYS="([^"]*)"/m)||[])[1]||'').trim();
+dOn.join(' ')===dok
+  ?ok('WebUI defaultOn ↔ service.sh DEFAULT_ON_KEYS 一致 ['+dok+']')
+  :no(`默认开启项不一致: WebUI[${dOn.join(',')}] vs 服务端[${dok}]`);
+dOn.forEach(k=>{
+  new RegExp('is_off "'+k+'"').test(sh)
+    ?ok(`${k} 用 is_off（键缺失=开，升级用户不会丢默认值）`)
+    :no(`${k} 未用 is_off：升级用户 config 里没有这个键 → 会被当成"关"，默认值静默丢失`);
+});
 
 console.log(`\n═══ 汇总: ${P} 通过 / ${Fa.length} 失败 ═══`);
 process.exit(Fa.length?1:0);

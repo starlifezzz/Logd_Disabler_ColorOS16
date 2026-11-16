@@ -34,6 +34,10 @@ pmx() {
 # ===================== 1. 恢复全部包 =====================
 # 汇总 service.sh 中所有可能被禁用的包（PKG_TABLE + 特殊块 + 总开关）
 ui_print "- 恢复被禁用的包..."
+# 注意：下面是「超集清单」，允许包含 service.sh 已不再主动禁用的历史包。
+#   例：livepicker 曾被旧版本禁用，新版虽不再主动禁，但升级过的设备上仍是禁用态，
+#   卸载时必须确保它被启用，否则永久禁着。多恢复几个包无害。
+# 注意：本清单是 shell 词分割列表，双引号内禁止出现 # 注释——否则会被当成包名。
 ALL_PKGS="
 com.oplus.healthservice
 com.oplus.trafficmonitor
@@ -64,8 +68,6 @@ com.oplus.keyguard.clock.graffiti
 com.oplus.keyguard.personality.clocks
 com.oplus.keyguard.style.widgets
   com.heytap.pictorial
-  # 恢复清单为超集：livepicker 曾被旧版本禁用，新版虽不再主动禁，
-  # 但卸载时仍须确保启用（升级过的设备否则永久禁着）——保留无害
   com.android.wallpaper.livepicker
   com.oplus.networksense
 com.oplus.cellularqoe

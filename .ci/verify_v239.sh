@@ -47,11 +47,12 @@ grep -n 'echo 0x' $SRC/service.sh $SRC/post-fs-data.sh $SRC/customize.sh $SRC/bo
 echo "═══ C. 开关数量与同步 ═══"
 AK=$(grep -m1 'ALL_KEYS="' $SRC/service.sh | sed 's/.*ALL_KEYS="//;s/".*//')
 N=$(echo $AK | wc -w)
-[ "$N" = "37" ] && ok "ALL_KEYS 数量 = 37" || no "ALL_KEYS = $N (期望 37)"
+[ "$N" = "38" ] && ok "ALL_KEYS 数量 = 38" || no "ALL_KEYS = $N (期望 38)"
 AK2=$(grep -m1 -A0 'ALL_KEYS="' $SRC/service.sh | head -1)
 C1=$(grep -c 'ALL_KEYS="' $SRC/service.sh); [ "$C1" = "2" ] && ok "ALL_KEYS 出现 2 处" || no "ALL_KEYS 出现 $C1 处"
 grep -m1 'ALL_KEYS="' $SRC/service.sh | grep -q enable_mglru && no "ALL_KEYS 仍含 enable_mglru" || ok "ALL_KEYS 已无 enable_mglru"
-grep -m1 -A0 '' /dev/null; sed -n '101p' $SRC/service.sh | grep -q enable_mglru && no "ALL_KEYS#2 仍含" || ok "ALL_KEYS#2 已无 enable_mglru"
+# 【不再按行号取】原写法 sed -n '101p' 一旦 service.sh 增删行就指向别的行 → 假绿。改为统计两处赋值串
+[ "$(grep -c 'ALL_KEYS=".*enable_mglru' $SRC/service.sh)" = "0" ] && ok "ALL_KEYS 两处均无 enable_mglru" || no "ALL_KEYS#2 仍含 enable_mglru"
 
 echo "═══ D. FEATURES ↔ ALL_KEYS 一一对应 ═══"
 python3 - "$SRC" "$T" <<'PY'
@@ -68,13 +69,13 @@ extra=[k for k in feats if k not in ak]
 missing=[k for k in ak if k not in feats]
 open(f'{tmp}/feat.txt','w').write("%d\n%s\n%s\n" % (len(feats), ','.join(extra), ','.join(missing)))
 print(f"  FEATURES keys = {len(feats)}")
-if not extra and not missing and len(feats)==37:
-    print(f"  ✅ FEATURES == ALL_KEYS == 37，无缺无多")
+if not extra and not missing and len(feats)==38:
+    print(f"  ✅ FEATURES == ALL_KEYS == 38，无缺无多")
 else:
     print(f"  ❌ extra={extra} missing={missing}")
 PY
-[ "$(sed -n 1p $T/feat.txt)" = "37" ] && [ -z "$(sed -n 2p $T/feat.txt)" ] && [ -z "$(sed -n 3p $T/feat.txt)" ] \
-  && ok "FEATURES ↔ ALL_KEYS 一致(37)" || no "FEATURES ↔ ALL_KEYS 不一致"
+[ "$(sed -n 1p $T/feat.txt)" = "38" ] && [ -z "$(sed -n 2p $T/feat.txt)" ] && [ -z "$(sed -n 3p $T/feat.txt)" ] \
+  && ok "FEATURES ↔ ALL_KEYS 一致(38)" || no "FEATURES ↔ ALL_KEYS 不一致"
 
 echo "═══ E. 核心功能仍完整 ═══"
 BINS="midasd ostatsd ostats_pullerd ostats_tpd criticallog subsystem_ramdump"
@@ -716,7 +717,7 @@ grep -q '^bootstrap_orig_states$' $SRC/service.sh && ok "bootstrap_orig_states �
 BL=$(sed -n '/^bootstrap_orig_states() {/,/^}/p' $SRC/service.sh)
 echo "$BL" | grep -q 'orig_state_of "$_pkg"' && ok "自举幂等合并（跳过已有记录）" || no "自举会覆盖已有基线（危险：把用户操作当基线）"
 echo "$BL" | grep -q 'com.wifi.masterkey.lite' && ok "自举覆盖 bootfix 包（masterkey）" || no "自举漏 bootfix 包"
-echo "$BL" | grep -qF '[ "$_k" = "_bootfix" ] && _on=1' && ok "_bootfix 按模块负责认领（卸载必还原 masterkey）" || no "_bootfix 未按模块负责认领（升级用户 masterkey 不还原）"
+echo "$BL" | grep -qF 'if [ "$_k" = "_bootfix" ] && ! is_off "bootfix_masterkey"; then _on=1; fi' && ok "_bootfix 仅在开关开启时按模块负责认领（关闭则不碰用户原状）" || no "_bootfix 认领未跟随 bootfix_masterkey 开关"
 # 5) uninstall 侧按基线回滚 + 清理基线文件
 grep -q 'ORIG_STATE_FILE="$WORK_DIR/pkg_orig_state.txt"' $SRC/uninstall.sh && ok "uninstall 读取同一基线表" || no "uninstall 未接基线表"
 grep -q 'rm -f "$ORIG_STATE_FILE"' $SRC/uninstall.sh && ok "uninstall 清理基线文件（零残留）" || no "uninstall 未清理基线文件"

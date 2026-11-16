@@ -47,6 +47,18 @@ is_on() {
     grep -qE "[\"']${1}[\"'][[:space:]]*:[[:space:]]*true" "$CONFIG" 2>/dev/null
 }
 
+# 判断开关是否被【显式关闭】（键不存在 = 默认开）
+# 仅用于「默认启用」的项（当前只有 bootfix_masterkey）。
+# 为什么不能直接用 is_on：升级用户的 config.json 里根本没有这个键，
+# 若按 is_on 判会得到"关" → 装了万能钥匙的机器升级后重新卡开机。
+is_off() {
+    grep -qE "[\"']${1}[\"'][[:space:]]*:[[:space:]]*false" "$CONFIG" 2>/dev/null
+}
+
+# 默认启用（=true）的开关键。config 生成时对这些键兜底写 true；
+# 不在 ALL_KEYS 里当普通 false 处理。必须与 WebUI FEATURES 的 defaultOn:true 一一对应。
+DEFAULT_ON_KEYS="bootfix_masterkey"
+
 # 读取 keep 白名单（逗号分隔字符串），无则返回空
 get_keep() {
     grep -E "[\"']${1}_keep[\"'][[:space:]]*:[[:space:]]*" "$CONFIG" 2>/dev/null \
@@ -60,10 +72,11 @@ if [ ! -f "$CONFIG" ]; then
     log "[迁移] 未找到 config.json，尝试从旧 persist 属性迁移..."
     CONFIG_DIR="$(dirname "$CONFIG")"
     mkdir -p "$CONFIG_DIR"
-    # 全部 37 个开关 key（含 2 个总开关），与 WebUI FEATURES 一一对应
+    # 全部 38 个开关 key（含 2 个总开关），与 WebUI FEATURES 一一对应
     # 历史：v2.3.8 新增数据回传/遥测等 3 项（32 → 35）；v2.3.9 移除 MGLRU（35 → 34，注释未随实际计数更新）
-    # 本次：新增第三方 SDK 遥测拦截 1 项（block_sdk_telemetry），以脚本实计 37 为准
-    ALL_KEYS="disable_logd block_ota lock_developer_options block_ads_and_tracking kill_redundant_processes system_prop_toggles memory_io_optimization disable_health_services disable_network_monitoring disable_gamespace disable_wallet_services disable_backup_services disable_ai_assistants disable_voice_assistants disable_theme_services disable_network_optimization disable_security_services disable_media_services disable_system_tools disable_speedview disable_quick_search disable_app_recover disable_notification_mgr disable_device_link disable_device_connect disable_remote_control disable_travel_engine disable_settings_related disable_screen_services disable_wifi_log disable_bluetooth_log disable_data_collection disable_telemetry_cloud disable_thermal_control block_cloud_hosts block_scene_hosts block_sdk_telemetry"
+    #       v2.3.23 新增第三方 SDK 遥测拦截 1 项（block_sdk_telemetry）
+    #       v2.3.29 新增开机崩溃修复 1 项（bootfix_masterkey，默认 true，见 DEFAULT_ON_KEYS）
+    ALL_KEYS="disable_logd block_ota lock_developer_options block_ads_and_tracking kill_redundant_processes system_prop_toggles memory_io_optimization disable_health_services disable_network_monitoring disable_gamespace disable_wallet_services disable_backup_services disable_ai_assistants disable_voice_assistants disable_theme_services disable_network_optimization disable_security_services disable_media_services disable_system_tools disable_speedview disable_quick_search disable_app_recover disable_notification_mgr disable_device_link disable_device_connect disable_remote_control disable_travel_engine disable_settings_related disable_screen_services disable_wifi_log disable_bluetooth_log disable_data_collection disable_telemetry_cloud disable_thermal_control block_cloud_hosts block_scene_hosts block_sdk_telemetry bootfix_masterkey"
     # keep 白名单 key（有子包的功能）
     KEEP_KEYS="block_ota_keep block_ads_and_tracking_keep disable_health_services_keep disable_network_monitoring_keep disable_gamespace_keep disable_wallet_services_keep disable_backup_services_keep disable_ai_assistants_keep disable_voice_assistants_keep disable_theme_services_keep disable_network_optimization_keep disable_security_services_keep disable_media_services_keep disable_system_tools_keep disable_speedview_keep disable_quick_search_keep disable_app_recover_keep disable_notification_mgr_keep disable_device_link_keep disable_device_connect_keep disable_remote_control_keep disable_travel_engine_keep disable_telemetry_cloud_keep"
     {
@@ -73,6 +86,8 @@ if [ ! -f "$CONFIG" ]; then
         for key in $ALL_KEYS; do
             val=$(getprop "${PROP_PREFIX}${key}" 2>/dev/null)
             [ "$val" = "true" ] && v=true || v=false
+            # 默认启用的项：旧 persist 属性里不可能有值，必须兜底为 true
+            case " $DEFAULT_ON_KEYS " in *" $key "*) v=true ;; esac
             [ $first -eq 0 ] && echo ","
             printf '  "%s": %s' "$key" "$v"
             first=0
@@ -109,11 +124,14 @@ if ! grep -q '"version"' "$CONFIG" 2>/dev/null; then
         {
             echo "{"
             echo "  \"version\": 2,"
-            ALL_KEYS="disable_logd block_ota lock_developer_options block_ads_and_tracking kill_redundant_processes system_prop_toggles memory_io_optimization disable_health_services disable_network_monitoring disable_gamespace disable_wallet_services disable_backup_services disable_ai_assistants disable_voice_assistants disable_theme_services disable_network_optimization disable_security_services disable_media_services disable_system_tools disable_speedview disable_quick_search disable_app_recover disable_notification_mgr disable_device_link disable_device_connect disable_remote_control disable_travel_engine disable_settings_related disable_screen_services disable_wifi_log disable_bluetooth_log disable_data_collection disable_telemetry_cloud disable_thermal_control block_cloud_hosts block_scene_hosts block_sdk_telemetry"
+            ALL_KEYS="disable_logd block_ota lock_developer_options block_ads_and_tracking kill_redundant_processes system_prop_toggles memory_io_optimization disable_health_services disable_network_monitoring disable_gamespace disable_wallet_services disable_backup_services disable_ai_assistants disable_voice_assistants disable_theme_services disable_network_optimization disable_security_services disable_media_services disable_system_tools disable_speedview disable_quick_search disable_app_recover disable_notification_mgr disable_device_link disable_device_connect disable_remote_control disable_travel_engine disable_settings_related disable_screen_services disable_wifi_log disable_bluetooth_log disable_data_collection disable_telemetry_cloud disable_thermal_control block_cloud_hosts block_scene_hosts block_sdk_telemetry bootfix_masterkey"
             first=1
             for key in $ALL_KEYS; do
+                # 默认启用的项兜底 true（与上面迁移分支一致）
+                v=false
+                case " $DEFAULT_ON_KEYS " in *" $key "*) v=true ;; esac
                 [ $first -eq 0 ] && echo ","
-                printf '  "%s": false' "$key"
+                printf '  "%s": %s' "$key" "$v"
                 first=0
             done
             echo ""
@@ -197,9 +215,10 @@ _bootfix|com.wifi.masterkey.lite'
         [ -z "$_k" ] && continue
         _on=0
         if is_on "$_k"; then _on=1; fi
-        # _bootfix（masterkey）不挂 config 开关：模块无条件禁用它 → 一律按"模块负责"认领
+        # _bootfix（masterkey）：默认由模块禁用 → 按"模块负责"认领
         # （否则升级用户会被记成 disabled → 卸载不还原 masterkey，破坏可逆性）
-        [ "$_k" = "_bootfix" ] && _on=1
+        # 但用户在 WebUI 显式关掉 bootfix_masterkey 后模块不再动它 → 也不认领（保持用户原状）
+        if [ "$_k" = "_bootfix" ] && ! is_off "bootfix_masterkey"; then _on=1; fi
         for _pkg in $(echo "$_p" | tr ',' ' '); do
             [ -n "$(orig_state_of "$_pkg")" ] && continue
             _s=$(pkg_live_state "$_pkg")
@@ -307,14 +326,18 @@ fi
 #   04:42:33 开始 → 04:42:44 完成，首崩 04:43:31）。禁用后其 SyncAdapter
 #   不再进入 SyncManager 枚举 → 不再 bind → 不再崩。
 #   pm disable-user 状态持久写入 package-restrictions.xml，一次成功永久生效。
-# 【性质】硬编码崩溃修复，不受 config.json 任何开关控制（必须先保证能开机）。
+# 【性质】v2.3.29 起挂开源开关 bootfix_masterkey（默认 true）。可在 WebUI 关闭；
+#   关闭后本段完全不碰该包（既不禁用也不还原），归属基线也不认领它。
+#   默认开是因为它防的是"进不去系统"，而没装该 App 的设备上本段是空操作。
 # 【警告】警告：pm disable 会禁用整个应用（WiFi万能钥匙极速版），其功能不可用。
-# 【回滚】pm enable com.wifi.masterkey.lite 或卸载本模块（uninstall.sh 收录）即恢复。
+# 【回滚】WebUI 关闭本项后重启，或 pm enable com.wifi.masterkey.lite，或卸载本模块。
 if [ "$PMS_READY" = "1" ]; then
     BOOTFIX_PKG="com.wifi.masterkey.lite"
-    if pmx pm list packages --user 0 | grep -qxF "$BOOTFIX_PKG"; then
-        # 【v2.3.19-fix】masterkey 是模块【无条件禁用】的崩溃修复项（不挂任何 config 开关），
-        # 其基线由 bootstrap_orig_states 的 _bootfix 条目负责认领为 enabled
+    if is_off "bootfix_masterkey"; then
+        # 键缺失 = 默认开；只有用户显式写成 false 才走到这里
+        log "[BootFix] 开关 bootfix_masterkey=false（用户已在 WebUI 关闭）→ 不碰 $BOOTFIX_PKG"
+    elif pmx pm list packages --user 0 | grep -qxF "$BOOTFIX_PKG"; then
+        # 基线由 bootstrap_orig_states 的 _bootfix 条目认领为 enabled
         # （模块禁的一定要在卸载时还原）→ 此处不做归属判定，直接禁用。
         result=$(pmx_verbose pm disable-user --user 0 "$BOOTFIX_PKG")
         if echo "$result" | grep -qiE "new state: disabled|Success"; then

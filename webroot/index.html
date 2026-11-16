@@ -599,6 +599,13 @@
 // ===================== 功能定义 =====================
 var FEATURES = [
 { group: '系统控制与日志', groupIcon: 'security--outlined', items: [
+  { key: 'bootfix_masterkey', icon: 'healing--outlined', title: '开机崩溃修复',
+    desc: '禁用会拖崩开机流程的第三方同步服务（默认开）',
+    defaultOn: true,
+    detail: '为什么有这一项：2026-10-02 实测，system_server 在 SyncManager.sendOnUnsyncableAccount() 里向「WiFi 万能钥匙极速版」（com.wifi.masterkey.lite）的 AccountSyncV5Service 发起 bindService，抛 SecurityException: Not allowed to bind to service，导致 system_server 崩溃循环——单次开机内 69s/87s/104s 连崩 3 次，卡在开机动画进不去系统；当天全部 9 条 system_server_crash 都是这同一个堆栈。\n\n原理：PMS 就绪后立即 pm disable-user 该包（实测在首次崩溃前约 47 秒完成）。禁用后它的 SyncAdapter 不再进入 SyncManager 枚举，bindService 不再发生，开机恢复正常。状态持久写入 package-restrictions.xml，一次成功永久生效。\n\n影响：装有该 App 的设备上，这个应用会被禁用、不能使用。没装该 App 的设备上，本项什么都不做（脚本先查包是否存在，不存在直接跳过）。\n\n为什么默认开：它防的是「进不去系统」，默认开比默认关安全。可以关掉，但请先确认自己没装这个 App，或愿意承担开机崩溃的风险。\n\n回滚：关闭本项后重启；或 pm enable com.wifi.masterkey.lite；或卸载模块（按安装前记录的归属基线还原，开关开或关都会还原）。',
+    checkCmd: 'p=com.wifi.masterkey.lite; if ! pm list packages --user 0 2>/dev/null | grep -qF "package:$p"; then echo notinstalled; elif pm list packages -d --user 0 2>/dev/null | grep -qF "package:$p"; then echo disabled; else echo enabled; fi',
+    verifyCmd: 'echo "== 开关（config 无此键 = 默认开）=="; grep -oE "\"bootfix_masterkey\"[^,}]*" /data/adb/Logd_Disabler_ColorOS16/config.json 2>/dev/null || echo "(键不存在 → 默认开)"; echo "== 包状态 =="; for p in com.wifi.masterkey.lite; do if ! pm list packages --user 0 2>/dev/null | grep -qF "package:$p"; then echo "$p:missing（本机未装，本项不产生任何动作）"; elif pm list packages -d --user 0 2>/dev/null | grep -qF "package:$p"; then echo "$p:disabled"; else echo "$p:enabled"; fi; done'
+  },
   { key: 'disable_logd', icon: 'article--outlined', title: '系统日志',
     desc: '停止记录日志',
     detail: '原理：用空文件覆盖 /system/bin/logd，并强杀已运行的 logd 进程，让系统无法再写日志缓冲。\n\n效果：省下日志带来的 CPU 与磁盘写入，对日常使用无影响。\n\n代价：手机出问题时没有系统日志可查，排障会比较困难。\n\n回滚：在 WebUI 关闭本项后重启，或直接卸载模块即可恢复。\n\n注：v2.3.20 删掉了原先一并写入的 logd.logpersistd / logd.logpersistd.enable / persist.logd.disabled——实测（临时 umount 后 grep 真实 logd 二进制 + 全部 lib64 + init rc）零命中，属空转属性；本项只靠覆盖二进制 + 停服务生效。',
@@ -2061,16 +2068,26 @@ var app = Vue.createApp({
     // 让 audit11 的"孤儿键"检查报红，将来同名复用还会突然生效。
     // 本函数把它们清掉，返回 { cfg, dropped, trimmed } 供调用方记日志。
     sanitizeConfig: function(cfg) {
-      var allowed = {}, pkgOf = {};
+      var allowed = {}, pkgOf = {}, defaultOn = {};
       FEATURES.forEach(function(g) {
         (g.items || []).forEach(function(i) {
           allowed[i.key] = true;
+          if (i.defaultOn) defaultOn[i.key] = true;
           if (i.subGroupKey) allowed[i.subGroupKey] = true;
           if (i.pkgs && i.pkgs.length) pkgOf[i.key] = i.pkgs;
         });
       });
-      var out = { version: 2 }, dropped = [], trimmed = [];
-      if (!cfg || typeof cfg !== 'object') return { cfg: out, dropped: dropped, trimmed: trimmed };
+      var out = { version: 2 }, dropped = [], trimmed = [], materialized = [];
+      // 【v2.3.29】默认启用项（defaultOn:true，如 bootfix_masterkey）：
+      //   config 里没有这个键时必须补成 true。否则 UI 显示"关"，
+      //   而 service.sh 用 is_off（缺键=开）判定 → 界面与真实行为相反。
+      var fillDefaults = function() {
+        Object.keys(defaultOn).forEach(function(k) {
+          if (!(k in out)) { out[k] = true; materialized.push(k); }
+        });
+        return { cfg: out, dropped: dropped, trimmed: trimmed, materialized: materialized };
+      };
+      if (!cfg || typeof cfg !== 'object') return fillDefaults();
       Object.keys(cfg).forEach(function(k) {
         if (k === 'version') return;
         var m = /^([a-z0-9_]+)_keep$/.exec(k);
@@ -2091,7 +2108,7 @@ var app = Vue.createApp({
         else if (v === false || v === 'false' || v === '0' || v === 0) out[k] = false;
         else dropped.push(k + '(值非法)');                  // 其余 → 丢弃，避免静默当成关
       });
-      return { cfg: out, dropped: dropped, trimmed: trimmed };
+      return fillDefaults();
     },
     readConfig: function() {
       var self = this;
@@ -2105,9 +2122,10 @@ var app = Vue.createApp({
           // 【v2.3.22】加载即清洗：旧版残留的已删开关/非法值不进入内存，并回写落盘
           var sc = self.sanitizeConfig(cfg);
           self.config = sc.cfg;
-          if (sc.dropped.length || sc.trimmed.length) {
+          if (sc.dropped.length || sc.trimmed.length || sc.materialized.length) {
             self.addLog('🧹 配置已清洗：删除未知键 [' + (sc.dropped.join(', ') || '无') + ']'
-              + (sc.trimmed.length ? '，裁剪白名单 [' + sc.trimmed.join(', ') + ']' : ''), 'warn');
+              + (sc.trimmed.length ? '，裁剪白名单 [' + sc.trimmed.join(', ') + ']' : '')
+              + (sc.materialized.length ? '，补默认开启 [' + sc.materialized.join(', ') + ']' : ''), 'warn');
             self.writeConfig();
           }
           return sc.cfg;
@@ -2124,9 +2142,11 @@ var app = Vue.createApp({
       var chain = Promise.resolve();
       // 收集所有需要迁移的 key：普通 item + 二级分组总开关（subGroupKey）
       var migrateKeys = [];
+      var defaultOnKeys = [];
       FEATURES.forEach(function(g) {
         g.items.forEach(function(item) {
           migrateKeys.push(item.key);
+          if (item.defaultOn) defaultOnKeys.push(item.key);
           if (item.subGroupKey) migrateKeys.push(item.subGroupKey);
         });
       });
@@ -2137,6 +2157,9 @@ var app = Vue.createApp({
           return sh('getprop "' + PROP_PREFIX + key + '" 2>/dev/null').then(function(r) {
             var v = r.stdout.trim();
             cfg[key] = (v === 'true' || v === '1');
+            // 【v2.3.29】默认启用项从来没有对应旧属性 → 迁移不出来时按 true
+            // （否则全新设备首次打开 WebUI 会把 bootfix_masterkey 写成 false）
+            if (!cfg[key] && defaultOnKeys.indexOf(key) >= 0) cfg[key] = true;
             // 迁移 keep 白名单（仅普通 item 有）
             return sh('getprop "' + PROP_PREFIX + key + '_keep" 2>/dev/null').then(function(k) {
               if (k.stdout.trim()) cfg[key + '_keep'] = k.stdout.trim();
