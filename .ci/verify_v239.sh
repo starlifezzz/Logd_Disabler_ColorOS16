@@ -92,9 +92,21 @@ esac
 grep -q '完成 \$DC_OK/6' $SRC/post-fs-data.sh && ok "post-fs-data 完成计数 = /6" || no "完成计数不是 /6"
 grep -q '期望 6' $SRC/post-fs-data.sh && ok "post-fs-data 自检期望 6" || no "自检未改期望 6"
 grep -q '期望 6' $SRC/service.sh && ok "service.sh 复核期望 6" || no "复核未改期望 6"
-grep -q 'for dcproc in midasd ostatsd ostats_pullerd ostats_tpd criticallog subsystem_ramdump; do' $SRC/service.sh \
-  && ok "service.sh 杀进程清单已移除 mediametrics" || no "service.sh 杀进程清单仍含 mediametrics"
-grep -q 'mediametrics 必须存活' $SRC/service.sh && ok "service.sh 增加 mediametrics 存活复核" || no "缺 mediametrics 存活复核"
+grep -q '_dc_scan midasd ostatsd ostats_pullerd ostats_tpd criticallog subsystem_ramdump' $SRC/service.sh \
+  && ok "service.sh 杀进程清单 = 6 个采集二进制（_dc_scan 三路枚举）" || no "service.sh 杀进程清单缺失或含 mediametrics"
+# v2.3.32：pkill -9 -x 因 comm 被内核截断 15 字符，subsystem_ramdump(18) 永不匹配 → 死代码
+grep -q 'pkill -9 -x "\$dcproc"' $SRC/service.sh \
+  && no "仍用 pkill -9 -x（comm 15 字符截断，subsystem_ramdump 永不匹配，且不看返回码 = 假绿）" \
+  || ok "已弃用 pkill -9 -x（改 kill -9 <pid>）"
+grep -q '^_dc_scan()' $SRC/service.sh && ok "三路取证函数 _dc_scan 在位" || no "缺 _dc_scan 三路取证函数"
+grep -q 'mediametrics 检查' $SRC/service.sh && ok "service.sh 含 mediametrics 复核（v2.3.32 措辞）" || no "缺 mediametrics 复核"
+# v2.3.32：COS17 上 init.svc.mediametrics 为空，写死"期望 running"会假红
+grep -q '期望 running' $SRC/service.sh \
+  && no "service.sh 仍写死 mediametrics 期望 running（COS17 init.svc 为空 → 假红）" \
+  || ok "已去掉 mediametrics 期望 running（改判据 = 未被 bind）"
+grep -q "checkCmd: 'pgrep -x logd" $SRC/webroot/index.html \
+  && no "disable_logd 的 checkCmd 仍用 pgrep（进程名改写即失明）" \
+  || ok "disable_logd checkCmd 已改按 dummy 尺寸判定"
 grep -q 'mediametrics 必须正常' $SRC/post-fs-data.sh && ok "post-fs-data 增加 mediametrics 正常复核" || no "缺 mediametrics 正常复核"
 grep -q 'mediametrics 必须' $SRC/webroot/index.html && ok "WebUI verifyCmd 含 mediametrics 回归项" || no "WebUI 缺 mediametrics 回归项"
 PKGS="com.heytap.htms com.heytap.mcs com.heytap.mydevices com.oplus.pantanal.ums com.oppo.ctautoregist com.oplus.thirdkit"

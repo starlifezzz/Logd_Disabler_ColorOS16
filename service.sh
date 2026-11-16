@@ -922,6 +922,58 @@ else
     log "[Thermal] 关闭：zone/阀门由开机默认值自然恢复；oiface 属性回写见 post-fs-data.sh"
 fi
 
+# ===================== 进程枚举：三路取证（v2.3.32） =====================
+# 【为什么不能只用 pidof，也不能只用 pkill/pgrep -x】2026-11-17 一加 Ace5（COS16）实测：
+#   ① pidof 按 /proc/PID/cmdline 的 argv[0] 匹配。mediametrics 的 cmdline 实测为
+#      "media.metrics diametrics" → `pidof mediametrics` 空，`pidof media.metrics` = 2814。
+#      更严重的是它【时变】：同一 pid 2814，开机时 service.log 里 pidof 拿得到，
+#      数小时后同一条命令返回空（进程启动后改写了 cmdline）→ 单靠 pidof 判存活会漏。
+#   ② pgrep -x / pkill -x 按 comm 匹配，而内核把 comm 固定截断到 15 字符：
+#      `pkill -CONT -x hwservicemanager` rc=1（16 字符）而 `-x hwservicemanage` rc=0；
+#      因此 `pkill -9 -x subsystem_ramdump`（18 字符）永远匹配不到任何进程 = 死代码。
+#      另外 vold/netd/installd 的 comm 实测是 "Binder:vold" 这类，`pgrep -x vold` 也是空。
+#   ③ 结论：三种方法各有盲区，必须三路合并取并集。
+#      本函数只用 read < /proc/*/comm（无 fork），862 个进程实测 < 1 秒。
+_dc_scan() {
+    # 用法：_dc_scan <名字>...  结果写进 $_DC_SCAN（"pid:name" 空格分隔）
+    _DC_SCAN=""
+    [ $# -gt 0 ] || return 0
+    _dc_acc=""
+    _dc_pre=""
+    for _n in "$@"; do
+        _dc_pre="$_dc_pre $(printf '%.15s' "$_n")"
+        # 路1：init 自己的权威 pid
+        _p=$(getprop "init.svc_debug_pid.$_n" 2>/dev/null)
+        case "$_p" in ''|*[!0-9]*) _p="" ;; esac
+        [ -n "$_p" ] && _dc_acc="$_dc_acc $_p:$_n"
+        # 路2：pidof（匹配 cmdline 的 argv[0]）
+        for _q in $(pidof "$_n" 2>/dev/null); do
+            case "$_q" in ''|*[!0-9]*) continue ;; esac
+            _dc_acc="$_dc_acc $_q:$_n"
+        done
+    done
+    # 路3：遍历 /proc 比对 comm（按 15 字符前缀，与内核截断口径一致）
+    for _d in /proc/[0-9]*; do
+        _pid=${_d#/proc/}
+        case "$_pid" in ''|*[!0-9]*) continue ;; esac   # 排除 /proc/<pid>_xxx 之类非纯数字项
+        [ "$_pid" = "$$" ] && continue
+        _c=""
+        read -r _c < "$_d/comm" 2>/dev/null || continue
+        [ -n "$_c" ] || continue
+        case "$_dc_pre " in
+            *" $_c "*) ;;
+            *) continue ;;
+        esac
+        for _n in "$@"; do
+            if [ "$_c" = "$(printf '%.15s' "$_n")" ]; then
+                _dc_acc="$_dc_acc $_pid:$_n"
+                break
+            fi
+        done
+    done
+    _DC_SCAN=$(echo $_dc_acc | tr ' ' '\n' | grep -v '^$' | sort -u | tr '\n' ' ')
+}
+
 # ===================== 9. 数据回传与采集守护（v2.3.8 新增，v2.3.10 移除 mediametrics） =====================
 # 【分工】bind 空文件由 post-fs-data.sh 在开机早期完成；本段在 late_start
 #        负责杀掉【bind 之前就已启动】的残留进程，并复核最终状态。
@@ -941,16 +993,31 @@ fi
 #        oplusmemchecker）经查均不在 onservices.txt 表内，无需豁免。
 if is_on "disable_data_collection"; then
     log "[DataCollection] 杀残留进程 + 复核..."
-    # 警告：pkill -9 -x 精确名匹配；目标仅限下列 6 个采集/转储进程，可还原（关闭开关重启即恢复）
-    for dcproc in midasd ostatsd ostats_pullerd ostats_tpd criticallog subsystem_ramdump; do
-        if pidof "$dcproc" >/dev/null 2>&1; then
-            pkill -9 -x "$dcproc" 2>/dev/null
-            log "  🔪 已终止残留进程: $dcproc"
+    # 警告：目标仅限下列 6 个采集/转储进程，可还原（关闭开关重启即恢复）。
+    # 【v2.3.32】不再用 pkill -9 -x：comm 被内核截断到 15 字符，
+    #   subsystem_ramdump(18 字符) 永远匹配不到；且旧代码没检查 pkill 返回码，
+    #   日志会无条件打「已终止」= 假绿。改为先三路枚举 pid 再 kill -9 <pid>
+    #   （按 pid 精确，无名字匹配误伤风险）。
+    _dc_scan midasd ostatsd ostats_pullerd ostats_tpd criticallog subsystem_ramdump
+    _dc_killed=0
+    for _e in $_DC_SCAN; do
+        _dp=${_e%%:*}; _dn=${_e##*:}
+        if kill -9 "$_dp" 2>/dev/null; then
+            log "  🔪 已终止残留进程: $_dn (pid=$_dp)"
+            _dc_killed=$((_dc_killed + 1))
+        else
+            log "  ⚠️ 终止失败（进程可能已自行退出）: $_dn (pid=$_dp)"
         fi
     done
+    [ "$_dc_killed" = "0" ] && log "  （本阶段未发现残留进程）"
     log "[DataCollection] init.svc 复核 midasd=[$(getprop init.svc.midasd 2>/dev/null)] ostatsd=[$(getprop init.svc.ostatsd 2>/dev/null)] criticallog=[$(getprop init.svc.criticallog 2>/dev/null)] (期望 stopped 或空，绝不能 running)"
-    log "[DataCollection] 残留进程数=$(pidof midasd ostatsd ostats_pullerd ostats_tpd criticallog subsystem_ramdump 2>/dev/null | wc -w) (期望 0)"
-    log "[DataCollection] mediametrics 必须存活: init.svc=[$(getprop init.svc.mediametrics 2>/dev/null)] pid=$(pidof mediametrics 2>/dev/null || echo 无) (本模块【不禁用】此项，否则音频建流阻塞)"
+    sleep 1
+    _dc_scan midasd ostatsd ostats_pullerd ostats_tpd criticallog subsystem_ramdump
+    log "[DataCollection] 残留进程数=$(echo $_DC_SCAN | wc -w) (期望 0；三路取证 = init.svc_debug_pid + pidof + /proc comm，不用单一 pidof)"
+    _dc_scan mediametrics
+    _mm_e=${_DC_SCAN%% *}
+    _mm_pid=${_mm_e%%:*}
+    log "[DataCollection] mediametrics 检查（本模块【不禁用】此项，bind 它会让音频建流阻塞）: init.svc=[$(getprop init.svc.mediametrics 2>/dev/null)] debug_pid=[$(getprop init.svc_debug_pid.mediametrics 2>/dev/null)] pid=${_mm_pid:-未取到} (COS16 实测 running；COS17 实测 init.svc 为空 = 该服务未启动，属系统行为，不是本模块造成)"
     log "[DataCollection] 完成"
 else
     log "[DataCollection] 关闭：post-fs-data.sh 已 umount，二进制恢复原始；拉起 class main 服务..."
@@ -1040,9 +1107,10 @@ for _dc_b in /system_ext/bin/midasd /system_ext/bin/ostatsd /system_ext/bin/osta
     _dc_sz="$_dc_sz $(basename "$_dc_b")=$(stat -c %s "$_dc_b" 2>/dev/null || echo 缺)"
 done
 log "[复核][DataCollection] 覆盖生效判据: 尺寸${_dc_sz} (全部 == dummy ${_dc_dummy:-?} 字节才算生效；COS16 实测原值 midasd=2029056 criticallog=81728，仅供对照)"
-log "[复核][DataCollection] mediametrics 未被覆盖: size=$(stat -c %s /system/bin/mediametrics 2>/dev/null) 挂载=$(grep -c ' /system/bin/mediametrics ' /proc/mounts 2>/dev/null || true) (判据 = 挂载 0 且尺寸 != dummy 尺寸 ${_dc_dummy:-?} 字节；实测原值 COS16=18568 / COS17=18648，随版本变，勿写死) init.svc=[$(getprop init.svc.mediametrics 2>/dev/null)] (期望 running，否则 AAudio/Oboe 应用会无声+ANR)"
+log "[复核][DataCollection] mediametrics 未被覆盖: size=$(stat -c %s /system/bin/mediametrics 2>/dev/null) 挂载=$(grep -c ' /system/bin/mediametrics ' /proc/mounts 2>/dev/null || true) (判据 = 挂载 0 且尺寸 != dummy 尺寸 ${_dc_dummy:-?} 字节；实测原值 COS16=18568 / COS17=18648，随版本变，勿写死) init.svc=[$(getprop init.svc.mediametrics 2>/dev/null)] (空或 running 均正常：COS16 实测 running / COS17 实测空，该服务未启动属系统行为；唯一判据 = 未被 bind，bind 才会让 AAudio/Oboe 无声+ANR)"
 log "[复核][DataCollection] init.svc midasd=[$(getprop init.svc.midasd 2>/dev/null)] ostatsd=[$(getprop init.svc.ostatsd 2>/dev/null)] ostats_pullerd=[$(getprop init.svc.ostats_pullerd 2>/dev/null)] ostats_tpd=[$(getprop init.svc.ostats_tpd 2>/dev/null)] criticallog=[$(getprop init.svc.criticallog 2>/dev/null)] (期望 stopped 或空，绝不能 running)"
-log "[复核][DataCollection] 残留进程数=$(pidof midasd ostatsd ostats_pullerd ostats_tpd criticallog subsystem_ramdump 2>/dev/null | wc -w) (期望 0)"
+_dc_scan midasd ostatsd ostats_pullerd ostats_tpd criticallog subsystem_ramdump
+log "[复核][DataCollection] 残留进程数=$(echo $_DC_SCAN | wc -w) (期望 0；三路取证，见 _dc_scan 注释：pidof 会因进程改写 cmdline 而时隐时现，pkill/pgrep -x 会因 comm 截断 15 字符而失明)"
 # 【v2.3.11】期望值随开关动态：以前这里写死"期望 8"，父开关关闭走"恢复"分支时
 # 日志会打成 "状态=0 (期望 8)"，看着像禁用失败，实际是按配置正常恢复 → 误报。
 _tel_on=0; is_on "disable_telemetry_cloud" && _tel_on=1
