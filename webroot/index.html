@@ -1012,7 +1012,7 @@ var FEATURES = [
     pkgs: ['com.oplus.travelengine'],
     subNames: ['出行引擎'],
     subGroup: '设置相关', subGroupKey: "disable_settings_related",
-    detail: '原理：禁用出行引擎服务包（travelengine）。\n\n效果：出行卡片与行程后台服务停止。\n\n代价：智能出行提醒与行程卡片不可用。\n\n回滚：关闭本项后重启，或卸载模块即可恢复。',
+    detail: '原理：禁用出行引擎服务包（travelengine）。\n\n效果：出行卡片与行程后台服务停止。\n\n代价：智能出行提醒与行程卡片不可用，高德地图无法上岛显示。\n\n回滚：关闭本项后重启，或卸载模块即可恢复。',
     checkCmd: 'pm list packages -d --user 0 2>/dev/null | grep -qF "package:com.oplus.travelengine" && echo disabled || echo enabled',
     verifyCmd: 'if pm list packages -d --user 0 2>/dev/null | grep -qF "package:com.oplus.travelengine"; then echo "com.oplus.travelengine:disabled"; elif ! pm list packages --user 0 2>/dev/null | grep -qF "package:com.oplus.travelengine"; then echo "com.oplus.travelengine:missing"; else echo "com.oplus.travelengine:enabled"; fi'
   },
@@ -1021,7 +1021,7 @@ var FEATURES = [
     pkgs: ['com.heytap.accessory'],
     subNames: ['配件快连'],
     subGroup: '设置相关', subGroupKey: "disable_settings_related",
-    detail: '原理：禁用 HeyTap 配件快连服务包（accessory）。\n\n效果：新设备快连弹窗与配件管理后台停止。\n\n代价：新配件的快连配对引导不可用。\n\n回滚：关闭本项后重启，或卸载模块即可恢复。',
+    detail: '原理：禁用 HeyTap 配件快连服务包（accessory）。\n\n效果：新设备快连弹窗与配件管理后台停止。\n\n代价：新配件的快连配对引导不可用，高德地图无法在流体云显示。\n\n回滚：关闭本项后重启，或卸载模块即可恢复。',
     checkCmd: 'pm list packages -d --user 0 2>/dev/null | grep -qF "package:com.heytap.accessory" && echo disabled || echo enabled',
     verifyCmd: 'if pm list packages -d --user 0 2>/dev/null | grep -qF "package:com.heytap.accessory"; then echo "com.heytap.accessory:disabled"; elif ! pm list packages --user 0 2>/dev/null | grep -qF "package:com.heytap.accessory"; then echo "com.heytap.accessory:missing"; else echo "com.heytap.accessory:enabled"; fi'
   },
@@ -1035,19 +1035,19 @@ var FEATURES = [
     verifyCmd: 'if pm list packages -d --user 0 2>/dev/null | grep -qF "package:com.oplus.linker"; then echo "com.oplus.linker:disabled"; elif ! pm list packages --user 0 2>/dev/null | grep -qF "package:com.oplus.linker"; then echo "com.oplus.linker:missing"; else echo "com.oplus.linker:enabled"; fi'
   },
   { key: 'disable_speedview', icon: 'auto_awesome--outlined', title: '速览（负一屏）支持组件',
-    desc: '关闭速览（负一屏）及支持组件',
+    desc: '关闭速览（负一屏）及支持组件；⚠️ 会连带影响流体云展示',
     pkgs: ['com.coloros.ocs.opencapabilityservice', 'com.coloros.assistantscreen'],
     subNames: ['速览的支持组件', '速览/负一屏'],
     subDescs: [
       '速览组件开放服务（ocs.opencapabilityservice），为负一屏的第三方卡片提供数据接入通道。',
-      '速览/负一屏本体（assistantscreen），左滑负一屏页面与其内容聚合。'
+      '速览/负一屏本体（assistantscreen），左滑负一屏页面与其内容聚合；流体云声明依赖本包。'
     ],
     subDetails: [
       '原理：禁用后速览卡片的开放能力通道停止，卡片内容不再刷新。\n\n代价：负一屏卡片失效；左滑入口是否存在由下行 assistantscreen 决定。',
-      '原理：禁用后负一屏页面下线，左滑不再进入负一屏。\n\n代价：左滑负一屏不可用或显示空白；桌面主屏不受影响。'
+      '原理：禁用后负一屏页面下线，左滑不再进入负一屏。\n\n代价：左滑负一屏不可用或显示空白；流体云（colordirectservice）在 queriesPackages 里声明依赖本包，它的负一屏卡片与入口也会一并消失；桌面主屏不受影响。'
     ],
     subGroup: '屏幕服务', subGroupKey: "disable_screen_services",
-    detail: '原理：禁用负一屏（速览）的 2 个支撑包（opencapabilityservice、assistantscreen）。\n\n效果：负一屏卡片服务停止。\n\n代价：左滑负一屏不可用或显示空白。\n\n回滚：关闭本项后重启，或卸载模块即可恢复。',
+    detail: '原理：禁用负一屏（速览）的 2 个支撑包（opencapabilityservice、assistantscreen）。\n\n效果：负一屏卡片服务停止。\n\n⚠️ 连带影响流体云：com.coloros.colordirectservice（ColorDirect）的 queriesPackages 里声明依赖 com.coloros.assistantscreen，本项会把它的宿主一并下线 → 流体云的负一屏卡片与入口不再显示。\n\n代价：左滑负一屏不可用或显示空白。\n\n回滚：关闭本项后重启，或卸载模块即可恢复。',
     checkCmd: 'pm list packages -d --user 0 2>/dev/null | grep -qF "package:com.coloros.ocs.opencapabilityservice" && echo disabled || echo enabled',
     verifyCmd: 'for p in com.coloros.ocs.opencapabilityservice com.coloros.assistantscreen; do if pm list packages -d --user 0 2>/dev/null | grep -qF "package:$p"; then echo "$p:disabled"; elif ! pm list packages --user 0 2>/dev/null | grep -qF "package:$p"; then echo "$p:missing"; else echo "$p:enabled"; fi; done'
   },
